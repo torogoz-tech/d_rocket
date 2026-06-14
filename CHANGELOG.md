@@ -5,6 +5,32 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-06-13
+
+Patch release. Fixes the README's doc-link index
+on the **published package** (the pub.dev tarball
+includes the README, so the 1.0.1 fix only landed
+on GitHub). The 1.0.2 tarball carries the same
+README fix as GitHub commit `c716699`.
+
+* **14 doc links in README** pointed to
+  `blob/main/doc/0X-...` at the repo root, but
+  the docs actually live under
+  `packages/d_rocket/doc/0X-...` (the repo is a
+  monorepo with the d_rocket package under
+  `packages/`). All 14 now have the correct
+  `packages/d_rocket/` prefix.
+* **2 stale names** in the "Docs" section survived
+  the v1.0.0 rename: `@RocketTable` → `@Table`
+  in the Layer 4 bullet, and the CLI tools
+  `d_rocket:rocket_migration` / `d_rocket:rocket_closure`
+  → `d_rocket:migration` / `d_rocket:closure`.
+
+The 17 remaining `@Rocket*` / `d_rocket:rocket_*`
+references in the README are the rename-mapping
+table (lines 79-86) and the CHANGELOG entries —
+intentional historical record.
+
 ## [1.0.1] — 2026-06-13
 
 Patch release. No API changes. Fixes the
