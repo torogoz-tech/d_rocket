@@ -1,0 +1,14 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.d_rocket_serializer.g.dart"
+    - "**/*.d_rocket_rest_client.g.dart"
+    - "**/*.d_rocket_orm.g.dart"
+    # The example/ folder is its own runnable demo, not
+    # part of the library surface. It depends on the
+    # codegen-emitted bindings (a sibling `Book` stub is
+    # fine for the minimal version) and is excluded from
+    # the library analyze.
+    - "example/**"

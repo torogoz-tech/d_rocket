@@ -1,0 +1,35 @@
+# build.yaml for d_rocket (the runtime + example).
+#
+# The example at `lib/example/bookstore.dart` declares
+# `extends Record` classes (`Author`, `Book`, `Sale`) that
+# need codegen. This `build.yaml` wires the five
+# `d_rocket_builder` builders to the `d_rocket` package
+# itself so the example can be exercised with
+# `dart run lib/example/bookstore.dart`.
+#
+# The user of `d_rocket` typically has their **own**
+# `build.yaml` that points the same builders at their
+# `lib/**.dart` source tree. The `build.yaml` here is only
+# used to build + test + run the `d_rocket` package itself.
+#
+# Output suffixes (each non-default to fix the
+# HANDOFF.md §6 collision bug):
+#   - *.g.dart                       (record)
+#   - *.d_rocket_serializer.g.dart   (serializer)
+#   - *.d_rocket_rest_client.g.dart  (rest_client)
+#   - *.d_rocket_orm.g.dart          (rocket_table)
+#   - d_rocket_registry.g.dart       (record_registry)
+
+targets:
+  $default:
+    builders:
+      d_rocket_builder:record:
+        enabled: true
+      d_rocket_builder:serializer:
+        enabled: true
+      d_rocket_builder:rest_client:
+        enabled: true
+      d_rocket_builder:rocket_table:
+        enabled: true
+      d_rocket_builder:record_registry:
+        enabled: true
