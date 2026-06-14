@@ -5,7 +5,7 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] — 2026-06-12 — First stable release
+## [1.0.0] — 2026-06-12
 
 The first stable, production-ready release of `d_rocket`. The
 public API is now frozen within the `1.x` series: minor

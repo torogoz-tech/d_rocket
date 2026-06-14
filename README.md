@@ -11,7 +11,7 @@ force you to glue together half a dozen different libraries:
 | **1 — Serialization** | `@Serializable` classes with type-safe `fromJson` / `toJson`, union types, custom formatters, and policies for unknown keys. |
 | **2 — REST** | `@RestClient` interfaces with retry, backoff, rate limiting, circuit breaker, response cache, and a full interceptor chain. |
 | **3 — LINQ** | Deferred-execution `IQueryable<T>` with 40+ operators: filter, project, group, join, aggregate, set, quantifier, element, page. |
-| **4 — ORM (SQLite)** | `RocketDbContext`, change-tracked `DbSet<T>`, code-first migrations, `saveChanges()`, eager-loading `include_<T>()`, reactive `watch()`. |
+| **4 — ORM (SQLite)** | `DbContext`, change-tracked `DbSet<T>`, code-first migrations, `saveChanges()`, eager-loading `include_<T>()`, reactive `watch()`. |
 | **5 — Sync (offline-first)** | `SyncProvider` interface, `SyncOp` queue with persistence, push / pull pipelines, conflict-resolution policies. |
 | **6 — Realtime** | `@WebSocketRoute` and `@SseRoute`, typed `Stream<T>`, reconnection with exponential backoff, heartbeat. |
 
@@ -25,7 +25,7 @@ import 'package:my_app/d_rocket_registry.g.dart';
 
 void main() async {
   initializeD();
-  final db = await RocketDb.open(path: 'app.db');
+  final db = await Db.open(path: 'app.db');
   db.set<Todo>().add(Todo(id: 1, title: 'Ship d_rocket 1.0'));
   await db.saveChanges();
   final pending = await db.set<Todo>()
@@ -321,7 +321,7 @@ class Product {
 **Sealed unions** — for sum types, use `@SerializableUnion()`. The
 dispatcher reads a discriminator field and returns the right subtype.
 
-See the [Serialization guide](https://github.com/torogoz-tech/d_rocket/blob/main/docs/serialization.md)
+See the [Serialization guide](https://github.com/torogoz-tech/d_rocket/blob/main/doc/04-layer-1-serialization.md)
 for the full surface (custom formatters, `Format` enum, `JsonKey`,
 union dispatch).
 
@@ -374,7 +374,7 @@ dRest.use(AuthInterceptor(loadToken()));
 dRest.use(LoggingInterceptor());
 ```
 
-See the [REST guide](https://github.com/torogoz-tech/d_rocket/blob/main/docs/rest.md)
+See the [REST guide](https://github.com/torogoz-tech/d_rocket/blob/main/doc/05-layer-2-rest.md)
 for the full surface (`CancelToken`, mock clients, error mapping,
 streaming).
 
@@ -399,7 +399,7 @@ final top = await expensive.toListAsync_();
 
 40+ operators across filter, project, page, order, set, quantifier,
 aggregate, element, convert, join, and group. See the
-[LINQ reference](https://github.com/torogoz-tech/d_rocket/blob/main/docs/linq.md)
+[LINQ reference](https://github.com/torogoz-tech/d_rocket/blob/main/doc/06-layer-3-linq.md)
 for the complete matrix.
 
 **Push-down to SQL** — when the source is a `DbSet<T>`, the same
@@ -646,7 +646,7 @@ packages/
 ## Documentation
 
 The README is the landing page. The full reference
-lives in the [`docs/`](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/)
+lives in the [`doc/`](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/)
 folder of the source repository (it is **not** part
 of the published package; `pub publish` only ships
 `lib/`, `bin/`, `README.md`, `CHANGELOG.md`, and
@@ -654,20 +654,20 @@ of the published package; `pub publish` only ships
 
 Start here:
 
-- [Overview](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/01-overview.md) — what `d_rocket` is, the six layers, and the design philosophy.
-- [Quickstart](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/02-quickstart.md) — five minutes from `pubspec.yaml` to a working query.
-- [Installation](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/03-installation.md) — pubspec config, build_runner, platform-specific setup.
-- [Layer 1 — Serialization](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/04-layer-1-serialization.md) — `@Serializable`, `JsonNaming`, sealed unions.
-- [Layer 2 — REST](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/05-layer-2-rest.md) — `@RestClient`, resilience, interceptors.
-- [Layer 3 — LINQ](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/06-layer-3-linq.md) — `IQueryable<T>`, every operator, SQL push-down.
-- [Layer 4 — ORM (SQLite)](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/07-layer-4-orm.md) — `@RocketTable`, `DbSet<T>`, change tracking, includes, watch.
-- [Layer 5 — Sync](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/08-layer-5-sync.md) — `SyncProvider`, push / pull, conflict resolution.
-- [Layer 6 — Realtime](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/09-layer-6-realtime.md) — `@WebSocketRoute`, `@SseRoute`, reconnection.
-- [Migrations](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/10-migrations.md) — `Migration` base class, `MigrationStrategy`, CLI scaffolder.
-- [CLI tools](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/11-cli.md) — `d_rocket:rocket_migration` and `d_rocket:rocket_closure`.
-- [Cookbook](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/12-cookbook.md) — real recipes (auth, pagination, multi-tenant, FTS, soft delete, encryption, etc.).
-- [FAQ](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/13-faq.md) — common questions and migration notes.
-- [Architecture](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/docs/14-architecture.md) — internal design, codegen pipeline, extension points.
+- [Overview](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/01-overview.md) — what `d_rocket` is, the six layers, and the design philosophy.
+- [Quickstart](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/02-quickstart.md) — five minutes from `pubspec.yaml` to a working query.
+- [Installation](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/03-installation.md) — pubspec config, build_runner, platform-specific setup.
+- [Layer 1 — Serialization](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) — `@Serializable`, `JsonNaming`, sealed unions.
+- [Layer 2 — REST](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) — `@RestClient`, resilience, interceptors.
+- [Layer 3 — LINQ](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) — `IQueryable<T>`, every operator, SQL push-down.
+- [Layer 4 — ORM (SQLite)](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) — `@RocketTable`, `DbSet<T>`, change tracking, includes, watch.
+- [Layer 5 — Sync](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) — `SyncProvider`, push / pull, conflict resolution.
+- [Layer 6 — Realtime](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) — `@WebSocketRoute`, `@SseRoute`, reconnection.
+- [Migrations](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/10-migrations.md) — `Migration` base class, `MigrationStrategy`, CLI scaffolder.
+- [CLI tools](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/11-cli.md) — `d_rocket:rocket_migration` and `d_rocket:rocket_closure`.
+- [Cookbook](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/12-cookbook.md) — real recipes (auth, pagination, multi-tenant, FTS, soft delete, encryption, etc.).
+- [FAQ](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/13-faq.md) — common questions and migration notes.
+- [Architecture](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/14-architecture.md) — internal design, codegen pipeline, extension points.
 
 ## Roadmap
 
