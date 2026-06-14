@@ -211,9 +211,22 @@ class EntityMeta {
   static String _columnDdl(ColumnMeta c) {
     final StringBuffer buf = StringBuffer()..write('${c.sqlName} ');
     if (c.isPrimaryKey) {
-      buf.write('INTEGER PRIMARY KEY');
       if (c.isAutoIncrement) {
-        buf.write(' AUTOINCREMENT');
+        // SQLite only supports `AUTOINCREMENT` on
+        // `INTEGER PRIMARY KEY`. The codegen
+        // rejects `autoIncrement: true` on a
+        // non-`int` PK at build time, so this
+        // branch is only reached for `int` PKs.
+        buf.write('INTEGER PRIMARY KEY AUTOINCREMENT');
+      } else {
+        // Non-auto-incrementing PK: use the
+        // field's actual SQLite type so the
+        // column can hold a `String` (UUID),
+        // a `DateTime`, etc. Only `int` maps
+        // to INTEGER; everything else uses
+        // the type table at the bottom of
+        // this file.
+        buf.write('${_sqliteType(c.dartType)} PRIMARY KEY');
       }
     } else {
       buf.write(_sqliteType(c.dartType));

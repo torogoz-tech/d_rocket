@@ -38,6 +38,29 @@ void main() {
       expect(ddl, contains('rating INTEGER NOT NULL DEFAULT 0'));
     });
 
+    test(
+        'EntityMeta.createTableDdl uses TEXT for a non-int primary key '
+        '(UUID pattern)', () {
+      final EntityMeta meta = _eventMeta();
+      final String ddl = meta.createTableDdl();
+      expect(ddl, startsWith('CREATE TABLE IF NOT EXISTS events ('));
+      expect(ddl, contains('id TEXT PRIMARY KEY'),
+          reason:
+              'String PKs (UUIDs) must emit TEXT PRIMARY KEY, not '
+              'INTEGER PRIMARY KEY');
+      expect(ddl, isNot(contains('id INTEGER PRIMARY KEY')),
+          reason: 'A String PK must not be coerced to INTEGER');
+      expect(ddl, contains('name TEXT NOT NULL'));
+    });
+
+    test(
+        'EntityMeta.createTableDdl uses TEXT for a DateTime primary key', () {
+      final EntityMeta meta = _sessionMeta();
+      final String ddl = meta.createTableDdl();
+      expect(ddl, contains('started_at TEXT PRIMARY KEY'),
+          reason: 'DateTime PK maps to TEXT (ISO-8601), not INTEGER');
+    });
+
     test('EntityMeta.createTableDdl emits REFERENCES for FK columns (Fase 3.6)',
         () {
       final EntityMeta meta = _bookMeta();
@@ -440,6 +463,49 @@ EntityMeta _bookMeta() {
     primaryKey: id,
     primaryKeyIndex: 0,
     pkOf: (Object e) => 1,
+  );
+}
+
+EntityMeta _eventMeta() {
+  final ColumnMeta id = ColumnMeta(
+    sqlName: 'id',
+    dartField: 'id',
+    dartType: String,
+    isPrimaryKey: true,
+    isAutoIncrement: false,
+  );
+  final ColumnMeta name = ColumnMeta(
+    sqlName: 'name',
+    dartField: 'name',
+    dartType: String,
+  );
+  return EntityMeta(
+    tableName: 'events',
+    columns: <ColumnMeta>[id, name],
+    insertableColumns: <ColumnMeta>[id, name],
+    updatableColumns: <ColumnMeta>[name],
+    primaryKey: id,
+    primaryKeyIndex: 0,
+    pkOf: (Object e) => '',
+  );
+}
+
+EntityMeta _sessionMeta() {
+  final ColumnMeta startedAt = ColumnMeta(
+    sqlName: 'started_at',
+    dartField: 'startedAt',
+    dartType: DateTime,
+    isPrimaryKey: true,
+    isAutoIncrement: false,
+  );
+  return EntityMeta(
+    tableName: 'sessions',
+    columns: <ColumnMeta>[startedAt],
+    insertableColumns: <ColumnMeta>[startedAt],
+    updatableColumns: <ColumnMeta>[],
+    primaryKey: startedAt,
+    primaryKeyIndex: 0,
+    pkOf: (Object e) => DateTime(2026),
   );
 }
 

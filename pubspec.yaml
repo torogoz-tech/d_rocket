@@ -3,7 +3,7 @@ description: >
   Dart/Flutter data-layer framework: @Serializable codegen,
   @RestClient with retry, deferred LINQ, and a code-first
   SQLite ORM with migrations. See README for platform support.
-version: 1.0.3
+version: 1.0.4
 
 repository: https://github.com/torogoz-tech/d_rocket
 homepage: https://github.com/torogoz-tech/d_rocket
