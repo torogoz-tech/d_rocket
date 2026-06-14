@@ -145,7 +145,7 @@ void main() {
       final ddl = meta.createTableDdl();
       expect(
         ddl,
-        'CREATE TABLE customers (\n'
+        'CREATE TABLE IF NOT EXISTS customers (\n'
         '  id INTEGER PRIMARY KEY AUTOINCREMENT,\n'
         '  name TEXT NOT NULL,\n'
         '  street TEXT NOT NULL, city TEXT NOT NULL\n'

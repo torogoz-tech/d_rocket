@@ -5,6 +5,41 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-06-14
+
+Patch release. Two changes:
+
+* **`CREATE TABLE` now uses `IF NOT EXISTS`.**
+  `EntityMeta.createTableDdl()` in
+  `lib/src/orm/entity_meta.dart` previously
+  emitted `CREATE TABLE $tableName (`
+  unconditionally. On a fresh database this is
+  fine, but any re-run of the migration on an
+  existing database (e.g. a development
+  reset that left tables behind, or a hot-reload
+  in Flutter) threw `SqliteException(1):
+  table X already exists`. The 3 unit tests
+  that asserted the old `CREATE TABLE X` prefix
+  were updated to assert the new
+  `CREATE TABLE IF NOT EXISTS X` prefix. The
+  behavior change is purely additive — the
+  fresh-install path is unchanged (SQLite
+  creates the table), and the re-run path is
+  now a no-op (SQLite sees the table and
+  skips).
+* **README doc links dropped the
+  `packages/d_rocket/` prefix.** The 14 doc
+  links in the README's "Docs" section (and
+  the 3 inline cross-references) pointed to
+  `packages/d_rocket/doc/` in the monorepo.
+  They now point to `doc/` at the repo root
+  (e.g.
+  `https://github.com/torogoz-tech/d_rocket/blob/main/doc/01-overview.md`).
+  This is the URL shape the project README
+  ships with on pub.dev.
+
+No API or behavior changes.
+
 ## [1.0.2] — 2026-06-13
 
 Patch release. Fixes the README's doc-link index

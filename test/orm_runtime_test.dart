@@ -23,7 +23,7 @@ void main() {
         'columns, types, and NOT NULL constraints', () {
       final EntityMeta meta = _authorMeta();
       final String ddl = meta.createTableDdl();
-      expect(ddl, startsWith('CREATE TABLE authors ('));
+      expect(ddl, startsWith('CREATE TABLE IF NOT EXISTS authors ('));
       expect(ddl, contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));
       expect(ddl, contains("name TEXT NOT NULL"));
       expect(ddl, contains("country TEXT NOT NULL"));
@@ -68,7 +68,7 @@ void main() {
         'in one call (Fase 3.6)', () {
       final EntityMeta meta = _bookMeta();
       final String full = meta.createFullSchemaDdl();
-      expect(full, contains('CREATE TABLE books'));
+      expect(full, contains('CREATE TABLE IF NOT EXISTS books'));
       expect(full, contains('CREATE '));
       expect(full, contains('INDEX'));
       expect(full, contains('REFERENCES authors(id)'));

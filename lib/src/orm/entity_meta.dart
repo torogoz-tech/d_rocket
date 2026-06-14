@@ -174,7 +174,7 @@ class EntityMeta {
 
   String createTableDdl() {
     final StringBuffer buf = StringBuffer()
-      ..writeln('CREATE TABLE $tableName (');
+      ..writeln('CREATE TABLE IF NOT EXISTS $tableName (');
     final List<String> parts = <String>[];
     for (final ColumnMeta c in columns) {
       parts.add(_columnDdl(c));
