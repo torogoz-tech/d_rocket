@@ -61,6 +61,34 @@ void main() {
           reason: 'DateTime PK maps to TEXT (ISO-8601), not INTEGER');
     });
 
+    test(
+        'EntityMeta.createTableDdl does NOT emit AUTOINCREMENT for a String '
+        'auto-incrementing PK (UUID pattern)', () {
+      final EntityMeta meta = _eventMeta(); // String PK, autoIncrement:true
+      final String ddl = meta.createTableDdl();
+      expect(ddl, contains('id TEXT PRIMARY KEY'),
+          reason: 'String PK with autoIncrement:true must be TEXT PRIMARY KEY');
+      expect(ddl, isNot(contains('AUTOINCREMENT')),
+          reason:
+              "AUTOINCREMENT is SQLite-restricted to INTEGER PRIMARY KEY; "
+              "for a String PK the value is generated at runtime, so "
+              "the SQL must not include the keyword");
+    });
+
+    test('generateUuidV4 returns a valid RFC 4122 v4 UUID', () {
+      final RegExp uuidV4Re = RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-'
+          r'[0-9a-f]{12}$');
+      for (int i = 0; i < 16; i++) {
+        final String uuid = generateUuidV4();
+        expect(uuid, matches(uuidV4Re),
+            reason: 'Generated UUID "$uuid" is not a valid v4 UUID');
+      }
+      // Two consecutive calls must yield different values
+      // (Random.secure should not collide in 128 bits).
+      expect(generateUuidV4(), isNot(equals(generateUuidV4())));
+    });
+
     test('EntityMeta.createTableDdl emits REFERENCES for FK columns (Fase 3.6)',
         () {
       final EntityMeta meta = _bookMeta();

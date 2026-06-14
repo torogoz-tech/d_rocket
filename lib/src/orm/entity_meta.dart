@@ -211,21 +211,20 @@ class EntityMeta {
   static String _columnDdl(ColumnMeta c) {
     final StringBuffer buf = StringBuffer()..write('${c.sqlName} ');
     if (c.isPrimaryKey) {
-      if (c.isAutoIncrement) {
-        // SQLite only supports `AUTOINCREMENT` on
-        // `INTEGER PRIMARY KEY`. The codegen
-        // rejects `autoIncrement: true` on a
-        // non-`int` PK at build time, so this
-        // branch is only reached for `int` PKs.
+      if (c.isAutoIncrement && c.dartType == int) {
+        // SQLite's `AUTOINCREMENT` is restricted to
+        // `INTEGER PRIMARY KEY` (the implicit
+        // ROWID alias). For any other type the
+        // runtime fills the value before INSERT
+        // (e.g. a UUID v4 for `String` PKs), so
+        // the column is just `<type> PRIMARY KEY`
+        // with no `AUTOINCREMENT` keyword.
         buf.write('INTEGER PRIMARY KEY AUTOINCREMENT');
       } else {
-        // Non-auto-incrementing PK: use the
-        // field's actual SQLite type so the
-        // column can hold a `String` (UUID),
-        // a `DateTime`, etc. Only `int` maps
-        // to INTEGER; everything else uses
-        // the type table at the bottom of
-        // this file.
+        // Either `isAutoIncrement: false` (user
+        // provides the value) or
+        // `isAutoIncrement: true` on a non-`int`
+        // type (runtime generates the value).
         buf.write('${_sqliteType(c.dartType)} PRIMARY KEY');
       }
     } else {
