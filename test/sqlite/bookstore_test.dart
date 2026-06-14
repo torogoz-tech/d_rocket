@@ -4,8 +4,8 @@ library;
 
 import 'package:test/test.dart';
 
-import 'package:d_rocket/d_rocket_registry.g.dart';
-import 'package:d_rocket/example/bookstore.dart';
+import '../../example/bookstore.dart';
+import '../../example/d_rocket_registry.g.dart';
 
 void main() {
   late BookstoreResults r;

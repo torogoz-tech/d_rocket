@@ -22,8 +22,10 @@
 /// clean (no underscore): `.where(...)`, because
 /// the bridge extension runs on `DbSet<T>`, not
 /// on `Queryable<T>`.
-library;
-
+///
+/// Note: this example was moved from `lib/example/`
+/// to `example/` in v1.0.1. It is **not** part of
+/// the published library.
 import 'package:d_rocket/d_rocket.dart';
 
 import 'package:d_rocket/d_rocket_registry.g.dart';

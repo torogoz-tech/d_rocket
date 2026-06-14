@@ -16,6 +16,8 @@
 
 import 'package:d_rocket/d_rocket.dart';
 
+part 'main.g.dart';
+
 /// A minimal Table stub (codegen would emit this).
 class Book extends Record {
   Book({this.id = 0, required this.title, required this.authorId});

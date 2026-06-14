@@ -1,11 +1,12 @@
 # build.yaml for d_rocket (the runtime + example).
 #
-# The example at `lib/example/bookstore.dart` declares
+# The example at `example/bookstore.dart` declares
 # `extends Record` classes (`Author`, `Book`, `Sale`) that
 # need codegen. This `build.yaml` wires the five
 # `d_rocket_builder` builders to the `d_rocket` package
 # itself so the example can be exercised with
-# `dart run lib/example/bookstore.dart`.
+# `dart run example/bookstore.dart`. (As of v1.0.1
+# the example lives in `example/`, not `lib/example/`.)
 #
 # The user of `d_rocket` typically has their **own**
 # `build.yaml` that points the same builders at their

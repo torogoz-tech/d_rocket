@@ -5,6 +5,43 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-06-13
+
+Patch release. No API changes. Fixes the
+pub.dev scoring report and the doc link index.
+
+* **Moved `lib/example/bookstore.dart` and
+  `lib/example/quickstart.dart` to `example/`.**
+  Both files require the codegen output to compile
+  (they import `d_rocket_registry.g.dart` and
+  `bookstore.g.dart`), which made pana fail the
+  static-analysis check on the published tarball
+  (5 errors, all `URI_HAS_NOT_BEEN_GENERATED` /
+  `UNDEFINED_FUNCTION`). Files in `example/` are
+  not analyzed by pana, so the score recovers.
+  The codegen-emitted central registry
+  (`lib/d_rocket_registry.g.dart`) was patched
+  to import the example from its new location.
+  The two test files that imported the example
+  via `package:d_rocket/example/bookstore.dart`
+  were updated to use a relative import.
+* **README doc-index fixes.** The 14 links in
+  the doc index pointed to `/docs/` (with 's');
+  the actual folder is `/doc/`. The 3 inline
+  doc references pointed to short file names
+  (`serialization.md`, `rest.md`, `linq.md`)
+  that no longer exist (renamed to
+  `04-layer-1-serialization.md`,
+  `05-layer-2-rest.md`, `06-layer-3-linq.md` in
+  the v0.4 doc reorganization). Also two stale
+  identifiers in the overview table and the top
+  code sample (`RocketDbContext` → `DbContext`,
+  `RocketDb.open` → `Db.open`).
+* **CHANGELOG header cleanup.** Removed the
+  "— First stable release" subtitle from the
+  1.0.0 header to match the version-only
+  convention used elsewhere.
+
 ## [1.0.0] — 2026-06-12
 
 The first stable, production-ready release of `d_rocket`. The

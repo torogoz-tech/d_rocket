@@ -28,8 +28,8 @@ import 'dart:io';
 import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
 
-import 'package:d_rocket/d_rocket_registry.g.dart';
-import 'package:d_rocket/example/bookstore.dart';
+import '../../example/bookstore.dart';
+import '../../example/d_rocket_registry.g.dart';
 
 void main() {
   // The test must call `initializeD` exactly once before
@@ -125,7 +125,7 @@ void main() {
       // string contents. The codegen output is deterministic and
       // sorted, so the substring assertions are stable.
       final String src =
-          File('lib/d_rocket_registry.g.dart').readAsStringSync();
+          File('example/d_rocket_registry.g.dart').readAsStringSync();
       expect(src, contains('registerAuthorRecord()'));
       expect(src, contains('registerBookRecord()'));
       expect(src, contains('registerSaleRecord()'));
@@ -145,7 +145,7 @@ void main() {
       // serializable detection. If the codegen regresses, this
       // test catches it.
       final String src =
-          File('lib/d_rocket_registry.g.dart').readAsStringSync();
+          File('example/d_rocket_registry.g.dart').readAsStringSync();
       expect(src, contains('extends Record'));
       expect(src, contains('@Serializable'));
     });
