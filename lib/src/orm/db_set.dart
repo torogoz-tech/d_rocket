@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:d_rocket/d_rocket.dart';
 
@@ -535,6 +536,36 @@ class DbSet<T> {
   /// [entity] and executes it. Returns the number of rows
   /// affected (always 1 for a successful insert).
   int insertOne(T entity) {
+    // Auto-fill auto-incrementing PKs the user
+    // did not set:
+    //   - `int` PK + isAutoIncrement: leave the
+    //     field null. SQLite's
+    //     `INTEGER PRIMARY KEY AUTOINCREMENT`
+    //     assigns the value after the INSERT and
+    //     the runtime back-propagates it via
+    //     `lastInsertedPk()`.
+    //   - `String` PK + isAutoIncrement: generate
+    //     a UUID v4 here and set it on the entity
+    //     via `meta.setId` (the codegen-supplied
+    //     closure). The column DDL is
+    //     `id TEXT PRIMARY KEY` (no AUTOINCREMENT).
+    //   - Any other type + isAutoIncrement:
+    //     leave the field null. The user is
+    //     expected to set a value before calling
+    //     `saveChanges`, otherwise the INSERT
+    //     will fail with a NOT NULL constraint
+    //     violation.
+    // ignore: unnecessary_nullable_for_final_variable_declarations
+    final ColumnMeta? pk = meta.primaryKey;
+    if (pk != null && pk.isAutoIncrement) {
+      final Object? currentValue = _readField(entity, pk);
+      if (currentValue == null && pk.dartType == String) {
+        final String uuid = generateUuidV4();
+        final void Function(Object, Object)? setter = meta.setId;
+        setter?.call(entity as Object, uuid);
+      }
+    }
+
     // (TPH): use `effectiveInsertableColumns`
     // (not `insertableColumns`) so the INSERT also
     // includes the TPH children's columns. A `Cat`
@@ -1373,4 +1404,39 @@ class DbSet<T> {
       await sub.cancel();
     }
   }
+}
+
+/// Generates a random UUID v4 string in the
+/// canonical 8-4-4-4-12 lowercase hex form
+/// (for example `f47ac10b-58cc-4372-a567-0e02b2c3d479`).
+///
+/// The version nibble (the 13th hex digit) is
+/// `4` and the variant nibble (the 17th hex
+/// digit) is in the `8`/`9`/`a`/`b` range, as
+/// required by [RFC 4122](https://www.rfc-editor.org/rfc/rfc4122).
+/// Backed by `Random.secure()` so the output
+/// is suitable for use as a database primary
+/// key without coordination.
+///
+/// Exposed at the top level (not nested in
+/// `DbSet`) so the codegen and the unit tests
+/// in `test/orm_runtime_test.dart` can call it
+/// directly. Internal callers in this file
+/// use the unprefixed name.
+String generateUuidV4() {
+  final Random random = Random.secure();
+  final List<int> bytes =
+      List<int>.generate(16, (_) => random.nextInt(256));
+  // Set version to 4 (byte 6: top nibble = 0100).
+  bytes[6] = (bytes[6] & 0x0F) | 0x40;
+  // Set variant to RFC 4122 (byte 8: top 2 bits = 10).
+  bytes[8] = (bytes[8] & 0x3F) | 0x80;
+  final String hex = bytes
+      .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
+  return '${hex.substring(0, 8)}-'
+      '${hex.substring(8, 12)}-'
+      '${hex.substring(12, 16)}-'
+      '${hex.substring(16, 20)}-'
+      '${hex.substring(20, 32)}';
 }

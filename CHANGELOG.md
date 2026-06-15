@@ -5,6 +5,133 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] — 2026-06-14
+
+Patch release. Lifts the restriction
+that primary keys in `@Table` entities had
+to be `int`. UUID (and other non-`int`)
+primary keys are now supported, and
+auto-incrementing `String` PKs are filled
+with a UUID v4 at INSERT time.
+
+* **Non-`int` primary keys (DDL).**
+  `EntityMeta._columnDdl` in
+  `lib/src/orm/entity_meta.dart` previously
+  emitted `INTEGER PRIMARY KEY` for every
+  primary key, regardless of the field's
+  Dart type. A
+  `@PrimaryKey(autoIncrement: false) String id`
+  field — the typical UUID pattern —
+  therefore generated `id INTEGER PRIMARY
+  KEY` in the `CREATE TABLE` DDL, which
+  then failed at insert time when a UUID
+  string was passed. The DDL now uses the
+  field's actual SQLite type for
+  non-auto-incrementing PKs, so a `String`
+  PK produces `id TEXT PRIMARY KEY`, a
+  `DateTime` PK produces
+  `started_at TEXT PRIMARY KEY`, and so
+  on. `int` PKs with `autoIncrement: true`
+  still emit
+  `INTEGER PRIMARY KEY AUTOINCREMENT`
+  (SQLite's `AUTOINCREMENT` is restricted
+  to `INTEGER PRIMARY KEY`, so that branch
+  is unchanged). For `isAutoIncrement: true`
+  on a non-`int` type, the column is
+  `<type> PRIMARY KEY` (no `AUTOINCREMENT`
+  keyword) and the runtime fills the value.
+
+* **Auto-incrementing `String` PKs are
+  filled with a UUID v4.** When a
+  `@PrimaryKey()` (default
+  `autoIncrement: true`) is on a `String`
+  field and the entity is inserted without
+  a value set for that field, `DbSet.insertOne`
+  in `lib/src/orm/db_set.dart` now
+  generates a UUID v4 via the new
+  `generateUuidV4()` helper (also exported
+  from the package) and writes it back
+  through the codegen-supplied `meta.setId`
+  closure. The column DDL is
+  `id TEXT PRIMARY KEY` (see above). The
+  new helper is backed by `Random.secure()`
+  and produces RFC 4122 v4 UUIDs
+  (`xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`
+  with `y` in `8`/`9`/`a`/`b`).
+
+* **`@PrimaryKey` docstring updated** in
+  `lib/src/orm/primary_key.dart` to
+  document the supported field types and
+  the `autoIncrement` semantics, including
+  the "runtime fills the value for non-`int`
+  PKs" behavior.
+
+* **New unit tests** in
+  `test/orm_runtime_test.dart`:
+    * `String` PK with
+      `autoIncrement: true` emits
+      `id TEXT PRIMARY KEY` and does not
+      emit `AUTOINCREMENT`.
+    * `String` PK with
+      `autoIncrement: false` (the previous
+      patch) still emits
+      `id TEXT PRIMARY KEY`.
+    * `DateTime` PK emits
+      `started_at TEXT PRIMARY KEY`.
+    * `generateUuidV4()` returns a valid
+      RFC 4122 v4 UUID and consecutive
+      calls do not collide.
+
+No behavior change for existing `int` PKs.
+For non-`int` PKs the generated
+`CREATE TABLE` DDL is now correct instead
+of broken, and for
+`autoIncrement: true` `String` PKs the
+runtime generates a UUID v4 so callers
+no longer need to set a value before
+`saveChanges`.
+
+## [1.0.3] — 2026-06-14
+
+Patch release. Lifts the restriction that
+primary keys in `@Table` entities had to be
+`int`. UUID (and other non-`int`) primary
+keys are now supported.
+
+* **Non-`int` primary keys.** `EntityMeta._columnDdl`
+  in `lib/src/orm/entity_meta.dart` previously
+  emitted `INTEGER PRIMARY KEY` for every
+  primary key, regardless of the field's
+  Dart type. A `@PrimaryKey(autoIncrement: false)
+  String id` field — the typical UUID pattern
+  — therefore generated `id INTEGER PRIMARY KEY`
+  in the `CREATE TABLE` DDL, which then failed
+  at insert time when a UUID string was passed.
+  The DDL now uses the field's actual SQLite
+  type for non-auto-incrementing PKs, so a
+  `String` PK produces `id TEXT PRIMARY KEY`,
+  a `DateTime` PK produces `created_at TEXT
+  PRIMARY KEY`, and so on. `int` PKs with
+  `autoIncrement: true` still emit
+  `INTEGER PRIMARY KEY AUTOINCREMENT` (SQLite's
+  `AUTOINCREMENT` is restricted to `INTEGER
+  PRIMARY KEY`, so this branch is unchanged).
+
+* **`@PrimaryKey` docstring updated** in
+  `lib/src/orm/primary_key.dart` to document
+  the supported field types and the
+  `autoIncrement` semantics.
+
+* **New unit test** in
+  `test/orm_runtime_test.dart` covering
+  `String` and `DateTime` primary keys.
+  Existing `int` PK tests are unchanged and
+  still pass.
+
+No runtime behavior changes for `int` PKs.
+For non-`int` PKs the generated `CREATE TABLE`
+DDL is now correct instead of broken.
+
 ## [1.0.3] — 2026-06-14
 
 Patch release. Two changes:

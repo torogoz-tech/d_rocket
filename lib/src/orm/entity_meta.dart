@@ -211,9 +211,21 @@ class EntityMeta {
   static String _columnDdl(ColumnMeta c) {
     final StringBuffer buf = StringBuffer()..write('${c.sqlName} ');
     if (c.isPrimaryKey) {
-      buf.write('INTEGER PRIMARY KEY');
-      if (c.isAutoIncrement) {
-        buf.write(' AUTOINCREMENT');
+      if (c.isAutoIncrement && c.dartType == int) {
+        // SQLite's `AUTOINCREMENT` is restricted to
+        // `INTEGER PRIMARY KEY` (the implicit
+        // ROWID alias). For any other type the
+        // runtime fills the value before INSERT
+        // (e.g. a UUID v4 for `String` PKs), so
+        // the column is just `<type> PRIMARY KEY`
+        // with no `AUTOINCREMENT` keyword.
+        buf.write('INTEGER PRIMARY KEY AUTOINCREMENT');
+      } else {
+        // Either `isAutoIncrement: false` (user
+        // provides the value) or
+        // `isAutoIncrement: true` on a non-`int`
+        // type (runtime generates the value).
+        buf.write('${_sqliteType(c.dartType)} PRIMARY KEY');
       }
     } else {
       buf.write(_sqliteType(c.dartType));
