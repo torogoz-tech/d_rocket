@@ -5,9 +5,9 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.4] — 2026-06-14
 
-Pending patch release. Lifts the restriction
+Patch release. Lifts the restriction
 that primary keys in `@Table` entities had
 to be `int`. UUID (and other non-`int`)
 primary keys are now supported, and
