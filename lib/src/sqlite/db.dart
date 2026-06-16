@@ -86,13 +86,18 @@ class Db {
   static Future<Db> open({
     required String path,
     String? password,
+    KeyProvider? keyProvider,
     EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
+    final String? resolvedPassword = await _resolveKey(
+      password: password,
+      keyProvider: keyProvider,
+    );
     final SqliteQueryProvider provider = SqliteQueryProvider.file(
       path,
-      password: password,
+      password: resolvedPassword,
       encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
@@ -108,15 +113,21 @@ class Db {
 
   /// Opens an in-memory database. Convenient for tests.
   /// Same semantics as [open] for [password],
-  /// [encryptionConfig], [strategy] and [onCreate].
+  /// [keyProvider], [encryptionConfig], [strategy] and
+  /// [onCreate].
   static Future<Db> inMemory({
     String? password,
+    KeyProvider? keyProvider,
     EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
-    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
+    final String? resolvedPassword = await _resolveKey(
       password: password,
+      keyProvider: keyProvider,
+    );
+    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
+      password: resolvedPassword,
       encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
@@ -128,6 +139,32 @@ class Db {
       await onCreate(db);
     }
     return db;
+  }
+
+  /// helper: validates that exactly one of [password] or
+  /// [keyProvider] is set, awaits the key from the
+  /// provider (if used), and returns the resolved key.
+  /// Throws [ArgumentError] on mutual exclusion or on an
+  /// empty key from a [KeyProvider].
+  static Future<String?> _resolveKey({
+    required String? password,
+    required KeyProvider? keyProvider,
+  }) async {
+    if (password != null && keyProvider != null) {
+      throw ArgumentError(
+        'Db.open: pass either "password" or "keyProvider", not both',
+      );
+    }
+    if (keyProvider != null) {
+      final String resolved = await keyProvider.readKey();
+      if (resolved.isEmpty) {
+        throw ArgumentError(
+          'Db.open: keyProvider returned an empty key',
+        );
+      }
+      return resolved;
+    }
+    return password;
   }
 
   /// Returns a typed [DbSet] for entity [T]. Equivalent to
