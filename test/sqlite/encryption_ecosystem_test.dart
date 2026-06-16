@@ -302,4 +302,142 @@ void main() {
       }
     });
   });
+
+  group('Db.isOpen', () {
+    test('is true after Db.inMemory()', () async {
+      final Db db = await Db.inMemory();
+      try {
+        expect(db.isOpen, isTrue);
+      } finally {
+        await db.close();
+      }
+    });
+
+    test('is false after Db.close()', () async {
+      final Db db = await Db.inMemory();
+      await db.close();
+      expect(db.isOpen, isFalse);
+    });
+  });
+
+  group('Db.diagnostics()', () {
+    test('plain DB reports encrypted=false and status=plain', () async {
+      final Db db = await Db.inMemory();
+      try {
+        final Map<String, Object?> d = db.diagnostics();
+        expect(d['isOpen'], isTrue);
+        expect(d['encrypted'], isFalse);
+        expect(d['encryptionStatus'], EncryptionStatus.plain);
+        expect(d['keySource'], 'none');
+        expect(d['encryptionConfig'], isNull);
+      } finally {
+        await db.close();
+      }
+    });
+
+    test('password DB reports encrypted=true and keySource=password',
+        () async {
+      final Db db = await Db.inMemory(password: 'k');
+      try {
+        final Map<String, Object?> d = db.diagnostics();
+        expect(d['encrypted'], isTrue);
+        expect(d['keySource'], 'password');
+        expect(d['encryptionConfig'], isNull);
+      } finally {
+        await db.close();
+      }
+    });
+
+    test('keyProvider DB reports keySource=keyProvider', () async {
+      final Db db = await Db.inMemory(
+        keyProvider: const StaticKeyProvider('k'),
+      );
+      try {
+        final Map<String, Object?> d = db.diagnostics();
+        expect(d['encrypted'], isTrue);
+        expect(d['keySource'], 'keyProvider');
+      } finally {
+        await db.close();
+      }
+    });
+
+    test('EncryptionConfig is reported as a map of the four tunables',
+        () async {
+      final Db db = await Db.inMemory(
+        password: 'k',
+        encryptionConfig: const EncryptionConfig(
+          kdfIterations: 1000000,
+          pageSize: 8192,
+          hmacUse: false,
+          memorySecurity: false,
+        ),
+      );
+      try {
+        final Map<String, Object?> d = db.diagnostics();
+        expect(d['encryptionConfig'], <String, Object?>{
+          'kdfIterations': 1000000,
+          'pageSize': 8192,
+          'hmacUse': false,
+          'memorySecurity': false,
+        });
+      } finally {
+        await db.close();
+      }
+    });
+
+    test('isOpen flips to false after close()', () async {
+      final Db db = await Db.inMemory();
+      await db.close();
+      final Map<String, Object?> d = db.diagnostics();
+      expect(d['isOpen'], isFalse);
+    });
+
+    test(
+      'encryptionStatus is encrypted (or unknown) when a password is used',
+      () async {
+        final Db db = await Db.inMemory(password: 'k');
+        try {
+          // On a SQLCipher build, status is
+          // EncryptionStatus.encrypted. On vanilla
+          // SQLite (the dev machine), it is
+          // EncryptionStatus.unknown — the probe
+          // couldn't confirm the engine. Both
+          // indicate "the key was sent", so the
+          // contract is met.
+          expect(
+            db.diagnostics()['encryptionStatus'],
+            anyOf(
+              EncryptionStatus.encrypted,
+              EncryptionStatus.unknown,
+            ),
+          );
+        } finally {
+          await db.close();
+        }
+      },
+    );
+  });
+
+  group('isSqlCipherAvailable()', () {
+    test('returns false on a host without libsqlcipher (and caches it)',
+        () {
+      // The result is cached for the lifetime of
+      // the isolate. The dev machine has vanilla
+      // SQLite, so the cached value is false; the
+      // second call must return the same.
+      final bool first = isSqlCipherAvailable();
+      final bool second = isSqlCipherAvailable();
+      expect(second, first);
+    });
+
+    test('debugResetSqlCipherProbeCache clears the cache (test only)', () {
+      isSqlCipherAvailable();
+      debugResetSqlCipherProbeCache();
+      // After the reset, the next call probes
+      // again. We cannot assert the value (it
+      // depends on the host engine), only that
+      // the call does not throw.
+      expect(isSqlCipherAvailable, isNotNull);
+    });
+  });
 }

@@ -3,7 +3,6 @@
 library;
 
 import 'package:d_rocket/d_rocket.dart';
-import 'package:d_rocket/src/sqlite/redact_pragma_key.dart';
 ///
 /// The default configuration is conservative (method,
 /// URL, status — no headers, no bodies) so it is safe

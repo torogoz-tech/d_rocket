@@ -51,8 +51,71 @@ import 'package:d_rocket/d_rocket.dart';
 class Db {
   final SqliteQueryProvider _provider;
   final DbContext _ctx;
+  final String? _password;
+  final KeyProvider? _keyProvider;
+  final EncryptionConfig? _encryptionConfig;
 
-  Db._(this._provider, this._ctx);
+  Db._(
+    this._provider,
+    this._ctx, {
+    String? password,
+    KeyProvider? keyProvider,
+    EncryptionConfig? encryptionConfig,
+  })  : _password = password,
+        _keyProvider = keyProvider,
+        _encryptionConfig = encryptionConfig;
+
+  /// Whether the connection is still alive. `false`
+  /// after [close] has been called. Useful for
+  /// "is this handle reusable?" checks at the
+  /// call site.
+  bool get isOpen => _provider.isOpen;
+
+  /// Snapshot of the current connection state. The
+  /// map contains at least the following keys:
+  ///
+  /// * `isOpen: bool` — same as the [isOpen] getter.
+  /// * `encrypted: bool` — `true` if the connection
+  ///   was opened with a `password:` or `keyProvider:`.
+  /// * `encryptionStatus: EncryptionStatus` — the
+  ///   posture (plain / encrypted / unknown). See
+  ///   the `EncryptionStatus` docstring for the
+  ///   `unknown` caveat.
+  /// * `keySource: 'password' | 'keyProvider' | 'none'`
+  ///   — which input produced the key (if any).
+  /// * `encryptionConfig: Map<String, Object?>?` —
+  ///   the four SQLCipher tunables if a config was
+  ///   passed, `null` otherwise.
+  ///
+  /// The map is a plain `Map<String, Object?>`, not
+  /// a typed record, so it is easy to log to JSON,
+  /// post to a debug endpoint, or print.
+  Map<String, Object?> diagnostics() {
+    final bool wasEncrypted = _password != null || _keyProvider != null;
+    final EncryptionStatus status = wasEncrypted
+        ? (isSqlCipherAvailable()
+            ? EncryptionStatus.encrypted
+            : EncryptionStatus.unknown)
+        : EncryptionStatus.plain;
+    final String keySource = _keyProvider != null
+        ? 'keyProvider'
+        : (_password != null ? 'password' : 'none');
+
+    return <String, Object?>{
+      'isOpen': isOpen,
+      'encrypted': wasEncrypted,
+      'encryptionStatus': status,
+      'keySource': keySource,
+      'encryptionConfig': _encryptionConfig != null
+          ? <String, Object?>{
+              'kdfIterations': _encryptionConfig.kdfIterations,
+              'pageSize': _encryptionConfig.pageSize,
+              'hmacUse': _encryptionConfig.hmacUse,
+              'memorySecurity': _encryptionConfig.memorySecurity,
+            }
+          : null,
+    };
+  }
 
   /// Opens a file-backed SQLite database at [path]. Use
   /// `getDatabasesPath` from `package:sqflite` on mobile,
@@ -101,7 +164,13 @@ class Db {
       encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
-    final Db db = Db._(provider, ctx);
+    final Db db = Db._(
+      provider,
+      ctx,
+      password: password,
+      keyProvider: keyProvider,
+      encryptionConfig: encryptionConfig,
+    );
     if (strategy != null) {
       await db.migrateStrategy(strategy);
     }
@@ -131,7 +200,13 @@ class Db {
       encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
-    final Db db = Db._(provider, ctx);
+    final Db db = Db._(
+      provider,
+      ctx,
+      password: password,
+      keyProvider: keyProvider,
+      encryptionConfig: encryptionConfig,
+    );
     if (strategy != null) {
       await db.migrateStrategy(strategy);
     }

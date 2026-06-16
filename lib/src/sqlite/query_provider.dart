@@ -82,6 +82,7 @@ Future<T> _wrapAsync<T>(Future<T> Function() op) async {
 /// queryable needs.
 class SqliteQueryProvider implements AsyncQueryProvider {
   final Database _db;
+  bool _disposed = false;
 
   SqliteQueryProvider._(this._db);
 
@@ -270,6 +271,13 @@ class SqliteQueryProvider implements AsyncQueryProvider {
 
   @override
   Future<void> disposeAsync() async {
+    _disposed = true;
     _db.close();
   }
+
+  /// Whether the underlying engine connection is
+  /// still alive. Returns `false` after [disposeAsync]
+  /// has been called. Useful for `Db.isOpen` and
+  /// the diagnostics snapshot.
+  bool get isOpen => !_disposed;
 }
