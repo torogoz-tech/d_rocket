@@ -59,6 +59,7 @@ export 'src/rest/cancel_token.dart';
 export 'src/rest/clients/circuit_breaker_http_client.dart';
 export 'src/rest/clients/rate_limited_http_client.dart';
 export 'src/rest/clients/retrying_http_client.dart';
+export 'src/rest/logging_interceptor.dart';
 export 'src/rest/rest.dart';
 
 // ─── Layer 4: ORM (SQLite-First,) ──────────────────────────
