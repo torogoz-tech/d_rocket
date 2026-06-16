@@ -107,6 +107,75 @@ accidental log leaks.
   string). All tests run on the dev machine
   with no `libsqlcipher` installed.
 
+* **Boxed `LoggingInterceptor`.** A new
+  `LoggingInterceptor` in `lib/src/rest/`
+  implements `RestInterceptor` and writes one
+  line per request, response, and error to a
+  caller-supplied sink (e.g. `print`,
+  `developer.log`). The default configuration
+  is conservative (method, URL, status — no
+  headers, no bodies) so it is safe to drop in
+  production without exposing secrets. Headers
+  and bodies are opt-in via `includeHeaders: true`
+  and `includeBodies: true`. When bodies are
+  included, the body text is passed through
+  `redactPragmaKey` by default — a SQLCipher
+  database password that ends up in a request
+  body is never written to the log even when
+  body logging is enabled. To disable
+  redaction, pass `redactBody: (s) => s`.
+  Pairs naturally with the 1.0.5
+  `redactPragmaKey` utility to keep REST
+  tracing safe by default.
+
+* **Typed `ConflictPolicy` hierarchy.** A new
+  sealed `ConflictPolicy` class in
+  `lib/src/sync/` is the preferred API over the
+  bare `ConflictResolver` typedef. Four
+  built-in constants are exposed: `lww`
+  (alias `serverWins`, remote value wins on
+  collisions — the previous default), the
+  inverse `clientWins` (local value wins), and
+  `custom(resolver)` for user-provided merge
+  logic. The factory pairs naturally with the
+  existing `MergeStrategies` helpers
+  (`preferLocalColumns`, `preferRemoteColumns`,
+  `maxOf`). The old `LwwConflictResolver.instance`
+  and `CustomConflictResolver.wrap` shims are
+  retained for back-compat and behave
+  identically to the new `ConflictPolicy.lww`
+  and `ConflictPolicy.custom` equivalents.
+
+* **REST and sync docs updated.** The
+  Interceptors section in
+  `doc/05-layer-2-rest.md` now uses the
+  real `LoggingInterceptor(log: ...)` API in
+  its example (the old `LoggingInterceptor()`
+  no-arg call would not compile against the
+  1.1.0 signature) and documents the
+  `includeHeaders` / `includeBodies` /
+  `redactPragmaKey` opt-in. The conflict
+  resolution section in
+  `doc/08-layer-5-sync.md` adds a `ConflictPolicy`
+  walkthrough alongside the existing
+  `ConflictResolver` typedef.
+
+* **New tests** in
+  `test/rest/logging_interceptor_test.dart`
+  (11 cases): default line shape, opt-in
+  headers, opt-in bodies, `redactPragmaKey`
+  default, identity-function override, custom
+  redactor, and pass-through semantics for
+  `onRequest` / `onResponse` / `onError`. In
+  `test/sync/conflict_policy_test.dart` (16
+  cases): the constant identity (lww ==
+  serverWins, lww != clientWins), the merge
+  semantics of `lww` and `clientWins` (with
+  the empty-payload edge cases), the
+  `custom(resolver)` factory (including the
+  `MergeStrategies` helpers), and the
+  back-compat shims.
+
 No breaking changes; the `password:` parameter
 from 1.0.5 is unchanged. `keyProvider:`
 is mutually exclusive with `password:` (passing

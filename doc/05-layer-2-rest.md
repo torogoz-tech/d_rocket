@@ -479,9 +479,26 @@ Register globally via `RestConfig.interceptors`:
 
 ```dart
 dRest.useDefaults(
-  interceptors: [AuthInterceptor(loadToken), LoggingInterceptor()],
+  interceptors: [
+    AuthInterceptor(loadToken),
+    LoggingInterceptor(log: (line) => developer.log(line, name: 'rest')),
+  ],
 );
 ```
+
+`LoggingInterceptor` is a boxed interceptor that
+ships with d_rocket (since 1.1.0). It writes one
+line per request, response, and error to a
+caller-supplied sink. The default configuration
+is conservative (method, URL, status — no headers,
+no bodies). Headers and bodies are opt-in via
+`includeHeaders: true` and `includeBodies: true`.
+When bodies are included, the body text is passed
+through `redactPragmaKey` by default, so a
+SQLCipher database password attached to a request
+body is never written to the log. To disable
+redaction (e.g. when logging to a trusted local
+sink), pass `redactBody: (s) => s`.
 
 Or per-`HttpClient` (e.g. for a custom
 implementation):
