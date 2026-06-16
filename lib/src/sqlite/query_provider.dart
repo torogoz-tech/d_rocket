@@ -111,6 +111,7 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   }) {
     encryptionConfig?.validate();
     final Database db = sqlite3.openInMemory();
+    _applyConnectionPragmas(db);
     if (password != null) {
       _applyPragmaKey(db, password, encryptionConfig);
     }
@@ -142,6 +143,7 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   }) {
     encryptionConfig?.validate();
     final Database db = sqlite3.open(path);
+    _applyConnectionPragmas(db);
     if (password != null) {
       _applyPragmaKey(db, password, encryptionConfig);
     }
@@ -153,6 +155,32 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   /// and wants to keep ownership of the lifecycle.
   factory SqliteQueryProvider.fromDatabase(Database db) =>
       SqliteQueryProvider._(db);
+
+  /// helper: runs the connection-level PRAGMAs that
+  /// must be set on every open. Currently:
+  ///
+  /// * `PRAGMA foreign_keys = ON` — enable foreign
+  ///   key constraint enforcement. SQLite ships
+  ///   with FK enforcement **off** by default
+  ///   (for backwards compatibility); without
+  ///   this PRAGMA, `FOREIGN KEY (col) REFERENCES
+  ///   table(col)` clauses in `CREATE TABLE` are
+  ///   parsed and stored but never enforced. This
+  ///   is a silent data-integrity risk: a row
+  ///   can be inserted with a dangling reference
+  ///   and the constraint violation only surfaces
+  ///   if a tool happens to re-enable FKs. Setting
+  ///   this PRAGMA at open time makes d_rocket
+  ///   match the behaviour the user expects from
+  ///   the ORM annotations.
+  ///
+  /// The PRAGMA is set unconditionally — it has
+  /// no effect when the schema has no FK clauses,
+  /// and it does not interact with the SQLCipher
+  /// PRAGMAs in [EncryptionConfig].
+  static void _applyConnectionPragmas(Database db) {
+    db.execute('PRAGMA foreign_keys = ON');
+  }
 
   /// helper: runs `PRAGMA key = '<escaped>'` (and, if
   /// [config] is non-null, the four `PRAGMA cipher_*`
