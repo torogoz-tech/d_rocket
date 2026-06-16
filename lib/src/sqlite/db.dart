@@ -236,6 +236,70 @@ class Db {
   /// change tracker.
   Future<int> saveChanges() => _ctx.saveChangesAsync();
 
+  /// Re-encrypts the database with a new key.
+  ///
+  /// Wraps `PRAGMA rekey` with the same single-quote
+  /// escape used by the open path. The current
+  /// connection stays open and continues to work
+  /// (the engine re-encrypts the page cache in the
+  /// background on the next write). Subsequent
+  /// [close] + [Db.open] calls must use the new key.
+  ///
+  /// Exactly one of [newPassword] or [newKeyProvider]
+  /// must be supplied; passing both — or neither —
+  /// raises [ArgumentError]. The database must have
+  /// been opened with a key (i.e. via [Db.open] /
+  /// [Db.inMemory] with a non-null `password` or
+  /// `keyProvider`); running `changePassword` on a
+  /// plain SQLite database raises [StateError] because
+  /// there is no key to rotate.
+  ///
+  /// The rekey is applied to every page; for a
+  /// multi-megabyte database it can take a few hundred
+  /// milliseconds. Plan a one-time migration flow
+  /// (open → `changePassword` → close) and document
+  /// it in your release notes.
+  Future<void> changePassword({
+    String? newPassword,
+    KeyProvider? newKeyProvider,
+  }) async {
+    if (newPassword != null && newKeyProvider != null) {
+      throw ArgumentError(
+        'Db.changePassword: pass either "newPassword" '
+        'or "newKeyProvider", not both',
+      );
+    }
+    String? resolved;
+    if (newKeyProvider != null) {
+      resolved = await newKeyProvider.readKey();
+      if (resolved.isEmpty) {
+        throw ArgumentError(
+          'Db.changePassword: newKeyProvider returned '
+          'an empty key',
+        );
+      }
+    } else {
+      resolved = newPassword;
+    }
+    if (resolved == null) {
+      throw ArgumentError(
+        'Db.changePassword: pass either "newPassword" '
+        'or "newKeyProvider"',
+      );
+    }
+    final String escaped = resolved.replaceAll("'", "''");
+    try {
+      await _provider.executeAsync("PRAGMA rekey = '$escaped'");
+    } on DatabaseException {
+      rethrow;
+    } on Object catch (e) {
+      throw DatabaseException(
+        'Failed to rekey database: ${e.toString()}',
+        e,
+      );
+    }
+  }
+
   /// Closes the database. After this, all `set<T>`
   /// operations will throw.
   Future<void> close() => _provider.disposeAsync();
