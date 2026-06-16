@@ -1,5 +1,7 @@
 import 'package:d_rocket/d_rocket.dart';
 
+import '../sync/sync_queue_store.dart';
+
 /// Abstract base class for every d_rocket ORM context.
 ///
 /// A `DbContext` owns:
@@ -40,6 +42,20 @@ abstract class DbContext {
   /// entity `Type`. Populated on the first call to
   /// `dbSet<T>` for a given `T`.
   final Map<Type, Object> _dbSets = <Type, Object>{};
+
+  /// Persistent backing store for
+  /// [\_pendingSyncChanges]. Set in the constructor
+  /// of the concrete `\_SqliteRocketContext`;
+  /// left null in the abstract base so unit tests
+  /// that instantiate `DbContext` directly do not
+  /// have to wire a provider.
+  ///
+  /// The name omits the leading underscore (so
+  /// the concrete subclass in `db.dart` can
+  /// initialise it) but it is documented as an
+  /// internal field. Application code should
+  /// never read or write this directly.
+  SyncQueueStore? queueStore;
 
   /// Builder for a `DbSet<T>`. Subclasses override
   /// [createDbSet] to customise the underlying storage
@@ -275,6 +291,46 @@ abstract class DbContext {
         affected += 1;
       }
 
+      // (push queue, fix-1.1.1): persist a
+      // [SyncChange] for every entry that was
+      // committed IN THIS SAVE, INSIDE the same
+      // transaction as the data writes. When a
+      // [SyncQueueStore] is wired (the production
+      // path, set by `\_SqliteRocketContext`),
+      // the INSERT runs through the same provider
+      // as the data writes so the two are
+      // committed atomically. When the store is
+      // not wired (the abstract-base path used by
+      // some unit tests), we still build the
+      // SyncChange list and append to the
+      // in-memory cache, so the legacy
+      // "list-of-changes" contract is preserved
+      // for those tests. The in-memory cache is
+      // always updated after commit; if the
+      // transaction rolls back, the cache and
+      // the persistent queue are both unchanged.
+      final SyncQueueStore? store = queueStore;
+      final List<SyncChange> newChanges = <SyncChange>[];
+      for (final TrackedEntry entry in entriesToSync) {
+        final DbSet<Object> set = _dbSetForEntity(entry.entity);
+        // fix-5.13.1: emit a delete SyncChange
+        // for removed entries (with a null
+        // payload) instead of an upsert.
+        final SyncChangeType type = entry.state == EntityState.removed
+            ? SyncChangeType.delete
+            : SyncChangeType.upsert;
+        final SyncChange change = _buildSyncChangeFor(
+          entry.entity,
+          set.meta.tableName,
+          set.meta.pkOf(entry.entity),
+          type,
+        );
+        if (store != null) {
+          await store.enqueue(change);
+        }
+        newChanges.add(change);
+      }
+
       // The transaction is fully constructed. Commit it.
       await provider.commitAsync();
 
@@ -308,29 +364,16 @@ abstract class DbContext {
       // immediately (instead of waiting for the
       // next `pollInterval` tick).
       changeTracker.emitSaved();
-      // (push queue): append a
-      // [SyncChange] for every entry that was
-      // committed IN THIS SAVE (the snapshot we
-      // took before the commit loop). We can't
-      // iterate `changeTracker.entries` AFTER the
-      // commit because it includes entries from
-      // previous saves (which are now Unchanged
-      // and would double-count).
-      for (final TrackedEntry entry in entriesToSync) {
-        final DbSet<Object> set = _dbSetForEntity(entry.entity);
-        // fix-5.13.1: emit a delete
-        // SyncChange for removed entries (with
-        // a null payload) instead of an upsert.
-        final SyncChangeType type = entry.state == EntityState.removed
-            ? SyncChangeType.delete
-            : SyncChangeType.upsert;
-        _pendingSyncChanges.add(_buildSyncChangeFor(
-          entry.entity,
-          set.meta.tableName,
-          set.meta.pkOf(entry.entity),
-          type,
-        ));
-      }
+      // (push queue, post-commit): update the
+      // in-memory cache that backs
+      // [pendingSyncChanges] now that the data +
+      // queue INSERTs have committed. The cache
+      // is a read-through view of the persistent
+      // queue; it does not need to be rehydrated
+      // from disk because every entry we just
+      // appended is already in `newChanges`.
+      _pendingSyncChanges.addAll(newChanges);
+      queueHydrated = true;
       return affected;
     } catch (_) {
       // Roll back the transaction; the change tracker
@@ -722,10 +765,53 @@ abstract class DbContext {
   /// but not yet pushed to the remote. Populated
   /// by [saveChangesAsync] (after commit) and
   /// drained by [syncAsync] (on success).
+  ///
+  /// In-memory cache backed by [SyncQueueStore].
+  /// The table in the same SQLite database is the
+  /// source of truth: a crash between
+  /// [saveChangesAsync] and [syncAsync] does not
+  /// lose queued changes. The cache is hydrated
+  /// lazily on first access (see
+  /// [_ensureQueueHydrated]).
   final List<SyncChange> _pendingSyncChanges = <SyncChange>[];
+
+  /// helper: hydrates [\_pendingSyncChanges] from
+  /// the persistent [SyncQueueStore] the first
+  /// time it is needed. Subsequent calls are
+  /// no-ops (set a flag on completion). Called
+  /// from [saveChangesAsync] (before adding new
+  /// changes) and from the [pendingSyncChanges]
+  /// getter (before returning).
+  ///
+  /// Named without the leading underscore so
+  /// subclasses in other files can call it (it
+  /// is overridden by `\_SqliteRocketContext`
+  /// where applicable).
+  Future<void> ensureQueueHydrated() async {
+    if (queueHydrated) return;
+    final SyncQueueStore? store = queueStore;
+    if (store == null) return; // abstract base
+    _pendingSyncChanges
+      ..clear()
+      ..addAll(await store.loadAll());
+    queueHydrated = true;
+  }
+
+  bool queueHydrated = false;
 
   ///: returns a snapshot of the
   /// pending local changes (read-only).
+  ///
+  /// Hydrates the in-memory cache from the
+  /// persistent store on first access (so the
+  /// queue is consistent across app restarts).
+  /// The hydration is awaited transparently by
+  /// [Db.pendingSyncChanges] (the consumer-facing
+  /// wrapper); calling this getter directly from
+  /// inside the context returns whatever the
+  /// in-memory cache holds at the time, which
+  /// may be empty on the first read after
+  /// construction.
   List<SyncChange> get pendingSyncChanges =>
       List<SyncChange>.unmodifiable(_pendingSyncChanges);
 
@@ -870,13 +956,35 @@ abstract class DbContext {
         'clientId: \'...\' explicitly.',
       );
     }
-    // (push): drain the local
-    // queue into the envelope. We do this
-    // *before* the round-trip so the server sees
-    // the changes we made locally.
-    final List<SyncChange> localChanges = List<SyncChange>.of(
-      _pendingSyncChanges,
-    );
+    // (push, fix-1.1.1): read the local
+    // queue from the persistent store. We do
+    // not trust the in-memory cache for this
+    // read: a previous saveChangesAsync may have
+    // committed a row that the cache does not
+    // yet know about (e.g. after a process
+    // restart that did not trigger
+    // saveChangesAsync again). Reading from the
+    // store also gives us a single, atomic
+    // snapshot — `loadAll()` is one SELECT
+    // statement, so we cannot see a partial
+    // state of the queue.
+    final SyncQueueStore? store = queueStore;
+    final List<SyncChange> localChanges;
+    if (store != null) {
+      localChanges = await store.loadAll();
+      // Refresh the in-memory cache so a
+      // subsequent `pendingSyncChanges` getter
+      // sees the same set.
+      _pendingSyncChanges
+        ..clear()
+        ..addAll(localChanges);
+      queueHydrated = true;
+    } else {
+      // Abstract-base path (e.g. unit tests
+      // without a wired store): fall back to
+      // the in-memory list.
+      localChanges = List<SyncChange>.of(_pendingSyncChanges);
+    }
     final int lastWatermark = _clientWatermark;
     final SyncEnvelope envelope = SyncEnvelope(
       clientId: resolvedId,
@@ -906,9 +1014,15 @@ abstract class DbContext {
       await _applyRemoteChange(change);
       applied.add(change);
     }
-    // (drain): clear the local
-    // queue and advance the watermark only on a
-    // successful sync.
+    // (drain, fix-1.1.1): on a successful
+    // sync, clear both the persistent store
+    // (source of truth) and the in-memory cache.
+    // The two are kept in lockstep so that a
+    // subsequent `pendingSyncChanges` getter
+    // returns the empty list.
+    if (store != null) {
+      await store.clearAll();
+    }
     _pendingSyncChanges.clear();
     _clientWatermark = remote.since;
     // (auto-persist): if the user

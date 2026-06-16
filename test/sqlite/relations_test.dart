@@ -248,10 +248,19 @@ void main() {
         totalPrice: 25.00,
         date: '2026-01-02',
       ));
-      // A sale of a different book (won't match).
+      // A sale of a different book (won't match the
+      // @HasMany filter below). The book must exist
+      // because the test now runs with
+      // `PRAGMA foreign_keys = ON` (1.1.1), so a
+      // dangling FK would raise at insert time.
+      ctx.books.add(Book(
+        id: 2,
+        title: 'Other',
+        authorId: earthsea.authorId,
+      ));
       ctx.sales.add(Sale(
         id: 0,
-        bookId: 999,
+        bookId: 2,
         customer: 'Carol',
         quantity: 1,
         totalPrice: 9.99,
