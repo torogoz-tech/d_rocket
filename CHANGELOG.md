@@ -5,6 +5,116 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Minor release. Expands the SQLCipher password
+support landed in 1.0.5 with the four pieces the
+ecosystem needs to make encryption actually
+deployable: typed tunables, an async key source,
+a key-rotation helper, and a redactor for
+accidental log leaks.
+
+* **`EncryptionConfig` — typed SQLCipher
+  tunables.** A new `EncryptionConfig` class is
+  passed via `encryptionConfig:` on `Db.open` and
+  `Db.inMemory`. It wraps the four SQLCipher
+  PRAGMAs a security-conscious app most commonly
+  tunes: `kdfIterations` (default 256,000 →
+  `PRAGMA cipher_default_kdf_iter`), `pageSize`
+  (default 4096 → `PRAGMA cipher_page_size`),
+  `hmacUse` (default `true` → `PRAGMA
+  cipher_use_hmac`), and `memorySecurity`
+  (default `true` → `PRAGMA cipher_memory_security`).
+  The four PRAGMAs are applied right after
+  `PRAGMA key` in the order SQLCipher requires,
+  and the config is validated at construction:
+  a bad `kdfIterations` or `pageSize` raises
+  `ArgumentError` before the engine is touched.
+  The default config matches SQLCipher 4.x
+  defaults, so callers that pass the config
+  without tuning any value get the same behavior
+  as 1.0.5.
+
+* **`KeyProvider` — async password source.** A
+  new `KeyProvider` abstraction lets the encryption
+  password come from any async store (typically
+  the platform secure storage) instead of being
+  passed as a literal `String`. `Db.open` and
+  `Db.inMemory` accept `keyProvider:` (mutually
+  exclusive with `password:`); the value is awaited
+  once per open and held in memory for the lifetime
+  of the connection. `d_rocket` does not cache
+  across opens, so rotating the key in the keychain
+  takes effect on the next `Db.open`. Two built-in
+  providers ship: `StaticKeyProvider` (literal in
+  memory; for tests) and `CallbackKeyProvider`
+  (wraps an async function; for instrumentation
+  or non-`String` sources). Consumers integrating
+  with `flutter_secure_storage` (or any other
+  vault) implement the `KeyProvider` interface in
+  five lines on the application side, so the
+  production code can declare the dependency
+  without taking a Flutter-specific dep.
+
+* **`Db.changePassword()` — key rotation.** A new
+  `db.changePassword(newPassword: …)` method wraps
+  `PRAGMA rekey` with the same single-quote escape
+  used by the open path. The new key can also be
+  supplied via `newKeyProvider: …`; the two are
+  mutually exclusive. The current connection stays
+  open across the rekey (the engine re-encrypts
+  the page cache on the next write). The rekey
+  is applied to every page, so for a multi-megabyte
+  database it can take a few hundred milliseconds.
+  Replaces the "call `PRAGMA rekey` through the
+  provider" workaround documented in the 1.0.5
+  FAQ.
+
+* **`redactPragmaKey()` — safe SQL logging.** A
+  new top-level `redactPragmaKey(String sql)`
+  function replaces the literal value of any
+  `PRAGMA key = '...'` or `PRAGMA rekey = '...'`
+  in the input with `'***'`. Case-insensitive,
+  whitespace-tolerant, and correctly handles the
+  single-quote escape d_rocket uses internally.
+  Useful for application-level SQL traces when
+  the database is encrypted and the password
+  must not appear in logs, crash reports, or
+  any other observer.
+
+* **FAQ expanded.** The "Security" section in
+  `doc/13-faq.md` now also covers `KeyProvider`
+  with a `flutter_secure_storage` example,
+  `EncryptionConfig` with the four PRAGMAs and
+  the `pageSize` migration caveat, the new
+  `changePassword` flow (replacing the
+  "do-it-yourself through the provider" recipe
+  from 1.0.5), and `redactPragmaKey` for log
+  sanitization. The threat model entry from
+  1.0.5 is unchanged.
+
+* **New tests** in
+  `test/sqlite/encryption_ecosystem_test.dart`
+  (29 cases): EncryptionConfig validation
+  (defaults, tuned values, bad inputs, every
+  documented power-of-two pageSize), built-in
+  KeyProviders, mutual exclusion and empty-key
+  rejection on `Db.open`, `Db.changePassword`
+  argument validation, and the full
+  `redactPragmaKey` redaction matrix
+  (simple, escaped quote, case, whitespace,
+  multi-statement, unrelated SQL, empty
+  string). All tests run on the dev machine
+  with no `libsqlcipher` installed.
+
+No breaking changes; the `password:` parameter
+from 1.0.5 is unchanged. `keyProvider:`
+is mutually exclusive with `password:` (passing
+both raises `ArgumentError`). The full 1.0.5
+test suite (756 tests) still passes, plus the
+29 new ones, plus the 1 libsqlcipher round-trip
+test that is skipped without the engine.
+
 ## [1.0.5] — 2026-06-15
 
 Patch release. Adds optional, end-to-end encryption

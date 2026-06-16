@@ -480,17 +480,29 @@ database, or the underlying engine is not SQLCipher.
 
 ### Can I change the password of an existing database?
 
-Yes, with `PRAGMA rekey`. d_rocket does not wrap this
-yet — call it through the provider for now:
+Yes. `db.changePassword(newPassword: '...')` wraps
+`PRAGMA rekey` with the same single-quote escape used
+by the open path. The new key can also be supplied
+via a `KeyProvider` (`newKeyProvider: ...`); the two
+are mutually exclusive and the same `ArgumentError`
+pattern from `Db.open` applies.
 
 ```dart
-await db.provider
-    .executeAsync("PRAGMA rekey = '$newPassword'");
+final db = await Db.open(
+  path: 'app.db',
+  password: oldPassword,
+);
+await db.changePassword(newPassword: newPassword);
+await db.close();
 ```
 
-The `rekey` is applied to every page on the next
-write. Plan a one-time migration (open → rekey →
-close) and document it in your release notes.
+The `rekey` is applied to every page; for a
+multi-megabyte database it can take a few hundred
+milliseconds. Plan a one-time migration (open →
+`changePassword` → close) and document it in your
+release notes. The current connection stays open
+across the rekey, so the user can keep working with
+the same `Db` instance.
 
 ### Can I encrypt only some columns?
 
@@ -498,6 +510,106 @@ close) and document it in your release notes.
 helper, but the pattern is straightforward: encrypt
 the field in Dart before `add`, decrypt in the
 `fromRow` closure. The library stays the same.
+
+### Can I read the key from platform secure storage?
+
+Yes. `Db.open` and `Db.inMemory` accept a
+`keyProvider:` parameter (mutually exclusive with
+`password:`). The provider is awaited once per open,
+so the value is re-read from the keychain on every
+restart. `d_rocket` ships two built-in providers for
+tests and the simple case (`StaticKeyProvider` and
+`CallbackKeyProvider`); consumers that integrate
+with `flutter_secure_storage` (or any other vault)
+implement the `KeyProvider` interface in five lines
+on the application side:
+
+```dart
+class FlutterSecureStorageKeyProvider implements KeyProvider {
+  FlutterSecureStorageKeyProvider(this._storage, {required this.account});
+  final FlutterSecureStorage _storage;
+  final String account;
+
+  @override
+  Future<String> readKey() async {
+    final String? key = await _storage.read(key: account);
+    if (key == null) {
+      throw StateError('No key in secure storage for account "$account"');
+    }
+    return key;
+  }
+}
+
+final db = await Db.open(
+  path: 'app.db',
+  keyProvider: FlutterSecureStorageKeyProvider(
+    FlutterSecureStorage(),
+    account: 'd_rocket_key',
+  ),
+);
+```
+
+`d_rocket` does not cache the value across opens, so
+rotating the key in the keychain takes effect on the
+next `Db.open`.
+
+### Can I tune the SQLCipher PRAGMAs (KDF iterations, page size, HMAC)?
+
+Yes. Pass an `EncryptionConfig` to `Db.open` (or
+`Db.inMemory`) alongside `password:` or `keyProvider:`.
+The config wraps the four most common SQLCipher
+tunables:
+
+```dart
+const EncryptionConfig config = EncryptionConfig(
+  kdfIterations: 1000000, // default 256000
+  pageSize: 8192,         // default 4096
+  hmacUse: true,          // default true
+  memorySecurity: true,   // default true
+);
+
+final db = await Db.open(
+  path: 'app.db',
+  password: '…',
+  encryptionConfig: config,
+);
+```
+
+The four PRAGMAs
+(`cipher_default_kdf_iter`, `cipher_page_size`,
+`cipher_use_hmac`, `cipher_memory_security`) are
+applied right after `PRAGMA key` (the order SQLCipher
+requires) and before the open-time verification
+query. The config is validated at construction
+time: a bad `kdfIterations` or `pageSize` raises
+`ArgumentError` before the engine is touched, so
+configuration errors surface as Dart-level errors
+rather than `SqliteException`.
+
+Caveat: `pageSize` only takes effect on a fresh
+database. Changing the page size on an existing
+encrypted database requires a `PRAGMA rekey` flow
+(typically `changePassword` plus a dump/restore).
+
+### I want to log the SQL I send to the engine — but the password might leak
+
+Use `redactPragmaKey(sql)`. It replaces the literal
+value of any `PRAGMA key = '...'` or
+`PRAGMA rekey = '...'` in the input with `'***'`:
+
+```dart
+log('executed: ${redactPragmaKey(sql)}');
+// PRAGMA key = 'hunter2'
+// -> PRAGMA key = '***'
+```
+
+The function is case-insensitive, tolerates extra
+whitespace, and correctly handles the single-quote
+escape d_rocket uses internally (`O''Brien` becomes
+`'***'`, not `O'''`). It does not try to detect
+bound-parameter form (`PRAGMA key = ?`) because
+`PRAGMA` does not accept bound parameters in
+SQLite.
 
 ### What does SQLCipher protect against — and what doesn't it?
 
