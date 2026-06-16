@@ -176,6 +176,91 @@ accidental log leaks.
   `MergeStrategies` helpers), and the
   back-compat shims.
 
+* **Runtime observability helpers.** Four
+  additive, observability-focused public
+  additions that hang off the same "tell me
+  the state of this DB" question:
+
+    * `EncryptionStatus` enum in
+      `lib/src/sqlite/encryption_status.dart`
+      with three values: `plain` (no password
+      used), `encrypted` (password used AND
+      engine confirmed SQLCipher), and
+      `unknown` (password used but the probe
+      could not confirm the engine — most
+      commonly because the consumer forgot to
+      bundle `sqlcipher_flutter_libs` on
+      Flutter or `libsqlcipher` on desktop).
+
+    * `isSqlCipherAvailable()` top-level
+      function in
+      `lib/src/sqlite/sqlcipher_probe.dart`.
+      The probe was previously a private
+      helper inside
+      `test/sqlite/encrypted_db_test.dart`;
+      it is now part of the public API. The
+      result is cached at the isolate level
+      (the cost is paid at most once per
+      process). A test-only
+      `debugResetSqlCipherProbeCache()` clears
+      the cache.
+
+    * `Db.isOpen` getter on `Db`. Thin
+      wrapper over
+      `SqliteQueryProvider.isOpen` (which
+      tracks a `_disposed` flag set by
+      `disposeAsync`).
+
+    * `Db.diagnostics()` method on `Db`.
+      Returns a `Map<String, Object?>` with
+      `isOpen`, `encrypted`, `encryptionStatus`,
+      `keySource` (`'password' | 'keyProvider'
+      | 'none'`), and `encryptionConfig` (the
+      four SQLCipher tunables as a map, or
+      `null`). The map is easy to log to JSON,
+      post to a debug endpoint, or print. The
+      map never contains the resolved password
+      — only the key source — so it is safe
+      to forward to a server-side audit log.
+
+  `Db` is now constructed with the original
+  `password` / `keyProvider` /
+  `encryptionConfig` arguments tracked
+  (previously it discarded them after
+  resolving the key). The tracking is what
+  `diagnostics()` needs; the resolved
+  password itself is not stored, to keep the
+  key out of long-lived memory.
+
+* **Doc cleanups.** Two small, hygiene-only
+  changes bundled with the rest of the
+  polish: the Spanish doc comments in
+  `lib/src/rest/interceptor.dart` and
+  `lib/src/rest/error.dart` are translated to
+  English (the rest of the codebase is in
+  English; these two files were the only
+  outliers), and the README bullet that said
+  "989 unit and integration tests" is updated
+  to the actual current count. The FAQ gains
+  two new entries under the Security section:
+  "How do I check whether the engine is
+  actually SQLCipher?" (about
+  `isSqlCipherAvailable`) and "How do I tell,
+  at runtime, whether my DB is encrypted?"
+  (about `Db.diagnostics` and
+  `EncryptionStatus`).
+
+* **New tests** in
+  `test/sqlite/encryption_ecosystem_test.dart`
+  (10 new cases): `Db.isOpen` (open + closed),
+  `Db.diagnostics` (plain, password,
+  keyProvider, config, closed, status with
+  or without SQLCipher), and
+  `isSqlCipherAvailable` (cached value, debug
+  reset). The full
+  `encryption_ecosystem_test.dart` file goes
+  from 29 to 39 cases.
+
 No breaking changes; the `password:` parameter
 from 1.0.5 is unchanged. `keyProvider:`
 is mutually exclusive with `password:` (passing

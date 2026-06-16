@@ -611,6 +611,55 @@ bound-parameter form (`PRAGMA key = ?`) because
 `PRAGMA` does not accept bound parameters in
 SQLite.
 
+### How do I check whether the engine is actually SQLCipher?
+
+`isSqlCipherAvailable()` opens a short-lived
+in-memory database with a deliberately wrong
+password and reports `true` only if the engine
+rejects the key (the `SQLITE_NOTADB` that
+SQLCipher raises on the verification query). On
+a vanilla SQLite build, the `PRAGMA key` is
+silently ignored and the probe returns `false`.
+
+The result is cached at the isolate level, so the
+cost is paid at most once per process. Use it
+inside a "first run" guard:
+
+```dart
+if (!isSqlCipherAvailable() && db.diagnostics()['encrypted'] == true) {
+  // ...
+}
+```
+
+(`db.diagnostics()` reports the result as the
+`encryptionStatus` field, which is
+`EncryptionStatus.encrypted` on a SQLCipher build
+and `EncryptionStatus.unknown` on a vanilla SQLite
+build where the probe could not confirm the
+engine.)
+
+### How do I tell, at runtime, whether my DB is encrypted?
+
+`db.diagnostics()` returns a snapshot of the
+current connection state. The map contains at
+least:
+
+* `isOpen: bool` — the same as `db.isOpen`.
+* `encrypted: bool` — `true` if the connection
+  was opened with a `password:` or `keyProvider:`.
+* `encryptionStatus: EncryptionStatus` — the
+  posture (`plain`, `encrypted`, or `unknown`).
+* `keySource: 'password' | 'keyProvider' | 'none'`
+  — which input produced the key.
+* `encryptionConfig: Map<String, Object?>?` — the
+  four SQLCipher tunables, or `null` if no
+  config was passed.
+
+The map is plain `Map<String, Object?>`, so it is
+easy to log to JSON, post to a debug endpoint,
+or print. The map never contains the resolved
+password — only the key source.
+
 ### What does SQLCipher protect against — and what doesn't it?
 
 SQLCipher is at-rest encryption for the database
