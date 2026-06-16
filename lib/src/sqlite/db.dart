@@ -86,12 +86,14 @@ class Db {
   static Future<Db> open({
     required String path,
     String? password,
+    EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
     final SqliteQueryProvider provider = SqliteQueryProvider.file(
       path,
       password: password,
+      encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
     final Db db = Db._(provider, ctx);
@@ -105,15 +107,17 @@ class Db {
   }
 
   /// Opens an in-memory database. Convenient for tests.
-  /// Same semantics as [open] for [password], [strategy]
-  /// and [onCreate].
+  /// Same semantics as [open] for [password],
+  /// [encryptionConfig], [strategy] and [onCreate].
   static Future<Db> inMemory({
     String? password,
+    EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
     final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
       password: password,
+      encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
     final Db db = Db._(provider, ctx);

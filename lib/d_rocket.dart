@@ -93,6 +93,7 @@ export 'src/orm/orm.dart';
 // `Db` instances).
 export 'src/sqlite/db_context_extension.dart';
 export 'src/sqlite/db_set_extension.dart';
+export 'src/sqlite/encryption_config.dart';
 export 'src/sqlite/fragment.dart';
 export 'src/sqlite/query_provider.dart';
 export 'src/sqlite/queryable.dart';
