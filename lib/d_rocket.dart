@@ -99,6 +99,7 @@ export 'src/sqlite/key_provider.dart';
 export 'src/sqlite/query_provider.dart';
 export 'src/sqlite/queryable.dart';
 export 'src/sqlite/db.dart';
+export 'src/sqlite/redact_pragma_key.dart';
 export 'src/sqlite/translator.dart';
 export 'src/linq/operators/group_by.dart' show IGrouping;
 export 'src/linq/operators/lookup.dart';
