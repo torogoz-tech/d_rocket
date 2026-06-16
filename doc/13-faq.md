@@ -498,3 +498,83 @@ close) and document it in your release notes.
 helper, but the pattern is straightforward: encrypt
 the field in Dart before `add`, decrypt in the
 `fromRow` closure. The library stays the same.
+
+### What does SQLCipher protect against — and what doesn't it?
+
+SQLCipher is at-rest encryption for the database
+file. The protection boundary is well-defined and
+worth being explicit about, because the right
+answer for a security review is rarely "use
+SQLCipher and you're done".
+
+**SQLCipher protects against:**
+
+- **Filesystem access on an unlocked device.**
+  An attacker who pulls the `.db` file (via a
+  forensic image, a stolen unlocked phone, a
+  misplaced laptop, or a backup) and has *only*
+  the file cannot read the data without the
+  password.
+- **Backups.** The same property holds for any
+  backup medium (iCloud, Google Drive, ADB pull)
+  that copies the file but not the keychain.
+- **Single-page tampering.** SQLCipher includes an
+  HMAC over each page (default-on in 4.x); a
+  flipped bit in the file is detected on first
+  read and raises `SQLITE_NOTADB`.
+- **Weak passwords via brute force.** PBKDF2-HMAC-
+  SHA512 with 256,000 iterations by default makes
+  each guess expensive. (You can raise the
+  iteration count — see the FAQ entry on
+  `PRAGMA cipher_default_kdf_iter` once the
+  `EncryptionConfig` helper lands.)
+
+**SQLCipher does NOT protect against:**
+
+- **Root / admin access on a running device.**
+  If the attacker can run code as root while
+  the database is open, they can dump the key
+  out of process memory. The protection is
+  *at rest*, not *in use*. (Mitigation: keep the
+  DB closed when not in use; close on
+  background; rely on the OS's secure storage
+  for the key.)
+- **The keychain.** The key ultimately lives in
+  the OS's secure storage (Keychain, Keystore,
+  libsecret). If the attacker has the keychain,
+  they have the key, and therefore the database.
+  Pick a keychain that the OS actually protects
+  (Keychain with `kSecAttrAccessibleWhenUnlocked`
+  and a passcode set; Keystore-backed StrongBox
+  when available).
+- **Data in transit.** SQLCipher is for files
+  on disk. If you sync the file to a server,
+  the connection must be TLS. If you replicate
+  the rows over the wire (e.g. via the sync
+  layer), that channel needs its own encryption
+  and authentication.
+- **The application process.** A memory
+  corruption bug, a Dart-level SQL injection,
+  or a malicious dependency can read or write
+  the database with full SQLCipher privileges,
+  because the engine is loaded in the same
+  process. SQLCipher is not a sandbox; it is
+  a vault for the *file*.
+- **Side channels.** Timing attacks on the
+  password check are mitigated (SQLCipher uses
+  constant-time comparisons), but power
+  analysis, acoustic emanation, and rowhammer-
+  class attacks are out of scope.
+- **Wiping a stolen device.** If the attacker
+  has the device, they have the file. SQLCipher
+  only helps if the file is the *only* thing
+  they get; a screen-unlocked phone gives them
+  the running process, the keychain, and the
+  file.
+
+**The 30-second mental model:** SQLCipher makes a
+copied file unreadable without the key. It does
+not make a running process unreadable, a stolen
+device safe, or an insecure channel private.
+For those, you need a passcode on the device, a
+hardware-backed keychain, and TLS in flight.

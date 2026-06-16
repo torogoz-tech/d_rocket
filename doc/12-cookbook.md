@@ -445,25 +445,39 @@ db.setGlobalFilter(Expr.lambda(<Expr>[Expr.param('o')],
 
 ## Database encryption (SQLCipher)
 
-`package:sqlite3` supports SQLCipher for at-rest
-encryption. To enable:
+`d_rocket` opens an encrypted database with a
+`password` parameter on `Db.open` (or
+`Db.inMemory`). The password is forwarded to the
+SQLite engine as `PRAGMA key`, with single quotes
+escaped and a verification query that surfaces
+wrong-password errors at open time.
 
 ```dart
+final key = await keyStore.readKey(); // flutter_secure_storage
 final db = await Db.open(
   path: 'app.db',
-  encryption: SqliteEncryption(
-    cipher: SqlCipher.aes256cbc,
-    key: await keyStore.readKey(),
-  ),
+  password: key,
 );
 ```
 
 The `keyStore` is your abstraction over the platform's
 secure storage (Keychain on iOS, Keystore on Android,
-DPAPI on Windows). The key is read on every open and
-discarded after; the framework never persists it.
+DPAPI on Windows, libsecret on Linux). The key is
+read on every open and held in memory for the
+duration of the connection; `d_rocket` does not
+persist it.
 
-For a key rotation strategy, see the cookbook entry in
+> The `password` parameter is a no-op unless the
+> consumer bundles a SQLCipher build of the native
+> library. On Flutter, swap `sqlite3_flutter_libs`
+> for `sqlcipher_flutter_libs`. On desktop, install
+> `libsqlcipher` system-wide. See the
+> [Security — encrypted databases](13-faq.md#how-do-i-open-an-encrypted-database)
+> section of the FAQ for the full setup.
+
+To change the password of an existing database, see
+[the `PRAGMA rekey` recipe in the FAQ](13-faq.md#can-i-change-the-password-of-an-existing-database).
+For a key rotation strategy, see
 [Schema versioning and rolling upgrades](#schema-versioning).
 
 ## Background sync — `Isolate` worker

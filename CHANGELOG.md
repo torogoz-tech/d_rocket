@@ -72,6 +72,31 @@ callers that do not opt in are unaffected.
       `libsqlcipher`; on hosts without the engine
       they are skipped with an explanatory message.
 
+* **Cookbook recipe rewritten.** The "Database
+  encryption (SQLCipher)" entry in
+  `doc/12-cookbook.md` previously documented an
+  `SqliteEncryption(...)` API that does not exist
+  in the package; the recipe has been rewritten
+  to use the actual `password:` parameter on
+  `Db.open`, and now links to the Security
+  section of the FAQ for the engine setup and
+  the `PRAGMA rekey` recipe.
+
+* **Threat-model section added to the FAQ.**
+  `doc/13-faq.md` now has a "What does SQLCipher
+  protect against — and what doesn't it?" entry
+  that enumerates the realistic protection
+  boundary (file at rest, backups, page HMAC,
+  weak-password brute force) and the realistic
+  non-protection boundary (root on a running
+  device, the keychain itself, data in transit,
+  the application process, side channels, a
+  stolen unlocked device). The short mental
+  model at the end ("SQLCipher makes a copied
+  file unreadable without the key") is the line
+  the docs want a security reviewer to walk away
+  with.
+
 ## [1.0.4] — 2026-06-14
 
 Patch release. Lifts the restriction
