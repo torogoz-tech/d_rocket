@@ -353,3 +353,148 @@ Open an issue on the
 - Search the [GitHub issues](https://github.com/torogoz-tech/d_rocket/issues)
   to see if your question has been asked.
 - Open a new issue with the `question` label.
+
+---
+
+## Security
+
+### How do I open an encrypted database?
+
+Pass a `password` to `Db.open` or `Db.inMemory`. The
+`password` is forwarded to the SQLite engine as a
+`PRAGMA key`. d_rocket does the escape (`'O''Brien'`)
+and runs a small verification query
+(`SELECT count(*) FROM sqlite_master`) to surface
+wrong-password errors at open time instead of at
+first read.
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  password: 'correct horse battery staple',
+);
+```
+
+> **You must bundle a SQLCipher build of the native
+> library.** d_rocket does not switch engines on its
+> own. On Flutter, swap `sqlite3_flutter_libs` for
+> `sqlcipher_flutter_libs`. On desktop, install
+> `libsqlcipher` system-wide. The `PRAGMA key` is a
+> silent no-op on a vanilla SQLite engine, so an
+> unencrypted build will not surface an error — it
+> will just write plaintext to disk.
+
+### How do I bundle SQLCipher on Flutter?
+
+```yaml
+# pubspec.yaml — replace sqlite3_flutter_libs with
+# sqlcipher_flutter_libs. d_rocket itself only depends
+# on package:sqlite3; the consumer is responsible for
+# the native library.
+dependencies:
+  sqlcipher_flutter_libs: ^0.6.0
+```
+
+```dart
+// main.dart — the import has the side effect of
+// registering libsqlcipher with package:sqlite3's
+// loader, so subsequent `sqlite3.open` calls load
+// the SQLCipher binary.
+import 'package:sqlcipher_flutter_libs/sqlcipher_flutter_libs.dart';
+
+void main() async {
+  await applyToCipherOpen(); // or whatever your
+  // sqlcipher_flutter_libs version exposes; the
+  // import is what matters.
+  final db = await Db.open(path: 'app.db', password: '…');
+  // …
+}
+```
+
+### How do I bundle SQLCipher on desktop?
+
+Install `libsqlcipher` system-wide and point
+`package:sqlite3/open.dart`'s loader at it before
+opening any database:
+
+```dart
+import 'dart:io';
+import 'package:sqlite3/open.dart';
+
+void main() async {
+  if (Platform.isMacOS) {
+    open.overrideFor(
+      OperatingSystem.macOS,
+      () => DynamicLibrary.open('libsqlcipher.dylib'),
+    );
+  } else if (Platform.isLinux) {
+    open.overrideFor(
+      OperatingSystem.linux,
+      () => DynamicLibrary.open('libsqlcipher.so'),
+    );
+  } else if (Platform.isWindows) {
+    open.overrideFor(
+      OperatingSystem.windows,
+      () => DynamicLibrary.open('sqlcipher.dll'),
+    );
+  }
+  final db = await Db.open(path: 'app.db', password: '…');
+  // …
+}
+```
+
+> `homebrew install sqlcipher`,
+> `apt install libsqlcipher-dev`,
+> `choco install sqlcipher`. The `overrideFor` call
+> must run before the first `Db.open`.
+
+### What about raw keys (256-bit)?
+
+`PRAGMA key` accepts both passphrases and raw 256-bit
+keys. Pass the `x'…'` form as the `password`
+string — d_rocket escapes single quotes by doubling
+and forwards the literal to SQLCipher:
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  password: "x'2DD29CA851E7B56E4697B0E1F08507293"
+             "D761A05CE4D1B628663F411A8086D99'",
+);
+```
+
+### What happens if the password is wrong?
+
+`Db.open` throws a `DatabaseException` at open time
+(the verification query
+`SELECT count(*) FROM sqlite_master` returns
+`SQLITE_NOTADB` because the page can't be decrypted).
+The error message links back to this FAQ section so
+the cause is obvious:
+
+```
+DatabaseException: Failed to open encrypted database:
+the password is incorrect, the file is not a SQLCipher
+database, or the underlying engine is not SQLCipher.
+```
+
+### Can I change the password of an existing database?
+
+Yes, with `PRAGMA rekey`. d_rocket does not wrap this
+yet — call it through the provider for now:
+
+```dart
+await db.provider
+    .executeAsync("PRAGMA rekey = '$newPassword'");
+```
+
+The `rekey` is applied to every page on the next
+write. Plan a one-time migration (open → rekey →
+close) and document it in your release notes.
+
+### Can I encrypt only some columns?
+
+`d_rocket` does not bundle a column-level encryption
+helper, but the pattern is straightforward: encrypt
+the field in Dart before `add`, decrypt in the
+`fromRow` closure. The library stays the same.
