@@ -270,6 +270,27 @@ To use a custom resolver, pass it to the context's
 yourself). The framework's default behaviour is
 LWW; the user can override per-row or per-table.
 
+`d_rocket` 1.1.0 also ships a typed
+`ConflictPolicy` hierarchy that is the preferred
+API over the bare `ConflictResolver` typedef.
+Four built-in constants are exposed:
+
+```dart
+final ConflictPolicy serverWins = ConflictPolicy.lww;      // remote
+final ConflictPolicy clientWins = ConflictPolicy.clientWins; // local
+final ConflictPolicy columnAware = ConflictPolicy.custom(
+  MergeStrategies.preferLocalColumns(<String>['updated_by']),
+);
+```
+
+The `LwwConflictResolver.instance` and
+`CustomConflictResolver.wrap(...)` shims are
+retained for back-compat and behave identically
+to `ConflictPolicy.lww` and
+`ConflictPolicy.custom(...)`, respectively. New
+code should use `ConflictPolicy`; the shims are
+kept so existing sync code does not break.
+
 ## Triggers
 
 A `SyncTrigger` is what fires the `syncAsync` call.

@@ -5,6 +5,270 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Minor release. Expands the SQLCipher password
+support landed in 1.0.5 with the four pieces the
+ecosystem needs to make encryption actually
+deployable: typed tunables, an async key source,
+a key-rotation helper, and a redactor for
+accidental log leaks.
+
+* **`EncryptionConfig` — typed SQLCipher
+  tunables.** A new `EncryptionConfig` class is
+  passed via `encryptionConfig:` on `Db.open` and
+  `Db.inMemory`. It wraps the four SQLCipher
+  PRAGMAs a security-conscious app most commonly
+  tunes: `kdfIterations` (default 256,000 →
+  `PRAGMA cipher_default_kdf_iter`), `pageSize`
+  (default 4096 → `PRAGMA cipher_page_size`),
+  `hmacUse` (default `true` → `PRAGMA
+  cipher_use_hmac`), and `memorySecurity`
+  (default `true` → `PRAGMA cipher_memory_security`).
+  The four PRAGMAs are applied right after
+  `PRAGMA key` in the order SQLCipher requires,
+  and the config is validated at construction:
+  a bad `kdfIterations` or `pageSize` raises
+  `ArgumentError` before the engine is touched.
+  The default config matches SQLCipher 4.x
+  defaults, so callers that pass the config
+  without tuning any value get the same behavior
+  as 1.0.5.
+
+* **`KeyProvider` — async password source.** A
+  new `KeyProvider` abstraction lets the encryption
+  password come from any async store (typically
+  the platform secure storage) instead of being
+  passed as a literal `String`. `Db.open` and
+  `Db.inMemory` accept `keyProvider:` (mutually
+  exclusive with `password:`); the value is awaited
+  once per open and held in memory for the lifetime
+  of the connection. `d_rocket` does not cache
+  across opens, so rotating the key in the keychain
+  takes effect on the next `Db.open`. Two built-in
+  providers ship: `StaticKeyProvider` (literal in
+  memory; for tests) and `CallbackKeyProvider`
+  (wraps an async function; for instrumentation
+  or non-`String` sources). Consumers integrating
+  with `flutter_secure_storage` (or any other
+  vault) implement the `KeyProvider` interface in
+  five lines on the application side, so the
+  production code can declare the dependency
+  without taking a Flutter-specific dep.
+
+* **`Db.changePassword()` — key rotation.** A new
+  `db.changePassword(newPassword: …)` method wraps
+  `PRAGMA rekey` with the same single-quote escape
+  used by the open path. The new key can also be
+  supplied via `newKeyProvider: …`; the two are
+  mutually exclusive. The current connection stays
+  open across the rekey (the engine re-encrypts
+  the page cache on the next write). The rekey
+  is applied to every page, so for a multi-megabyte
+  database it can take a few hundred milliseconds.
+  Replaces the "call `PRAGMA rekey` through the
+  provider" workaround documented in the 1.0.5
+  FAQ.
+
+* **`redactPragmaKey()` — safe SQL logging.** A
+  new top-level `redactPragmaKey(String sql)`
+  function replaces the literal value of any
+  `PRAGMA key = '...'` or `PRAGMA rekey = '...'`
+  in the input with `'***'`. Case-insensitive,
+  whitespace-tolerant, and correctly handles the
+  single-quote escape d_rocket uses internally.
+  Useful for application-level SQL traces when
+  the database is encrypted and the password
+  must not appear in logs, crash reports, or
+  any other observer.
+
+* **FAQ expanded.** The "Security" section in
+  `doc/13-faq.md` now also covers `KeyProvider`
+  with a `flutter_secure_storage` example,
+  `EncryptionConfig` with the four PRAGMAs and
+  the `pageSize` migration caveat, the new
+  `changePassword` flow (replacing the
+  "do-it-yourself through the provider" recipe
+  from 1.0.5), and `redactPragmaKey` for log
+  sanitization. The threat model entry from
+  1.0.5 is unchanged.
+
+* **New tests** in
+  `test/sqlite/encryption_ecosystem_test.dart`
+  (29 cases): EncryptionConfig validation
+  (defaults, tuned values, bad inputs, every
+  documented power-of-two pageSize), built-in
+  KeyProviders, mutual exclusion and empty-key
+  rejection on `Db.open`, `Db.changePassword`
+  argument validation, and the full
+  `redactPragmaKey` redaction matrix
+  (simple, escaped quote, case, whitespace,
+  multi-statement, unrelated SQL, empty
+  string). All tests run on the dev machine
+  with no `libsqlcipher` installed.
+
+* **Boxed `LoggingInterceptor`.** A new
+  `LoggingInterceptor` in `lib/src/rest/`
+  implements `RestInterceptor` and writes one
+  line per request, response, and error to a
+  caller-supplied sink (e.g. `print`,
+  `developer.log`). The default configuration
+  is conservative (method, URL, status — no
+  headers, no bodies) so it is safe to drop in
+  production without exposing secrets. Headers
+  and bodies are opt-in via `includeHeaders: true`
+  and `includeBodies: true`. When bodies are
+  included, the body text is passed through
+  `redactPragmaKey` by default — a SQLCipher
+  database password that ends up in a request
+  body is never written to the log even when
+  body logging is enabled. To disable
+  redaction, pass `redactBody: (s) => s`.
+  Pairs naturally with the 1.0.5
+  `redactPragmaKey` utility to keep REST
+  tracing safe by default.
+
+* **Typed `ConflictPolicy` hierarchy.** A new
+  sealed `ConflictPolicy` class in
+  `lib/src/sync/` is the preferred API over the
+  bare `ConflictResolver` typedef. Four
+  built-in constants are exposed: `lww`
+  (alias `serverWins`, remote value wins on
+  collisions — the previous default), the
+  inverse `clientWins` (local value wins), and
+  `custom(resolver)` for user-provided merge
+  logic. The factory pairs naturally with the
+  existing `MergeStrategies` helpers
+  (`preferLocalColumns`, `preferRemoteColumns`,
+  `maxOf`). The old `LwwConflictResolver.instance`
+  and `CustomConflictResolver.wrap` shims are
+  retained for back-compat and behave
+  identically to the new `ConflictPolicy.lww`
+  and `ConflictPolicy.custom` equivalents.
+
+* **REST and sync docs updated.** The
+  Interceptors section in
+  `doc/05-layer-2-rest.md` now uses the
+  real `LoggingInterceptor(log: ...)` API in
+  its example (the old `LoggingInterceptor()`
+  no-arg call would not compile against the
+  1.1.0 signature) and documents the
+  `includeHeaders` / `includeBodies` /
+  `redactPragmaKey` opt-in. The conflict
+  resolution section in
+  `doc/08-layer-5-sync.md` adds a `ConflictPolicy`
+  walkthrough alongside the existing
+  `ConflictResolver` typedef.
+
+* **New tests** in
+  `test/rest/logging_interceptor_test.dart`
+  (11 cases): default line shape, opt-in
+  headers, opt-in bodies, `redactPragmaKey`
+  default, identity-function override, custom
+  redactor, and pass-through semantics for
+  `onRequest` / `onResponse` / `onError`. In
+  `test/sync/conflict_policy_test.dart` (16
+  cases): the constant identity (lww ==
+  serverWins, lww != clientWins), the merge
+  semantics of `lww` and `clientWins` (with
+  the empty-payload edge cases), the
+  `custom(resolver)` factory (including the
+  `MergeStrategies` helpers), and the
+  back-compat shims.
+
+* **Runtime observability helpers.** Four
+  additive, observability-focused public
+  additions that hang off the same "tell me
+  the state of this DB" question:
+
+    * `EncryptionStatus` enum in
+      `lib/src/sqlite/encryption_status.dart`
+      with three values: `plain` (no password
+      used), `encrypted` (password used AND
+      engine confirmed SQLCipher), and
+      `unknown` (password used but the probe
+      could not confirm the engine — most
+      commonly because the consumer forgot to
+      bundle `sqlcipher_flutter_libs` on
+      Flutter or `libsqlcipher` on desktop).
+
+    * `isSqlCipherAvailable()` top-level
+      function in
+      `lib/src/sqlite/sqlcipher_probe.dart`.
+      The probe was previously a private
+      helper inside
+      `test/sqlite/encrypted_db_test.dart`;
+      it is now part of the public API. The
+      result is cached at the isolate level
+      (the cost is paid at most once per
+      process). A test-only
+      `debugResetSqlCipherProbeCache()` clears
+      the cache.
+
+    * `Db.isOpen` getter on `Db`. Thin
+      wrapper over
+      `SqliteQueryProvider.isOpen` (which
+      tracks a `_disposed` flag set by
+      `disposeAsync`).
+
+    * `Db.diagnostics()` method on `Db`.
+      Returns a `Map<String, Object?>` with
+      `isOpen`, `encrypted`, `encryptionStatus`,
+      `keySource` (`'password' | 'keyProvider'
+      | 'none'`), and `encryptionConfig` (the
+      four SQLCipher tunables as a map, or
+      `null`). The map is easy to log to JSON,
+      post to a debug endpoint, or print. The
+      map never contains the resolved password
+      — only the key source — so it is safe
+      to forward to a server-side audit log.
+
+  `Db` is now constructed with the original
+  `password` / `keyProvider` /
+  `encryptionConfig` arguments tracked
+  (previously it discarded them after
+  resolving the key). The tracking is what
+  `diagnostics()` needs; the resolved
+  password itself is not stored, to keep the
+  key out of long-lived memory.
+
+* **Doc cleanups.** Two small, hygiene-only
+  changes bundled with the rest of the
+  polish: the Spanish doc comments in
+  `lib/src/rest/interceptor.dart` and
+  `lib/src/rest/error.dart` are translated to
+  English (the rest of the codebase is in
+  English; these two files were the only
+  outliers), and the README bullet that said
+  "989 unit and integration tests" is updated
+  to the actual current count. The FAQ gains
+  two new entries under the Security section:
+  "How do I check whether the engine is
+  actually SQLCipher?" (about
+  `isSqlCipherAvailable`) and "How do I tell,
+  at runtime, whether my DB is encrypted?"
+  (about `Db.diagnostics` and
+  `EncryptionStatus`).
+
+* **New tests** in
+  `test/sqlite/encryption_ecosystem_test.dart`
+  (10 new cases): `Db.isOpen` (open + closed),
+  `Db.diagnostics` (plain, password,
+  keyProvider, config, closed, status with
+  or without SQLCipher), and
+  `isSqlCipherAvailable` (cached value, debug
+  reset). The full
+  `encryption_ecosystem_test.dart` file goes
+  from 29 to 39 cases.
+
+No breaking changes; the `password:` parameter
+from 1.0.5 is unchanged. `keyProvider:`
+is mutually exclusive with `password:` (passing
+both raises `ArgumentError`). The full 1.0.5
+test suite (756 tests) still passes, plus the
+29 new ones, plus the 1 libsqlcipher round-trip
+test that is skipped without the engine.
+
 ## [1.0.5] — 2026-06-15
 
 Patch release. Adds optional, end-to-end encryption

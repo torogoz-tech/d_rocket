@@ -59,6 +59,7 @@ export 'src/rest/cancel_token.dart';
 export 'src/rest/clients/circuit_breaker_http_client.dart';
 export 'src/rest/clients/rate_limited_http_client.dart';
 export 'src/rest/clients/retrying_http_client.dart';
+export 'src/rest/logging_interceptor.dart';
 export 'src/rest/rest.dart';
 
 // ─── Layer 4: ORM (SQLite-First,) ──────────────────────────
@@ -93,10 +94,15 @@ export 'src/orm/orm.dart';
 // `Db` instances).
 export 'src/sqlite/db_context_extension.dart';
 export 'src/sqlite/db_set_extension.dart';
+export 'src/sqlite/encryption_config.dart';
+export 'src/sqlite/encryption_status.dart';
 export 'src/sqlite/fragment.dart';
+export 'src/sqlite/key_provider.dart';
 export 'src/sqlite/query_provider.dart';
 export 'src/sqlite/queryable.dart';
 export 'src/sqlite/db.dart';
+export 'src/sqlite/redact_pragma_key.dart';
+export 'src/sqlite/sqlcipher_probe.dart';
 export 'src/sqlite/translator.dart';
 export 'src/linq/operators/group_by.dart' show IGrouping;
 export 'src/linq/operators/lookup.dart';
@@ -113,6 +119,7 @@ export 'src/linq/operators/lookup.dart';
 //
 // `shared_preferences_sync_state_store.dart` moved to
 // `d_rocket_provider_flutter` in .
+export 'src/sync/conflict_policy.dart';
 export 'src/sync/rest_sync_provider.dart';
 export 'src/sync/sync.dart';
 

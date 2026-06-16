@@ -51,8 +51,71 @@ import 'package:d_rocket/d_rocket.dart';
 class Db {
   final SqliteQueryProvider _provider;
   final DbContext _ctx;
+  final String? _password;
+  final KeyProvider? _keyProvider;
+  final EncryptionConfig? _encryptionConfig;
 
-  Db._(this._provider, this._ctx);
+  Db._(
+    this._provider,
+    this._ctx, {
+    String? password,
+    KeyProvider? keyProvider,
+    EncryptionConfig? encryptionConfig,
+  })  : _password = password,
+        _keyProvider = keyProvider,
+        _encryptionConfig = encryptionConfig;
+
+  /// Whether the connection is still alive. `false`
+  /// after [close] has been called. Useful for
+  /// "is this handle reusable?" checks at the
+  /// call site.
+  bool get isOpen => _provider.isOpen;
+
+  /// Snapshot of the current connection state. The
+  /// map contains at least the following keys:
+  ///
+  /// * `isOpen: bool` — same as the [isOpen] getter.
+  /// * `encrypted: bool` — `true` if the connection
+  ///   was opened with a `password:` or `keyProvider:`.
+  /// * `encryptionStatus: EncryptionStatus` — the
+  ///   posture (plain / encrypted / unknown). See
+  ///   the `EncryptionStatus` docstring for the
+  ///   `unknown` caveat.
+  /// * `keySource: 'password' | 'keyProvider' | 'none'`
+  ///   — which input produced the key (if any).
+  /// * `encryptionConfig: Map<String, Object?>?` —
+  ///   the four SQLCipher tunables if a config was
+  ///   passed, `null` otherwise.
+  ///
+  /// The map is a plain `Map<String, Object?>`, not
+  /// a typed record, so it is easy to log to JSON,
+  /// post to a debug endpoint, or print.
+  Map<String, Object?> diagnostics() {
+    final bool wasEncrypted = _password != null || _keyProvider != null;
+    final EncryptionStatus status = wasEncrypted
+        ? (isSqlCipherAvailable()
+            ? EncryptionStatus.encrypted
+            : EncryptionStatus.unknown)
+        : EncryptionStatus.plain;
+    final String keySource = _keyProvider != null
+        ? 'keyProvider'
+        : (_password != null ? 'password' : 'none');
+
+    return <String, Object?>{
+      'isOpen': isOpen,
+      'encrypted': wasEncrypted,
+      'encryptionStatus': status,
+      'keySource': keySource,
+      'encryptionConfig': _encryptionConfig != null
+          ? <String, Object?>{
+              'kdfIterations': _encryptionConfig.kdfIterations,
+              'pageSize': _encryptionConfig.pageSize,
+              'hmacUse': _encryptionConfig.hmacUse,
+              'memorySecurity': _encryptionConfig.memorySecurity,
+            }
+          : null,
+    };
+  }
 
   /// Opens a file-backed SQLite database at [path]. Use
   /// `getDatabasesPath` from `package:sqflite` on mobile,
@@ -86,15 +149,28 @@ class Db {
   static Future<Db> open({
     required String path,
     String? password,
+    KeyProvider? keyProvider,
+    EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
+    final String? resolvedPassword = await _resolveKey(
+      password: password,
+      keyProvider: keyProvider,
+    );
     final SqliteQueryProvider provider = SqliteQueryProvider.file(
       path,
-      password: password,
+      password: resolvedPassword,
+      encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
-    final Db db = Db._(provider, ctx);
+    final Db db = Db._(
+      provider,
+      ctx,
+      password: password,
+      keyProvider: keyProvider,
+      encryptionConfig: encryptionConfig,
+    );
     if (strategy != null) {
       await db.migrateStrategy(strategy);
     }
@@ -105,18 +181,32 @@ class Db {
   }
 
   /// Opens an in-memory database. Convenient for tests.
-  /// Same semantics as [open] for [password], [strategy]
-  /// and [onCreate].
+  /// Same semantics as [open] for [password],
+  /// [keyProvider], [encryptionConfig], [strategy] and
+  /// [onCreate].
   static Future<Db> inMemory({
     String? password,
+    KeyProvider? keyProvider,
+    EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
-    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
+    final String? resolvedPassword = await _resolveKey(
       password: password,
+      keyProvider: keyProvider,
+    );
+    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
+      password: resolvedPassword,
+      encryptionConfig: encryptionConfig,
     );
     final DbContext ctx = _SqliteRocketContext(provider);
-    final Db db = Db._(provider, ctx);
+    final Db db = Db._(
+      provider,
+      ctx,
+      password: password,
+      keyProvider: keyProvider,
+      encryptionConfig: encryptionConfig,
+    );
     if (strategy != null) {
       await db.migrateStrategy(strategy);
     }
@@ -124,6 +214,32 @@ class Db {
       await onCreate(db);
     }
     return db;
+  }
+
+  /// helper: validates that exactly one of [password] or
+  /// [keyProvider] is set, awaits the key from the
+  /// provider (if used), and returns the resolved key.
+  /// Throws [ArgumentError] on mutual exclusion or on an
+  /// empty key from a [KeyProvider].
+  static Future<String?> _resolveKey({
+    required String? password,
+    required KeyProvider? keyProvider,
+  }) async {
+    if (password != null && keyProvider != null) {
+      throw ArgumentError(
+        'Db.open: pass either "password" or "keyProvider", not both',
+      );
+    }
+    if (keyProvider != null) {
+      final String resolved = await keyProvider.readKey();
+      if (resolved.isEmpty) {
+        throw ArgumentError(
+          'Db.open: keyProvider returned an empty key',
+        );
+      }
+      return resolved;
+    }
+    return password;
   }
 
   /// Returns a typed [DbSet] for entity [T]. Equivalent to
@@ -194,6 +310,70 @@ class Db {
   ///: saves all pending changes in the
   /// change tracker.
   Future<int> saveChanges() => _ctx.saveChangesAsync();
+
+  /// Re-encrypts the database with a new key.
+  ///
+  /// Wraps `PRAGMA rekey` with the same single-quote
+  /// escape used by the open path. The current
+  /// connection stays open and continues to work
+  /// (the engine re-encrypts the page cache in the
+  /// background on the next write). Subsequent
+  /// [close] + [Db.open] calls must use the new key.
+  ///
+  /// Exactly one of [newPassword] or [newKeyProvider]
+  /// must be supplied; passing both — or neither —
+  /// raises [ArgumentError]. The database must have
+  /// been opened with a key (i.e. via [Db.open] /
+  /// [Db.inMemory] with a non-null `password` or
+  /// `keyProvider`); running `changePassword` on a
+  /// plain SQLite database raises [StateError] because
+  /// there is no key to rotate.
+  ///
+  /// The rekey is applied to every page; for a
+  /// multi-megabyte database it can take a few hundred
+  /// milliseconds. Plan a one-time migration flow
+  /// (open → `changePassword` → close) and document
+  /// it in your release notes.
+  Future<void> changePassword({
+    String? newPassword,
+    KeyProvider? newKeyProvider,
+  }) async {
+    if (newPassword != null && newKeyProvider != null) {
+      throw ArgumentError(
+        'Db.changePassword: pass either "newPassword" '
+        'or "newKeyProvider", not both',
+      );
+    }
+    String? resolved;
+    if (newKeyProvider != null) {
+      resolved = await newKeyProvider.readKey();
+      if (resolved.isEmpty) {
+        throw ArgumentError(
+          'Db.changePassword: newKeyProvider returned '
+          'an empty key',
+        );
+      }
+    } else {
+      resolved = newPassword;
+    }
+    if (resolved == null) {
+      throw ArgumentError(
+        'Db.changePassword: pass either "newPassword" '
+        'or "newKeyProvider"',
+      );
+    }
+    final String escaped = resolved.replaceAll("'", "''");
+    try {
+      await _provider.executeAsync("PRAGMA rekey = '$escaped'");
+    } on DatabaseException {
+      rethrow;
+    } on Object catch (e) {
+      throw DatabaseException(
+        'Failed to rekey database: ${e.toString()}',
+        e,
+      );
+    }
+  }
 
   /// Closes the database. After this, all `set<T>`
   /// operations will throw.

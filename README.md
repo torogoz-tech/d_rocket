@@ -209,7 +209,7 @@ generator**:
   PBKDF2-HMAC-SHA512 key derivation, transparent to the rest of the
   stack. The engine library is a consumer choice (see
   [Security — encrypted databases](doc/13-faq.md#how-do-i-open-an-encrypted-database)).
-- **Production-tested.** 989 unit and integration tests cover all four
+- **Production-tested.** 821 unit and integration tests cover all four
   layers and the codegen pipeline.
 
 ## Installation

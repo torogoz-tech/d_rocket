@@ -1,24 +1,26 @@
 import 'package:d_rocket/d_rocket.dart';
 
-/// Interceptor estilo Refit/OkHttp. Permite transformar peticiones
-/// (p. ej. añadir `Authorization`) y respuestas (p. ej. refrescar
-/// tokens en 401).
+/// Refit/OkHttp-style interceptor. Lets you transform
+/// requests (e.g. add an `Authorization` header) and
+/// responses (e.g. refresh a token on 401).
 abstract class RestInterceptor {
-  /// Se llama antes de enviar la petición. Devuelve la petición
-  /// (posiblemente modificada) o lanza una [RestException] para
-  /// abortar.
+  /// Called before the request is sent. Returns the
+  /// (possibly modified) request, or throws a
+  /// [RestException] to abort the call.
   Future<RestRequest> onRequest(RestRequest request) async => request;
 
-  /// Se llama después de recibir la respuesta (incluso para errores).
+  /// Called after the response is received (including
+  /// error responses).
   Future<RestResponse<dynamic>> onResponse(
           RestResponse<dynamic> response) async =>
       response;
 
-  /// Se llama si la petición falla por red o por status code.
+  /// Called when the request fails (network error or
+  /// non-success status code).
   Future<RestException> onError(RestException error) async => error;
 }
 
-/// Composición de varios interceptores en orden.
+/// Composes several interceptors in order.
 class CompositeInterceptor implements RestInterceptor {
   final List<RestInterceptor> interceptors;
   CompositeInterceptor(this.interceptors);

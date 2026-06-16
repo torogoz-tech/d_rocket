@@ -82,6 +82,7 @@ Future<T> _wrapAsync<T>(Future<T> Function() op) async {
 /// queryable needs.
 class SqliteQueryProvider implements AsyncQueryProvider {
   final Database _db;
+  bool _disposed = false;
 
   SqliteQueryProvider._(this._db);
 
@@ -98,10 +99,20 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   /// (`sqlcipher_flutter_libs` on Flutter, or `libsqlcipher`
   /// installed system-wide on desktop) when [password] is
   /// non-null. See `doc/13-faq.md` for the full setup.
-  factory SqliteQueryProvider.inMemory({String? password}) {
+  ///
+  /// If [encryptionConfig] is non-null and [password] is also
+  /// non-null, the four SQLCipher PRAGMAs in the config are
+  /// applied right after `PRAGMA key` (the order SQLCipher
+  /// requires). The config is validated first; a bad value
+  /// raises [ArgumentError] before the engine is touched.
+  factory SqliteQueryProvider.inMemory({
+    String? password,
+    EncryptionConfig? encryptionConfig,
+  }) {
+    encryptionConfig?.validate();
     final Database db = sqlite3.openInMemory();
     if (password != null) {
-      _applyPragmaKey(db, password);
+      _applyPragmaKey(db, password, encryptionConfig);
     }
     return SqliteQueryProvider._(db);
   }
@@ -118,10 +129,21 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   /// (`sqlcipher_flutter_libs` on Flutter, or `libsqlcipher`
   /// installed system-wide on desktop) when [password] is
   /// non-null. See `doc/13-faq.md` for the full setup.
-  factory SqliteQueryProvider.file(String path, {String? password}) {
+  ///
+  /// If [encryptionConfig] is non-null and [password] is also
+  /// non-null, the four SQLCipher PRAGMAs in the config are
+  /// applied right after `PRAGMA key` (the order SQLCipher
+  /// requires). The config is validated first; a bad value
+  /// raises [ArgumentError] before the engine is touched.
+  factory SqliteQueryProvider.file(
+    String path, {
+    String? password,
+    EncryptionConfig? encryptionConfig,
+  }) {
+    encryptionConfig?.validate();
     final Database db = sqlite3.open(path);
     if (password != null) {
-      _applyPragmaKey(db, password);
+      _applyPragmaKey(db, password, encryptionConfig);
     }
     return SqliteQueryProvider._(db);
   }
@@ -132,16 +154,24 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   factory SqliteQueryProvider.fromDatabase(Database db) =>
       SqliteQueryProvider._(db);
 
-  /// helper: runs `PRAGMA key = '<escaped>'` and verifies the
-  /// key works. Throws [DatabaseException] on wrong password
-  /// (the underlying engine raises `SQLITE_NOTADB` on the
-  /// first read of an encrypted page when the key is wrong).
-  /// Single quotes in [password] are escaped by doubling
-  /// (`O'Brien` -> `O''Brien`), so user input is safe to
-  /// interpolate.
-  static void _applyPragmaKey(Database db, String password) {
+  /// helper: runs `PRAGMA key = '<escaped>'` (and, if
+  /// [config] is non-null, the four `PRAGMA cipher_*`
+  /// statements from the config), then verifies the
+  /// key works. Throws [DatabaseException] on wrong
+  /// password (the underlying engine raises
+  /// `SQLITE_NOTADB` on the first read of an encrypted
+  /// page when the key is wrong). Single quotes in
+  /// [password] are escaped by doubling
+  /// (`O'Brien` -> `O''Brien`), so user input is safe
+  /// to interpolate.
+  static void _applyPragmaKey(
+    Database db,
+    String password, [
+    EncryptionConfig? config,
+  ]) {
     final String escaped = password.replaceAll("'", "''");
     db.execute("PRAGMA key = '$escaped'");
+    config?.applyTo(db);
     try {
       db.select('SELECT count(*) FROM sqlite_master');
     } on SqliteException catch (e) {
@@ -241,6 +271,13 @@ class SqliteQueryProvider implements AsyncQueryProvider {
 
   @override
   Future<void> disposeAsync() async {
+    _disposed = true;
     _db.close();
   }
+
+  /// Whether the underlying engine connection is
+  /// still alive. Returns `false` after [disposeAsync]
+  /// has been called. Useful for `Db.isOpen` and
+  /// the diagnostics snapshot.
+  bool get isOpen => !_disposed;
 }
