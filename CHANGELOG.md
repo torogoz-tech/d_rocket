@@ -5,6 +5,98 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Patch release. Adds optional, end-to-end encryption
+of the local SQLite database via SQLCipher. Existing
+callers that do not opt in are unaffected.
+
+* **Encrypted database support.**
+  `Db.open` and `Db.inMemory` now accept an optional
+  `password` parameter that is forwarded to the
+  underlying SQLite engine as `PRAGMA key` after
+  open. The same parameter is exposed on
+  `SqliteQueryProvider.file` and
+  `SqliteQueryProvider.inMemory` for advanced users.
+  The default (`password: null`) preserves the
+  1.0.x behavior — plain SQLite, no key — so this
+  change is fully backward compatible.
+
+* **Single-quote escaping.** Passwords that contain
+  `'` characters are escaped by doubling
+  (`O'Brien` → `O''Brien`) before being interpolated
+  into the `PRAGMA key = '...'` literal. The escape
+  is applied by a single private helper,
+  `SqliteQueryProvider._applyPragmaKey`.
+
+* **Open-time wrong-password detection.** After
+  running `PRAGMA key`, the provider issues a
+  verification query
+  (`SELECT count(*) FROM sqlite_master`) and closes
+  the connection with a `DatabaseException` if the
+  first encrypted page cannot be decrypted. The
+  exception message is explicit about the three
+  possible causes (wrong password, non-SQLCipher
+  file, engine is not SQLCipher) and links to
+  `doc/13-faq.md` for the engine setup. This avoids
+  the alternative failure mode where the database
+  appears to open successfully and then returns
+  garbage on the first read.
+
+* **Engine responsibility is the consumer's.**
+  `d_rocket` does not bundle a SQLCipher build.
+  The consumer installs `sqlcipher_flutter_libs`
+  on Flutter, or `libsqlcipher` system-wide on
+  desktop, and the `PRAGMA key` is then effective.
+  A vanilla SQLite engine silently ignores
+  `PRAGMA key`, so the parameter is a no-op
+  without a SQLCipher native library. The
+  documentation in `doc/13-faq.md` (new "Security"
+  section) covers the platform setup in detail.
+
+* **New tests** in
+  `test/sqlite/encrypted_db_test.dart`:
+    * The `password` parameter is accepted on
+      `Db.open`, `Db.inMemory`,
+      `SqliteQueryProvider.file`, and
+      `SqliteQueryProvider.inMemory`
+      (compile checks).
+    * A password containing a single quote is
+      escaped and does not produce a syntax error.
+    * Opening without a `password` continues to
+      work (back-compat, no behavior change).
+    * An end-to-end round-trip
+      (open → `CREATE TABLE` → `INSERT` → close →
+      reopen → read) and a wrong-password
+      rejection are gated on a runtime probe for
+      `libsqlcipher`; on hosts without the engine
+      they are skipped with an explanatory message.
+
+* **Cookbook recipe rewritten.** The "Database
+  encryption (SQLCipher)" entry in
+  `doc/12-cookbook.md` previously documented an
+  `SqliteEncryption(...)` API that does not exist
+  in the package; the recipe has been rewritten
+  to use the actual `password:` parameter on
+  `Db.open`, and now links to the Security
+  section of the FAQ for the engine setup and
+  the `PRAGMA rekey` recipe.
+
+* **Threat-model section added to the FAQ.**
+  `doc/13-faq.md` now has a "What does SQLCipher
+  protect against — and what doesn't it?" entry
+  that enumerates the realistic protection
+  boundary (file at rest, backups, page HMAC,
+  weak-password brute force) and the realistic
+  non-protection boundary (root on a running
+  device, the keychain itself, data in transit,
+  the application process, side channels, a
+  stolen unlocked device). The short mental
+  model at the end ("SQLCipher makes a copied
+  file unreadable without the key") is the line
+  the docs want a security reviewer to walk away
+  with.
+
 ## [1.0.4] — 2026-06-14
 
 Patch release. Lifts the restriction

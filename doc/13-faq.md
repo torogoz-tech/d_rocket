@@ -353,3 +353,228 @@ Open an issue on the
 - Search the [GitHub issues](https://github.com/torogoz-tech/d_rocket/issues)
   to see if your question has been asked.
 - Open a new issue with the `question` label.
+
+---
+
+## Security
+
+### How do I open an encrypted database?
+
+Pass a `password` to `Db.open` or `Db.inMemory`. The
+`password` is forwarded to the SQLite engine as a
+`PRAGMA key`. d_rocket does the escape (`'O''Brien'`)
+and runs a small verification query
+(`SELECT count(*) FROM sqlite_master`) to surface
+wrong-password errors at open time instead of at
+first read.
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  password: 'correct horse battery staple',
+);
+```
+
+> **You must bundle a SQLCipher build of the native
+> library.** d_rocket does not switch engines on its
+> own. On Flutter, swap `sqlite3_flutter_libs` for
+> `sqlcipher_flutter_libs`. On desktop, install
+> `libsqlcipher` system-wide. The `PRAGMA key` is a
+> silent no-op on a vanilla SQLite engine, so an
+> unencrypted build will not surface an error — it
+> will just write plaintext to disk.
+
+### How do I bundle SQLCipher on Flutter?
+
+```yaml
+# pubspec.yaml — replace sqlite3_flutter_libs with
+# sqlcipher_flutter_libs. d_rocket itself only depends
+# on package:sqlite3; the consumer is responsible for
+# the native library.
+dependencies:
+  sqlcipher_flutter_libs: ^0.6.0
+```
+
+```dart
+// main.dart — the import has the side effect of
+// registering libsqlcipher with package:sqlite3's
+// loader, so subsequent `sqlite3.open` calls load
+// the SQLCipher binary.
+import 'package:sqlcipher_flutter_libs/sqlcipher_flutter_libs.dart';
+
+void main() async {
+  await applyToCipherOpen(); // or whatever your
+  // sqlcipher_flutter_libs version exposes; the
+  // import is what matters.
+  final db = await Db.open(path: 'app.db', password: '…');
+  // …
+}
+```
+
+### How do I bundle SQLCipher on desktop?
+
+Install `libsqlcipher` system-wide and point
+`package:sqlite3/open.dart`'s loader at it before
+opening any database:
+
+```dart
+import 'dart:io';
+import 'package:sqlite3/open.dart';
+
+void main() async {
+  if (Platform.isMacOS) {
+    open.overrideFor(
+      OperatingSystem.macOS,
+      () => DynamicLibrary.open('libsqlcipher.dylib'),
+    );
+  } else if (Platform.isLinux) {
+    open.overrideFor(
+      OperatingSystem.linux,
+      () => DynamicLibrary.open('libsqlcipher.so'),
+    );
+  } else if (Platform.isWindows) {
+    open.overrideFor(
+      OperatingSystem.windows,
+      () => DynamicLibrary.open('sqlcipher.dll'),
+    );
+  }
+  final db = await Db.open(path: 'app.db', password: '…');
+  // …
+}
+```
+
+> `homebrew install sqlcipher`,
+> `apt install libsqlcipher-dev`,
+> `choco install sqlcipher`. The `overrideFor` call
+> must run before the first `Db.open`.
+
+### What about raw keys (256-bit)?
+
+`PRAGMA key` accepts both passphrases and raw 256-bit
+keys. Pass the `x'…'` form as the `password`
+string — d_rocket escapes single quotes by doubling
+and forwards the literal to SQLCipher:
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  password: "x'2DD29CA851E7B56E4697B0E1F08507293"
+             "D761A05CE4D1B628663F411A8086D99'",
+);
+```
+
+### What happens if the password is wrong?
+
+`Db.open` throws a `DatabaseException` at open time
+(the verification query
+`SELECT count(*) FROM sqlite_master` returns
+`SQLITE_NOTADB` because the page can't be decrypted).
+The error message links back to this FAQ section so
+the cause is obvious:
+
+```
+DatabaseException: Failed to open encrypted database:
+the password is incorrect, the file is not a SQLCipher
+database, or the underlying engine is not SQLCipher.
+```
+
+### Can I change the password of an existing database?
+
+Yes, with `PRAGMA rekey`. d_rocket does not wrap this
+yet — call it through the provider for now:
+
+```dart
+await db.provider
+    .executeAsync("PRAGMA rekey = '$newPassword'");
+```
+
+The `rekey` is applied to every page on the next
+write. Plan a one-time migration (open → rekey →
+close) and document it in your release notes.
+
+### Can I encrypt only some columns?
+
+`d_rocket` does not bundle a column-level encryption
+helper, but the pattern is straightforward: encrypt
+the field in Dart before `add`, decrypt in the
+`fromRow` closure. The library stays the same.
+
+### What does SQLCipher protect against — and what doesn't it?
+
+SQLCipher is at-rest encryption for the database
+file. The protection boundary is well-defined and
+worth being explicit about, because the right
+answer for a security review is rarely "use
+SQLCipher and you're done".
+
+**SQLCipher protects against:**
+
+- **Filesystem access on an unlocked device.**
+  An attacker who pulls the `.db` file (via a
+  forensic image, a stolen unlocked phone, a
+  misplaced laptop, or a backup) and has *only*
+  the file cannot read the data without the
+  password.
+- **Backups.** The same property holds for any
+  backup medium (iCloud, Google Drive, ADB pull)
+  that copies the file but not the keychain.
+- **Single-page tampering.** SQLCipher includes an
+  HMAC over each page (default-on in 4.x); a
+  flipped bit in the file is detected on first
+  read and raises `SQLITE_NOTADB`.
+- **Weak passwords via brute force.** PBKDF2-HMAC-
+  SHA512 with 256,000 iterations by default makes
+  each guess expensive. (You can raise the
+  iteration count — see the FAQ entry on
+  `PRAGMA cipher_default_kdf_iter` once the
+  `EncryptionConfig` helper lands.)
+
+**SQLCipher does NOT protect against:**
+
+- **Root / admin access on a running device.**
+  If the attacker can run code as root while
+  the database is open, they can dump the key
+  out of process memory. The protection is
+  *at rest*, not *in use*. (Mitigation: keep the
+  DB closed when not in use; close on
+  background; rely on the OS's secure storage
+  for the key.)
+- **The keychain.** The key ultimately lives in
+  the OS's secure storage (Keychain, Keystore,
+  libsecret). If the attacker has the keychain,
+  they have the key, and therefore the database.
+  Pick a keychain that the OS actually protects
+  (Keychain with `kSecAttrAccessibleWhenUnlocked`
+  and a passcode set; Keystore-backed StrongBox
+  when available).
+- **Data in transit.** SQLCipher is for files
+  on disk. If you sync the file to a server,
+  the connection must be TLS. If you replicate
+  the rows over the wire (e.g. via the sync
+  layer), that channel needs its own encryption
+  and authentication.
+- **The application process.** A memory
+  corruption bug, a Dart-level SQL injection,
+  or a malicious dependency can read or write
+  the database with full SQLCipher privileges,
+  because the engine is loaded in the same
+  process. SQLCipher is not a sandbox; it is
+  a vault for the *file*.
+- **Side channels.** Timing attacks on the
+  password check are mitigated (SQLCipher uses
+  constant-time comparisons), but power
+  analysis, acoustic emanation, and rowhammer-
+  class attacks are out of scope.
+- **Wiping a stolen device.** If the attacker
+  has the device, they have the file. SQLCipher
+  only helps if the file is the *only* thing
+  they get; a screen-unlocked phone gives them
+  the running process, the keychain, and the
+  file.
+
+**The 30-second mental model:** SQLCipher makes a
+copied file unreadable without the key. It does
+not make a running process unreadable, a stolen
+device safe, or an insecure channel private.
+For those, you need a passcode on the device, a
+hardware-backed keychain, and TLS in flight.

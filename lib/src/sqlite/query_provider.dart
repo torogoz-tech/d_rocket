@@ -87,18 +87,75 @@ class SqliteQueryProvider implements AsyncQueryProvider {
 
   /// Opens an in-memory database. Convenient for tests and for
   /// ephemeral apps.
-  factory SqliteQueryProvider.inMemory() =>
-      SqliteQueryProvider._(sqlite3.openInMemory());
+  ///
+  /// If [password] is non-null, the open call is followed by
+  /// `PRAGMA key = '<password>'` and a verification query
+  /// (a `SELECT count(*) FROM sqlite_master`) to surface
+  /// wrong-password errors as a [DatabaseException] at open
+  /// time instead of at first read. The `PRAGMA key` is a
+  /// no-op on a vanilla SQLite engine — the consumer is
+  /// responsible for bundling a SQLCipher build
+  /// (`sqlcipher_flutter_libs` on Flutter, or `libsqlcipher`
+  /// installed system-wide on desktop) when [password] is
+  /// non-null. See `doc/13-faq.md` for the full setup.
+  factory SqliteQueryProvider.inMemory({String? password}) {
+    final Database db = sqlite3.openInMemory();
+    if (password != null) {
+      _applyPragmaKey(db, password);
+    }
+    return SqliteQueryProvider._(db);
+  }
 
   /// Opens a file-backed database at [path].
-  factory SqliteQueryProvider.file(String path) =>
-      SqliteQueryProvider._(sqlite3.open(path));
+  ///
+  /// If [password] is non-null, the open call is followed by
+  /// `PRAGMA key = '<password>'` and a verification query
+  /// (a `SELECT count(*) FROM sqlite_master`) to surface
+  /// wrong-password errors as a [DatabaseException] at open
+  /// time instead of at first read. The `PRAGMA key` is a
+  /// no-op on a vanilla SQLite engine — the consumer is
+  /// responsible for bundling a SQLCipher build
+  /// (`sqlcipher_flutter_libs` on Flutter, or `libsqlcipher`
+  /// installed system-wide on desktop) when [password] is
+  /// non-null. See `doc/13-faq.md` for the full setup.
+  factory SqliteQueryProvider.file(String path, {String? password}) {
+    final Database db = sqlite3.open(path);
+    if (password != null) {
+      _applyPragmaKey(db, password);
+    }
+    return SqliteQueryProvider._(db);
+  }
 
   /// Wraps an existing `Database` instance. Use this if the caller
   /// has already opened the database (e.g. via `sqlite3.openInMemory`)
   /// and wants to keep ownership of the lifecycle.
   factory SqliteQueryProvider.fromDatabase(Database db) =>
       SqliteQueryProvider._(db);
+
+  /// helper: runs `PRAGMA key = '<escaped>'` and verifies the
+  /// key works. Throws [DatabaseException] on wrong password
+  /// (the underlying engine raises `SQLITE_NOTADB` on the
+  /// first read of an encrypted page when the key is wrong).
+  /// Single quotes in [password] are escaped by doubling
+  /// (`O'Brien` -> `O''Brien`), so user input is safe to
+  /// interpolate.
+  static void _applyPragmaKey(Database db, String password) {
+    final String escaped = password.replaceAll("'", "''");
+    db.execute("PRAGMA key = '$escaped'");
+    try {
+      db.select('SELECT count(*) FROM sqlite_master');
+    } on SqliteException catch (e) {
+      db.close();
+      throw DatabaseException(
+        'Failed to open encrypted database: the password is '
+        'incorrect, the file is not a SQLCipher database, or '
+        'the underlying engine is not SQLCipher. '
+        'See doc/13-faq.md for the SQLCipher setup. '
+        'Underlying error: ${e.toString()}',
+        e,
+      );
+    }
+  }
 
   /// The underlying `Database`. Exposed for callers that need to
   /// run ad-hoc SQL.

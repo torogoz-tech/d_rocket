@@ -204,6 +204,11 @@ generator**:
 - **SQLite-bundled.** Open a database, get a typed set, query it.
   `package:sqlite3` is the only engine shipped out of the box; no
   provider indirection.
+- **Encrypted at rest.** Pass `password: '…'` to `Db.open` and the
+  database is opened as a SQLCipher database. Full-page AES,
+  PBKDF2-HMAC-SHA512 key derivation, transparent to the rest of the
+  stack. The engine library is a consumer choice (see
+  [Security — encrypted databases](doc/13-faq.md#how-do-i-open-an-encrypted-database)).
 - **Production-tested.** 989 unit and integration tests cover all four
   layers and the codegen pipeline.
 

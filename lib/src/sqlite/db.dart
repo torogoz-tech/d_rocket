@@ -58,6 +58,14 @@ class Db {
   /// `getDatabasesPath` from `package:sqflite` on mobile,
   /// or an absolute path on desktop.
   ///
+  /// If [password] is non-null, the database is opened as
+  /// an encrypted SQLCipher database — see the
+  /// `SqliteQueryProvider.file` docstring for the engine
+  /// setup. The default (no [password]) is plain SQLite,
+  /// preserving the v1.0.x behavior. The parameter is
+  /// additive: existing callers that don't pass [password]
+  /// are unaffected.
+  ///
   /// If [strategy] is provided, the runner
   /// auto-detects the database's current version and
   /// either applies all migrations (`fresh` install),
@@ -77,10 +85,14 @@ class Db {
   /// strategy.
   static Future<Db> open({
     required String path,
+    String? password,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
-    final SqliteQueryProvider provider = SqliteQueryProvider.file(path);
+    final SqliteQueryProvider provider = SqliteQueryProvider.file(
+      path,
+      password: password,
+    );
     final DbContext ctx = _SqliteRocketContext(provider);
     final Db db = Db._(provider, ctx);
     if (strategy != null) {
@@ -93,13 +105,16 @@ class Db {
   }
 
   /// Opens an in-memory database. Convenient for tests.
-  /// Same semantics as [open] for [strategy] and
-  /// [onCreate].
+  /// Same semantics as [open] for [password], [strategy]
+  /// and [onCreate].
   static Future<Db> inMemory({
+    String? password,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
   }) async {
-    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory();
+    final SqliteQueryProvider provider = SqliteQueryProvider.inMemory(
+      password: password,
+    );
     final DbContext ctx = _SqliteRocketContext(provider);
     final Db db = Db._(provider, ctx);
     if (strategy != null) {
