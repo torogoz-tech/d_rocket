@@ -117,6 +117,7 @@ export 'src/linq/operators/lookup.dart';
 //
 // `shared_preferences_sync_state_store.dart` moved to
 // `d_rocket_provider_flutter` in .
+export 'src/sync/conflict_policy.dart';
 export 'src/sync/rest_sync_provider.dart';
 export 'src/sync/sync.dart';
 
