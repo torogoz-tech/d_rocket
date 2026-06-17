@@ -155,6 +155,8 @@ class Db {
     EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
+    List<EntityMeta> entityMetas = const <EntityMeta>[],
+    bool autoMigrate = false,
   }) async {
     final String? resolvedPassword = await _resolveKey(
       password: password,
@@ -165,7 +167,10 @@ class Db {
       password: resolvedPassword,
       encryptionConfig: encryptionConfig,
     );
-    final DbContext ctx = _SqliteRocketContext(provider);
+    final DbContext ctx = _SqliteRocketContext(
+      provider,
+      entityMetas: entityMetas,
+    );
     final Db db = Db._(
       provider,
       ctx,
@@ -178,6 +183,15 @@ class Db {
     }
     if (onCreate != null) {
       await onCreate(db);
+    }
+    if (autoMigrate && entityMetas.isNotEmpty) {
+      // Run the auto-migrator AFTER any manual
+      // migrations. The auto-migrator is a no-op
+      // if the schema is already in sync with the
+      // entity list (it just rewrites the snapshot
+      // row to keep the state in lockstep with the
+      // codegen-emitted entity list).
+      await db.runAutoMigrations();
     }
     return db;
   }
@@ -192,6 +206,8 @@ class Db {
     EncryptionConfig? encryptionConfig,
     MigrationStrategy? strategy,
     Future<void> Function(Db db)? onCreate,
+    List<EntityMeta> entityMetas = const <EntityMeta>[],
+    bool autoMigrate = false,
   }) async {
     final String? resolvedPassword = await _resolveKey(
       password: password,
@@ -201,7 +217,10 @@ class Db {
       password: resolvedPassword,
       encryptionConfig: encryptionConfig,
     );
-    final DbContext ctx = _SqliteRocketContext(provider);
+    final DbContext ctx = _SqliteRocketContext(
+      provider,
+      entityMetas: entityMetas,
+    );
     final Db db = Db._(
       provider,
       ctx,
@@ -214,6 +233,9 @@ class Db {
     }
     if (onCreate != null) {
       await onCreate(db);
+    }
+    if (autoMigrate && entityMetas.isNotEmpty) {
+      await db.runAutoMigrations();
     }
     return db;
   }
@@ -325,6 +347,55 @@ class Db {
   /// change tracker.
   Future<int> saveChanges() => _ctx.saveChangesAsync();
 
+  /// Runs the auto-migration system. Computes
+  /// the diff between the current schema and
+  /// the entity list passed to `Db.open(
+  /// entityMetas: ...)` and applies the safe
+  /// changes in a single transaction. Returns
+  /// the [AutoMigrationResult] so the caller
+  /// can log the applied changes and surface
+  /// the unsafe ones.
+  ///
+  /// Called automatically by `Db.open(
+  /// autoMigrate: true)`; users do not call it
+  /// directly. Exposed for tests that want to
+  /// drive the auto-migrator from a custom
+  /// `Db` lifecycle.
+  Future<AutoMigrationResult> runAutoMigrations() async {
+    final _SqliteRocketContext ctx =
+        _ctx as _SqliteRocketContext;
+    if (ctx._entityMetas.isEmpty) {
+      return AutoMigrationResult(
+        applied: const <SchemaDiff>[],
+        unsafe: const <SchemaDiff>[],
+        snapshot: SchemaSnapshot(version: 1, tables: const <SchemaTable>[]),
+      );
+    }
+    final AutoMigrator migrator = AutoMigrator(
+      provider: _provider,
+      entityMetas: ctx._entityMetas,
+    );
+    return migrator.run();
+  }
+
+  /// Returns the pending schema diff (the
+  /// changes that would be applied by the auto-
+  /// migration system) WITHOUT applying them.
+  /// Useful for logging, dry-runs, and CI
+  /// checks.
+  Future<List<SchemaDiff>> pendingSchemaDiff() async {
+    final _SqliteRocketContext ctx =
+        _ctx as _SqliteRocketContext;
+    if (ctx._entityMetas.isEmpty) {
+      return const <SchemaDiff>[];
+    }
+    final AutoMigrator migrator = AutoMigrator(
+      provider: _provider,
+      entityMetas: ctx._entityMetas,
+    );
+    return migrator.computePendingDiff();
+  }
+
   /// Re-encrypts the database with a new key.
   ///
   /// Wraps `PRAGMA rekey` with the same single-quote
@@ -398,14 +469,28 @@ class Db {
 /// provider. Users don't see this class; they interact
 /// with [Db] only.
 class _SqliteRocketContext extends DbContext {
-  _SqliteRocketContext(this._provider) {
+  _SqliteRocketContext(
+    this._provider, {
+    List<EntityMeta> entityMetas = const <EntityMeta>[],
+  }) {
     // Wire the persistent sync queue to the same
     // connection as the user data. The queue
     // table picks up SQLCipher encryption for
     // free when the main DB is encrypted.
     queueStore = SyncQueueStore(provider: _provider);
+    _entityMetas.addAll(entityMetas);
   }
   final SqliteQueryProvider _provider;
+  final List<EntityMeta> _entityMetas = <EntityMeta>[];
+
+  /// helper: the list of [EntityMeta]s passed
+  /// to the constructor. Used by the auto-
+  /// migrator (which the [Db] calls via
+  /// `db.runAutoMigrations()` / `db.pendingSchemaDiff()`).
+  /// Empty when the consumer did not opt into
+  /// the auto-migration system (back-compat).
+  List<EntityMeta> get entityMetas =>
+      List<EntityMeta>.unmodifiable(_entityMetas);
 
   @override
   AsyncQueryProvider? get asyncProvider => _provider;

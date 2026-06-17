@@ -739,3 +739,139 @@ not make a running process unreadable, a stolen
 device safe, or an insecure channel private.
 For those, you need a passcode on the device, a
 hardware-backed keychain, and TLS in flight.
+
+## Auto-migrations (1.2.0+)
+
+### How do I turn on auto-migrations?
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  entityMetas: <EntityMeta>[
+    Patient.entityMeta,
+    Observation.entityMeta,
+  ],
+  autoMigrate: true,
+);
+```
+
+`Db.open` and `Db.inMemory` gain two new
+parameters: `entityMetas:` (the list of
+codegen-emitted entity metas) and
+`autoMigrate: bool`. When both are set, the
+runtime computes the diff between the
+codegen schema and the last applied schema
+on disk, applies the safe changes in a
+single transaction, and reports the unsafe
+changes. Existing callers that do not pass
+`entityMetas:` see no change in behaviour.
+
+### What counts as a "safe" change?
+
+CREATE TABLE (new entity), CREATE INDEX
+(new `@Index`), and ADD COLUMN (nullable
+or with a default literal). Everything
+else is unsafe and is reported, not
+applied:
+
+- DROP TABLE, DROP COLUMN, DROP INDEX.
+- MODIFY COLUMN: a change in type,
+  nullability, default literal, or
+  foreign-key target. SQLite has no
+  ALTER COLUMN; the migration requires a
+  table rebuild.
+- The rename heuristic: a DROP + an ADD
+  of the same name with the same type and
+  nullability is reported as a possible
+  RENAME (the user has to confirm manually
+  because the heuristic can be wrong).
+
+The conservative default: the auto-migrator
+never destroys data silently. The user is
+expected to handle unsafe changes
+explicitly (typically by writing a
+hand-rolled migration that performs the
+unsafe change).
+
+### How do I see the pending diff without applying it?
+
+```dart
+final pending = await db.pendingSchemaDiff();
+for (final diff in pending) {
+  print('${diff.severity}: ${diff.tableName}'
+        '.${diff.columnName ?? "<table>"} '
+        '(${diff.type})');
+  print('  reason: ${diff.reason}');
+  print('  sql:    ${diff.sql}');
+}
+```
+
+`db.pendingSchemaDiff()` returns the diff
+without applying anything. Useful for
+logging, dry-runs, and CI checks that
+fail when there are unhandled unsafe
+diffs. The diff is also returned by
+`db.runAutoMigrations()` in the
+`AutoMigrationResult.unsafe` list.
+
+### How do I run the auto-migration on demand?
+
+```dart
+final result = await db.runAutoMigrations();
+print('applied: ${result.applied.length}');
+print('unsafe:  ${result.unsafe.length}');
+print('snapshot is now: ${result.snapshot}');
+```
+
+`Db.runAutoMigrations()` is called
+automatically by `Db.open(autoMigrate: true)`.
+The version that takes no arguments can
+also be called from a custom Db lifecycle
+(e.g. a background task that runs the
+migration outside the open path).
+
+### What happens to the schema_state when there are unsafe diffs?
+
+The safe diffs are applied, but the new
+snapshot is NOT written to the
+`d_rocket_schema_state` table. The unsafe
+diffs keep showing up in
+`db.pendingSchemaDiff()` on every reopen
+until the user handles them (typically by
+writing a hand-rolled migration that
+performs the unsafe change explicitly,
+then re-opening). This is intentional: a
+pending unsafe diff is a louder signal
+than a pending safe change, and we want
+the user to handle the unsafe first.
+
+### Can I use auto-migrations and hand-written migrations together?
+
+Yes. The auto-migrator runs AFTER any
+hand-written `MigrationStrategy`. The two
+do not share data: the hand-written
+migrations are tracked in the existing
+`_d_rocket_migrations` table; the
+auto-migration snapshot is stored in the
+new `d_rocket_schema_state` table. A
+typical pattern is: hand-written
+migrations for the initial schema and
+for one-off data migrations, then
+auto-migrations for the steady-state
+add-column / add-index work.
+
+### How does the auto-migrator know what the schema is?
+
+The runtime computes the schema snapshot
+from the `EntityMeta` list you pass to
+`Db.open(entityMetas: ...)`. The codegen
+emits one `EntityMeta` per `@Table` class
+(it is a `static const` field on the
+generated `*EntityMeta` class). The
+runtime walks the list, flattens
+embedded fields and TPH subclass
+columns, and produces a JSON-serializable
+`SchemaSnapshot`. The diff is then
+computed against the last applied
+snapshot (from the `d_rocket_schema_state`
+table) and applied.

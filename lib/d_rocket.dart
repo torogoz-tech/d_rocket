@@ -85,6 +85,7 @@ export 'src/rest/rest.dart';
 // `DbContext` types, and the `EntityRegistry` global
 // lookup.
 export 'src/orm/orm.dart';
+export 'src/orm/auto_migration/auto_migration.dart';
 
 //: SQLite-First. The SQLite engine is bundled
 // directly in `d_rocket`. No more `d_rocket_provider_sqlite`
