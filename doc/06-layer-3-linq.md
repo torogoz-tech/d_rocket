@@ -239,183 +239,86 @@ no-arg and predicate forms.
 LINQ — like a `Map<TKey, List<T>>` with explicit
 "key may map to zero values" semantics.
 
-## Two forms: closure vs explicit AST
+## Two forms: explicit AST (the current runtime)
 
-Every LINQ operator in d_rocket (with the lone
-exception of the terminal aggregates `count_` and
-`firstOrDefault_`) accepts **two equivalent
-forms** for its predicate / selector arguments:
+The runtime accepts a single form for every
+operator argument: an `Expr` value, built
+explicitly with the [`Expr` DSL](#the-expr-dsl)
+factories. The user constructs the tree by hand
+and the operator dispatches on its type:
 
-- **Closure** — a Dart function, written with the
-  usual `=>` arrow syntax. Idiomatic, 99% of
-  user code.
-- **AST** — an `Expr` value, built explicitly with
-  the [`Expr` DSL](#the-expr-dsl) factories. Used
-  for dynamic queries, unit tests of the SQL
-  translator, and the codegen that produces query
-  helpers for `@Table`-annotated classes.
-
-You can mix the two in the same chain — `where_`
-can be AST and `orderBy_` can be a closure, or
-vice versa. The dispatch is done at runtime, per
-operator.
-
-### Side-by-side
-
-| Operator | Closure (idiomatic) | AST (explicit) |
+| Operator | Argument | Example |
 |---|---|---|
-| `where_` | `.where_((b) => b.name == 'Name')` | `.where_(Expr.lambda([Expr.param('b')], Expr.binary('==', Expr.member(Expr.param('b'), 'name'), Expr.const_('Name'))))` |
-| `select_<T2>` | `.select_<String>((b) => b.title)` | `.select_<String>(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'title')))` |
-| `orderBy_` / `orderByDescending_` | `.orderByDescending_((b) => b.price)` | `.orderByDescending_(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'price')))` |
-| `take_` / `skip_` | AST-only (these are SQL-only pagination, not selectors) | `.take_(3)`, `.skip_(10)` |
-| `groupBy_<TKey>` | `.groupBy_<int>(keySelector: (b) => b.authorId)` | `.groupBy_<int>(keySelector: Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'authorId')))` |
-| `join_<TIn,TKey,TR>` | `.join_<Author,int,String>(inner: q, outerKeySelector: (b) => b.authorId, innerKeySelector: (a) => a.id, resultSelector: (b, a) => '${a.name}: ${b.title}')` | (all three selectors as `Expr.lambda(...)`) |
-| `groupJoin_<...>` | (same shape, three closures) | (all three selectors as `Expr.lambda(...)`) |
-| `sum_` / `average_` | `.sum_((b) => b.price)`, `.average_((b) => b.price)` | `.sum_(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'price')))` |
-| `min_` / `max_` | `.min_((b) => b.year)`, `.max_((b) => b.price)` | (AST form, same shape) |
+| `where_` | `Expr` (a single-param `LambdaExpr`) | `.where_(Expr.lambda([Expr.param('b')], Expr.binary('==', Expr.member(Expr.param('b'), 'name'), Expr.const_('Name'))))` |
+| `select_<TResult>` | `Expr` (single-param `LambdaExpr`) | `.select_<String>(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'title')))` |
+| `orderBy_` / `orderByDescending_` | `Expr` (single-param `LambdaExpr`) | `.orderByDescending_(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'price')))` |
+| `take_` / `skip_` | `int` (no Expr) | `.take_(3)`, `.skip_(10)` |
+| `groupBy_<TKey>` | `Expr` (keySelector) | `.groupBy_<int>(keySelector: Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'authorId')))` |
+| `join_<...>` | three `Expr`s (all required to be single-param `LambdaExpr`s) | `.join_<Author,int,String>(inner: q, outerKeySelector: Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'authorId')), innerKeySelector: Expr.lambda([Expr.param('a')], Expr.member(Expr.param('a'), 'id')), resultSelector: Expr.lambda([Expr.param('b'), Expr.param('a')], Expr.binary('+', Expr.binary('+', Expr.member(Expr.param('a'), 'name'), Expr.const_(': ')), Expr.member(Expr.param('b'), 'title'))))` |
+| `groupJoin_<...>` | three `Expr`s (resultSelector is a 3-param `LambdaExpr`) | (same shape, resultSelector takes `(o, i, k)`) |
+| `sum_` / `average_` | `Expr` (single-param `LambdaExpr` returning `num`) | `.sum_(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'price')))` |
+| `min_` / `max_` | `Expr` (single-param `LambdaExpr`) | `.min_(Expr.lambda([Expr.param('b')], Expr.member(Expr.param('b'), 'year')))` |
+| `count_({where})` | `int count_({Expr? where})` | `.count_()` or `.count_(where: Expr.lambda([Expr.param('b')], Expr.binary('==', Expr.member(Expr.param('b'), 'active'), Expr.const_(true))))` |
+| `first_({where})` / `firstOrDefault_({where})` | same shape | (same) |
+| `aggregate_<TResult>({seed, func})` | `Expr` (2-param `LambdaExpr` `(acc, x) => nextAcc`) | (see aggregate tests) |
 
-### When to use which
+### Why AST-only, not the closure form?
 
-| Scenario | Recommended form |
-|---|---|
-| Hand-written application code | **Closure** — it's Dart. |
-| Unit-testing the SQL translator | **AST** — you need precise control over the tree shape, the closure form would hide the test. |
-| Building a dynamic query (e.g. a REST `?filter=` parser) | **AST** — the field, operator, and value all come from strings, not a literal closure. |
-| Codegen (`d_rocket_builder` generating helpers for `@Table` classes) | **AST** — the generator emits the tree literally. |
-| Composing operators across two libraries that don't share a codegen | **Closure** — no interop cost, no DSL to learn. |
+Dart does not have C#-style expression trees. A
+Dart closure `(b) => b.name == 'Name'` is
+compiled to native bytecode at the call site; the
+runtime cannot read its AST. That means a closure
+form *cannot* be pushed down to SQL by the
+SQLite provider: the in-memory provider would
+have to iterate the source and evaluate the
+closure in Dart, defeating the purpose of having a
+SQL provider at all.
 
-### Why both forms exist — the technical decision
+`d_rocket` therefore carries the AST form as the
+canonical, provider-agnostic representation. The
+AST self-evaluates (the in-memory provider calls
+`expr.eval(ctx)` directly) and translates to SQL
+(the SQLite provider walks the tree and emits
+`WHERE` / `ORDER BY` / `LIMIT` fragments). The
+trade-off is verbosity: the user has to build the
+tree by hand.
 
-There are three reasons d_rocket carries both the
-closure form and the AST form, instead of one or
-the other:
+### When to use which builder
 
-1. **The closure is what users want to write.** Dart
-   programmers reach for `(b) => b.name == 'Name'`
-   the same way they reach for `if` and `for`. The
-   closure is the path that is *idiomatic*. Forcing
-   everyone to learn an AST DSL just to filter a
-   list would put d_rocket in the same bucket as
-   the JPA Criteria API — useful, but not fun. The
-   closure form makes the public surface
-   indistinguishable from `Iterable.where`.
+The `Expr` DSL has named factories for every
+common shape:
 
-2. **The AST is what the SQL provider needs.** The
-   in-memory provider could evaluate a closure
-   trivially, but the SQLite provider must
-   *translate* the predicate to SQL. It cannot
-   read a Dart function's bytecode. It needs a
-   *tree* — `b.name == 'Name'` becomes
-   `Lambda([Param('b')], Binary('==', Member(Param('b'), 'name'), Const('Name')))`. The
-   AST is the canonical, provider-agnostic
-   representation; the closure is sugar on top.
+- `Expr.lambda(params, body)` for a lambda.
+- `Expr.binary(op, left, right)` for `+`, `-`,
+  `*`, `/`, `%`, `==`, `!=`, `<`, `<=`, `>`,
+  `>=`, `&&`, `||`.
+- `Expr.unary(op, operand)` for `!`, unary `-`.
+- `Expr.member(target, name)` for field access.
+- `Expr.call(target, method, args)` for method
+  calls.
+- `Expr.const_(value)` for a literal.
+- `Expr.param(name)` for a parameter reference.
+- `Expr.ternary({cond, thenBranch, elseBranch})`
+  for `cond ? a : b`.
+- `Expr.coalesce(left, right)` for `a ?? b`.
+- `Expr.nullSafe(target, member)` for `a?.b`.
+- `Expr.aggregate(function, selector:, distinct:)`
+  for `sum`, `avg`, `min`, `max`, `count`.
+- `Expr.groupBy({keySelector, ...})` for `groupBy`.
+- `Expr.join({...})` for join trees.
+- `Expr.list([...])`, `Expr.map([...])` for
+  literals.
 
-3. **Some queries are not expressible as a closure.**
-   A REST API that takes a `?filter=name:eq:John`
-   query string cannot turn that into a literal
-   `(b) => b.name == 'John'` at parse time — the
-   field, operator, and value are all runtime data.
-   The AST is the only representation that lets
-   you build the query programmatically. The same
-   is true for any sort of query-builder UI.
-
-The design choice, then, is:
-
-- The **closure** is the user-facing syntax sugar.
-  When the operator sees a closure, it materialises
-  the source (running the same `where_` / `orderBy_` /
-  `take_` / `skip_` pipeline up to this point) and
-  then runs the closure in Dart over the surviving
-  rows. There is no SQL translation cost — the
-  closure is plain Dart. The trade-off is that the
-  closure path cannot be pushed down to SQLite
-  (e.g. for `where_`); the source query has to
-  fully materialise first.
-
-- The **AST** is the provider-facing canonical
-  form. When the operator sees an `Expr`, it asks
-  the current `IQueryProvider` to translate the
-  `Expr` to a `SqlFragment` and splices that into
-  the SQL `WHERE` / `ORDER BY` / `LIMIT` clause.
-  The trade-off is the verbosity of building the
-  tree by hand.
-
-Both forms are first-class: every operator does
-the same type check at the call site, both
-compose with each other in the same chain, and
-both participate in deferred execution. The
-choice is yours, per operator, per query.
-
-### Operator dispatch rules
-
-When the operator runs, it does a runtime `is`
-check on the argument:
-
-```dart
-Queryable<T> where_(Object predicate) {
-  if (predicate is bool Function(T)) {
-    // Closure path: stash in _memFilters,
-    // applied after SQL in _materialize().
-  }
-  if (predicate is Expr) {
-    // AST path: stash in _where, translated
-    // to a SQL fragment in _buildSelect().
-  }
-  throw ArgumentError(
-    'where_ expects bool Function(T) or Expr, '
-    'got ${predicate.runtimeType}',
-  );
-}
-```
-
-The exception is `join_` and `groupJoin_`, which
-take three selectors and require *all three* to be
-closures or *all three* to be `Expr` (no mixing
-within a single call). This is checked at the
-constructor of the internal `_JoinOp` class.
-
-### The closure-form gotcha: explicit parameter types
-
-Because every operator signature accepts `Object`
-(not a function type), Dart's closure type
-inference has no information about the row type.
-This means a closure written as `(u) => u.year > 1970`
-is inferred as `(dynamic) => dynamic`, which does
-not match the `is bool Function(Book)` check at
-runtime — it falls through to the AST path, which
-then throws.
-
-**The fix is to type the closure parameter
-explicitly**:
-
-```dart
-// Does NOT match the closure overload — type is
-// `(dynamic) => dynamic`:
-.where_((u) => u.year > 1970)
-
-// Does match — type is `bool Function(Book)`:
-.where_((Book u) => u.year > 1970)
-```
-
-This is the same rule that C# applies to its
-`Expression<Func<T,bool>>` vs `Func<T,bool>`
-overloads, and the same rule that LINQ-to-SQL
-used to require. The verbose annotation is the
-price of supporting both forms through a single
-`Object` parameter; the alternative — a separate
-method name for each form, like `whereExpr_` and
-`whereLambda_` — was considered and rejected
-because it would double the surface area of the
-API.
-
-For the `groupJoin_` result selector the runtime
-type check on the `matches` list (a `List<dynamic>`)
-can also fail when the user types the second
-parameter as `Iterable<Book>`. In that case, drop
-the explicit type annotation on the matches
-parameter and let Dart infer `dynamic`; the
-closure body still type-checks each element when
-it accesses `b.title`.
+The single common gotcha: when building a
+two-parameter lambda (for `join_` /
+`groupJoin_` / `aggregate_`), the runtime's
+`LambdaExpr.eval` currently supports the
+single-parameter form directly. For multi-param
+lambdas, the operator extracts the body
+(`_collectionSelector.body`) and evaluates it
+against a context built from the two param names.
+This is transparent to the user; the operators
+do the right thing automatically.
 
 ---
 

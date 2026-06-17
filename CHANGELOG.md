@@ -5,6 +5,126 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-06-15
+
+Patch release. A documentation-parity pass
+across the d_rocket docs (14 layer docs +
+shared `STATUS.md`, `ROADMAP.md`, `BUG_REVIEW.md`,
+`MIGRATION_LEGACY.md`, `DAILY_EXECUTION.md`),
+plus the monorepo README. No code changes
+beyond what was already in 1.2.1.
+
+* **Doc moves.** The shared `doc/` folder
+  (which was unversioned at the monorepo root)
+  is now in `packages/d_rocket/doc/`. Files
+  moved: `STATUS.md`, `ROADMAP.md` (renamed
+  from `ROADMAP_d_rocket.md`), `BUG_REVIEW.md`
+  (renamed from `BUG_REVIEW_d_rocket.md`),
+  `MIGRATION_LEGACY.md` (renamed from
+  `MIGRATION_LEGACY_TO_d_rocket.md`),
+  `DAILY_EXECUTION.md`, `RELEASE_1.0.0.md`. The
+  obsolete `FRAMEWORK_VISION.md` and
+  `NEXT_FEATURES.md` (both about d_serializer)
+  are not moved; they were already redirecting
+  to the live docs.
+
+* **Doc accuracy fixes.**
+  * `01-overview.md` — the layer table now
+    lists the actual ORM annotations
+    (`@ForeignKey`, `@Embedded`, `@Index`)
+    instead of the never-shipped `@BelongsTo` /
+    `@HasMany`. The "one generator" bullet
+    describes the `EntityMeta`-driven
+    auto-migrator (1.2.0), not the old
+    `fromRow` / `setId` closures. A
+    "Key 1.2.0 feature — auto-migrations"
+    block is added.
+  * `02-quickstart.md` — the `Db.open(...)`
+    example now uses `entityMetas: [...]`
+    and `autoMigrate: true` (1.2.0+)
+    instead of the old `onCreate` callback.
+    A second example shows how to combine
+    hand-written `MigrationBase`s with the
+    auto-migrator.
+  * `06-layer-3-linq.md` — the
+    "Two forms: closure vs explicit AST"
+    section is rewritten. The runtime is
+    AST-only (`Expr.lambda(...)`); the
+    closure form is aspirational, not
+    implemented. The doc was misleading
+    users into thinking both forms work.
+  * `07-layer-4-orm.md` — the `@Index` DDL
+    section now reflects 1.1.1: the codegen
+    emits `CREATE [UNIQUE] INDEX IF NOT
+    EXISTS` as part of the auto-migrator's
+    CREATE TABLE output. The MVP-doesn't-
+    emit-this note is gone.
+  * `08-layer-5-sync.md` — the
+    `pendingSyncChanges` queue is no longer
+    in-memory. Since 1.1.1, it is persisted
+    to a `d_rocket_sync_queue` table in the
+    same transaction as the data write. The
+    "queue grows without bound" section
+    points to `SyncQueueStore`'s
+    `maxQueueSize` (default 10,000).
+  * `10-migrations.md` — the base class is
+    `MigrationBase` (not `Migration`). A
+    new "Auto-migrations (1.2.0+)" section
+    documents the safe / unsafe split with
+    a per-operation table. The CLI
+    scaffolder section is honest about its
+    current minimal state (skeleton with
+    `// TODO` bodies; the EF Core parity is
+    a 1.3.0 candidate documented in
+    `ROADMAP.md`).
+
+* **No codegen changes.** `d_rocket_builder`
+  ships 1.2.2 in lockstep (no code changes;
+  the bump keeps the convention).
+
+## [1.2.1] — 2026-06-15
+
+Patch release. A documentation-parity pass +
+the closing of the B-09 bug + a new LINQ
+operator.
+
+* **Fix (B-09).** The `_requireResult` helper
+  in `lib/src/linq/operators/join.dart` now
+  takes an explicit `expected` arity. `join_`
+  requires 2 params (outer, inner);
+  `groupJoin_` requires 3 (outer, inners,
+  key). A wrong arity throws `ArgumentError`
+  at the call site instead of silently
+  producing incorrect results. Two new tests
+  in `test/linq/join_test.dart` cover the
+  bad-arity case for both operators.
+
+* **New LINQ operator: `selectMany_`.** The
+  LINQ equivalent of `flatMap`. Takes a
+  single-parameter selector that returns an
+  `Iterable`, projects each element to its
+  inner collection, and flattens the result.
+  An optional `resultSelector` combines each
+  `(outer, inner)` pair into the final
+  result. Lazy evaluation. 9 new tests in
+  `test/linq/select_many_test.dart`. SQL
+  push-down is a 1.3.0 candidate.
+
+* **Doc parity.** The `README.md` and the
+  shared `doc/` (STATUS, ROADMAP, BUG_REVIEW,
+  monorepo README) are rewritten to reflect
+  the post-1.2.0 state. The v1.0 rename
+  history section is removed from the
+  README; readers arriving at 1.2.0 have
+  never seen the old names. The "missing
+  LINQ operators" gap in the LINQ surface
+  drops to five (`toLookup_`, `reverse_`,
+  `defaultIfEmpty_`, `zip_`, `sequenceEqual_`).
+
+* **No codegen changes.** `d_rocket_builder`
+  ships 1.2.1 in lockstep (no code changes;
+  the bump keeps the convention).
+
 ## [1.2.0] — 2026-06-15
 
 Minor release. Adds the auto-migration system

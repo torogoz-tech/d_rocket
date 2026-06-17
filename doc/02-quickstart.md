@@ -89,29 +89,43 @@ void main() async {
   //    @Table in the project.
   initializeD();
 
-  // 2. Open the local SQLite database. The path
-  //    resolves to a writable location on every
-  //    supported platform.
+  // 2. Open the local SQLite database. With
+  //    `entityMetas:` and `autoMigrate: true` (1.2.0+),
+  //    d_rocket computes the diff between the
+  //    codegen-emitted schema and the last applied
+  //    snapshot, applies the safe changes (CREATE
+  //    TABLE / CREATE INDEX / ADD COLUMN nullable or
+  //    with default) in a single transaction, and
+  //    reports the unsafe changes (DROP / MODIFY) via
+  //    `db.pendingSchemaDiff()`. See
+  //    [10-migrations.md](10-migrations.md#auto-migrations-120)
+  //    for the full design.
   final db = await Db.open(
     path: 'app.db',
-    onCreate: (db) async {
-      // First-run schema. In a real app, replace
-      // this with a MigrationStrategy — see
-      // docs/10-migrations.md.
-      await db.exec('''
-        CREATE TABLE todos (
-          id         INTEGER PRIMARY KEY AUTOINCREMENT,
-          title      TEXT    NOT NULL,
-          done       INTEGER NOT NULL DEFAULT 0,
-          created_at TEXT    NOT NULL
-        )
-      ''');
-    },
+    entityMetas: <EntityMeta>[Todo.entityMeta],
+    autoMigrate: true,
   );
 
   // 3. Hand the database to your app.
   runApp(MyApp(db: db));
 }
+```
+
+If you have hand-written `MigrationBase`s (e.g.
+data migrations), pass a `MigrationStrategy` to
+`Db.open` as well — the auto-migrator runs **after**
+the manual one, and the two do not interfere.
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  strategy: MigrationStrategy(
+    version: 4,
+    migrations: [M001(), M002(), M003(), M004()],
+  ),
+  entityMetas: <EntityMeta>[Todo.entityMeta],
+  autoMigrate: true,
+);
 ```
 
 ## Step 4 — Insert a row

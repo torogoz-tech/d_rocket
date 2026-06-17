@@ -18,7 +18,7 @@ rest:
 | 1 | **Serialization** | JSON ↔ Dart | `@Serializable`, `@SerializableUnion` |
 | 2 | **REST** | Typed HTTP clients | `@RestClient`, `@HttpGet` / `@HttpPost` / ... |
 | 3 | **LINQ** | Query composition | `IQueryable<T>` (no annotation — queryable) |
-| 4 | **ORM (SQLite)** | Local persistence | `@Table`, `@PrimaryKey`, `@Column`, `@BelongsTo`, `@HasMany` |
+| 4 | **ORM (SQLite)** | Local persistence | `@Table`, `@PrimaryKey`, `@Column`, `@ForeignKey`, `@Embedded`, `@Index` |
 | 5 | **Sync (offline-first)** | Push/pull against a backend | `SyncProvider` (no annotation — class) |
 | 6 | **Realtime** | WebSocket / SSE | `@WebSocketRoute`, `@SseRoute` |
 
@@ -81,6 +81,16 @@ queries via `watch()`. SQLite is bundled via `package:sqlite3`
 **Lives in:** `lib/src/orm/` and `lib/src/sqlite/`.
 **Docs:** [07-layer-4-orm.md](07-layer-4-orm.md).
 
+**Key 1.2.0 feature — auto-migrations.** When
+`Db.open(entityMetas: [...], autoMigrate: true)`
+is set, d_rocket computes the diff between the
+codegen-emitted schema and the last applied
+snapshot, applies the safe changes in a single
+transaction, and reports the unsafe changes
+(DROP, MODIFY) via `db.pendingSchemaDiff()`. The
+conservative default: nothing is destroyed
+silently.
+
 ### Layer 5 — Sync (offline-first)
 
 `SyncProvider` is the interface your backend integration
@@ -121,8 +131,11 @@ Layer 1 is reused for inbound and outbound payloads.
      `register<X>Serializer` call;
    - per-interface `RestClient` implementations with
      interceptors, retry, and serialization wired in;
-   - per-entity `fromRow` (row materialiser) and
-     `setId` (back-propagation hook) closures for the ORM;
+   - per-entity `EntityMeta` (table name, columns,
+  indexes, primary-key, embedded fields) for the
+  ORM. The auto-migrator (1.2.0) reads the
+  `EntityMeta` list at runtime to compute schema
+  diffs;
    - a single `d_rocket_registry.g.dart` with the central
      `initializeD()` that registers every annotated class
      in the project.

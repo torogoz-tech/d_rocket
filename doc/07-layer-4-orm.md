@@ -262,16 +262,23 @@ const Index({this.unique = false, this.name});
 ```
 
 Marks a field (or set of fields, in a future
-iteration) for indexing.
+iteration) for indexing. As of **1.1.1** the
+codegen emits a `CREATE INDEX` statement in the
+auto-migrator's CREATE TABLE output and in the
+`MigrationGenerator` hand-rolled migration
+template; the `autoMigrate: true` path on
+`Db.open(entityMetas: ...)` creates the index as
+part of the fresh-install diff.
 
 | Parameter | Default | Purpose |
 |---|---|---|
 | `unique` | `false` | Whether the index is unique. |
 | `name` | `null` | Optional index name. If `null`, the codegen derives `<table>_<column>_idx` (or `_unq` for unique indexes). |
 
-The MVP does **not** emit the `CREATE INDEX` DDL;
-the annotation is metadata-only and surfaces in the
-`ColumnMeta` for downstream tooling.
+The DDL is emitted as `CREATE [UNIQUE] INDEX
+IF NOT EXISTS <name> ON <table>(<column>)` and
+is non-destructive (the `IF NOT EXISTS` clause
+makes it safe to re-run on every open).
 
 ## Navigation properties
 

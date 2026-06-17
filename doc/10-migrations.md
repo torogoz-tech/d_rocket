@@ -26,14 +26,14 @@ This document covers both modes and the CLI scaffolder.
 
 ---
 
-## The `Migration` base class
+## The `MigrationBase` class
 
-A migration is a class that extends `Migration`:
+A migration is a class that extends `MigrationBase`:
 
 ```dart
 import 'package:d_rocket/d_rocket.dart';
 
-class M001CreateTodos extends Migration {
+class M001CreateTodos extends MigrationBase {
   @override
   String get id => '001';
 
@@ -85,7 +85,7 @@ exec.renameTable('orders', 'sales_orders');
 exec.dropTableIfExists('legacy_users');
 ```
 
-`Migration` parameters:
+`MigrationBase` parameters:
 
 | Member | Required | Purpose |
 |---|---|---|
@@ -101,7 +101,7 @@ is the integer the runner uses to compute upgrades and
 downgrades. You can use date-based ids:
 
 ```dart
-class M2026_06_12_AddCustomerEmailIndex extends Migration {
+class M2026_06_12_AddCustomerEmailIndex extends MigrationBase {
   @override
   String get id => '2026-06-12-001';
 
@@ -113,6 +113,89 @@ class M2026_06_12_AddCustomerEmailIndex extends Migration {
   // ...
 }
 ```
+
+## Auto-migrations (1.2.0+)
+
+As of **1.2.0** d_rocket ships a second migration
+system that is the **recommended default for the
+steady-state add-column / add-index / add-table
+work**. Set `autoMigrate: true` on `Db.open` and
+pass the list of codegen-emitted `EntityMeta`s:
+
+```dart
+final db = await Db.open(
+  path: 'app.db',
+  entityMetas: <EntityMeta>[
+    Patient.entityMeta,
+    Observation.entityMeta,
+  ],
+  autoMigrate: true,
+);
+```
+
+The auto-migrator runs **after** the manual
+`MigrationStrategy` (if one was provided). The
+flow is:
+
+1. Compute the new `SchemaSnapshot` from the
+   entity list (deterministic JSON).
+2. Read the last applied snapshot from the
+   `d_rocket_schema_state` table (or `null` on
+   fresh install).
+3. Compute the diff.
+4. Split into **safe** (auto-applied in a single
+   transaction) and **unsafe** (reported, never
+   auto-applied) operations.
+
+| Operation | Severity | Auto-applies? |
+|---|---|---|
+| `CREATE TABLE` (new entity) | safe | ✅ |
+| `CREATE INDEX` (new `@Index`) | safe | ✅ |
+| `ADD COLUMN` nullable or with default | safe | ✅ |
+| `ADD COLUMN` NOT NULL without default | unsafe | ❌ reported (SQLite cannot backfill) |
+| `DROP TABLE` (entity removed) | unsafe | ❌ reported |
+| `DROP COLUMN` (field removed) | unsafe | ❌ reported |
+| `DROP INDEX` (`@Index` removed) | unsafe | ❌ reported |
+| `MODIFY COLUMN` (type / nullability / default / FK change) | unsafe | ❌ reported (no ALTER COLUMN in SQLite) |
+| Rename heuristic: drop + add of the same name with the same type | unsafe (suggestion) | ❌ reported (`ALTER TABLE ... RENAME COLUMN` for the user to confirm) |
+
+Inspect the pending diff at any time:
+
+```dart
+final pending = await db.pendingSchemaDiff();
+for (final diff in pending) {
+  if (diff.severity == DiffSeverity.unsafe) {
+    print('UNSAFE: ${diff.tableName}.${diff.columnName}');
+    print('  reason: ${diff.reason}');
+    print('  sql:    ${diff.sql}');
+  }
+}
+```
+
+The conservative default: when the auto-migrator
+runs and finds unsafe diffs, the safe diffs are
+applied but the new snapshot is **not** written
+to `d_rocket_schema_state`. The unsafe diffs keep
+showing up in `db.pendingSchemaDiff()` on every
+reopen until the user handles them (typically by
+writing a hand-rolled `MigrationBase` that
+performs the unsafe change). This is intentional:
+a pending unsafe diff is a louder signal than a
+pending safe change, and we want the user to
+handle the unsafe first.
+
+The two migration systems coexist: hand-written
+migrations run first, auto-migration runs after.
+A project that started with hand-written
+migrations can opt into auto-migration for the
+steady-state add-column / add-index work without
+rewriting the initial schema.
+
+The auto-migrator never touches the
+`_d_rocket_migrations` table — the hand-written
+history and the auto-migration snapshot are
+stored separately. Mixing the two does not
+interfere.
 
 ## The `MigrationStrategy`
 
@@ -282,12 +365,17 @@ other one-time work that isn't a schema change.
 
 ## CLI scaffolder
 
-`d_rocket:migration add <name>` scaffolds a new
-migration with the right id, class name, and
-pre-filled `up()` / `down()` bodies:
+`dart run bin/migration.dart add <name>` scaffolds
+a new migration. As of 1.2.1 the CLI is **minimal**
+— it emits a skeleton with the right `id` and
+`class` names and pre-filled `// TODO`
+bodies, but the generated SQL is not auto-populated
+from the entity diff. A 1.3.0 candidate (CLI
+scaffolder with EF Core parity) is documented in
+[ROADMAP.md](ROADMAP.md#13-candidates).
 
 ```bash
-$ dart run d_rocket:migration add create_inventory_table
+$ dart run bin/migration.dart add create_inventory_table
 ✅ Created lib/db/migrations/M005_create_inventory_table.dart
    id: 005, class: M005CreateInventoryTable
 ```
@@ -443,7 +531,7 @@ each gets its own `_d_rocket_migrations` table.
 
 ## API reference
 
-### `Migration`
+### `MigrationBase`
 
 Abstract base class. Members: `id`, `version`, `name`,
 `up(exec)`, `down(exec)`.

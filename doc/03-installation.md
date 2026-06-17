@@ -313,7 +313,8 @@ first stable version. Upgrading from a 0.x version requires:
    path is unchanged, but some internal modules moved).
 4. If you were using `d_rocket_provider_sqlite` directly,
    switch to depending on `d_rocket` instead — the engine
-   is bundled in 1.0.
+   is bundled in 1.0. (Note: `d_rocket_provider_sqlite` is
+   also marked as deprecated; use `d_rocket` 1.2+ directly.)
 
 The migration from `d_serializer` 1.3.0 and `d_rest` 0.1.0
 to `d_rocket` 1.0 is documented in

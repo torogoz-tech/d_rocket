@@ -65,12 +65,18 @@ in the background. The default trigger is the user wiring
                                   └───────────────────────────┘
 ```
 
-The `pendingSyncChanges` queue is **in-memory** (not
-persisted to SQLite). It is populated by
-`saveChangesAsync` after a successful commit and
-drained by `syncAsync` on a successful round-trip.
-A failed sync keeps the queue intact (the next
-`syncAsync` retries the same changes).
+The `pendingSyncChanges` queue is **persisted to
+SQLite** (since 1.1.1) in a `d_rocket_sync_queue`
+table. The INSERT happens in the same transaction
+as the data write (inside `saveChanges` /
+`saveChangesAsync`), so a crash between the
+write and the next `syncAsync` does not lose
+queued changes. A failed sync keeps the queue
+intact (the next `syncAsync` retries the same
+changes). The previous in-memory queue is
+deprecated; consumers that referenced it via
+`ctx.pendingSyncChanges` continue to work (the
+getter is now backed by the on-disk table).
 
 ## `SyncProvider` — the contract
 
@@ -211,10 +217,13 @@ already exists locally.
 `DbContext.syncAsync(provider, ...)` is the
 orchestrator. It runs a 3-step round-trip:
 
-1. **Push.** Drain `_pendingSyncChanges` (populated
-   by `saveChangesAsync` after a successful commit)
-   into a `SyncEnvelope` with the current
-   `_clientWatermark` as `since`.
+1. **Push.** Drain the `d_rocket_sync_queue` table
+   (populated by `saveChanges` /
+   `saveChangesAsync` after a successful commit) into
+   a `SyncEnvelope` with the current
+   `_clientWatermark` as `since`. The DELETE that
+   removes the queue rows happens in the same
+   transaction as the new `clientWatermark` write.
 2. **Pull.** Call `provider.syncAsync(envelope)`.
    The provider returns a `SyncEnvelope` with
    changes that happened on the server since
@@ -423,11 +432,10 @@ envelopes via a test helper.
 
 ### "My local changes don't reach the server"
 
-Check that `pendingSyncChanges` is non-empty. The
-queue is populated by `saveChangesAsync` (NOT
-`saveChanges`). If you're using the sync
-`saveChanges()` (the non-transactional path), the
-queue is not populated.
+Check that `d_rocket_sync_queue` is non-empty. The
+queue is populated by `saveChanges` AND
+`saveChangesAsync` (both paths share the
+persistence, since 1.1.1).
 
 ```dart
 ctx.orders.add(order);
@@ -456,10 +464,12 @@ StreamBuilder<List<Order>>(
 
 ### "The queue grows without bound"
 
-`pendingSyncChanges` is in-memory. If `syncAsync` is
-never called (or always fails), the queue grows on
-every `saveChangesAsync`. To guard against runaway
-memory, the user can cap the queue size manually:
+The `d_rocket_sync_queue` table is on disk. If
+`syncAsync` is never called (or always fails), the
+queue grows on every `saveChanges`. To guard
+against runaway growth, `SyncQueueStore` ships a
+`maxQueueSize` parameter (default 10,000) that
+throws a `StateError` when the cap is hit:
 
 ```dart
 if (ctx.pendingSyncChanges.length > 1000) {
