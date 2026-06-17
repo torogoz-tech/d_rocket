@@ -16,6 +16,7 @@ export 'operators/of_type.dart';
 export 'operators/order_by.dart';
 export 'operators/quantifiers.dart';
 export 'operators/select.dart';
+export 'operators/select_many.dart';
 export 'operators/set_operations.dart';
 export 'operators/skip.dart';
 export 'operators/skip_while.dart';
