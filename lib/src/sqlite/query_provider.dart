@@ -31,27 +31,16 @@ import 'package:sqlite3/sqlite3.dart';
 /// barrel. The exception was leaking out as an unhandled
 /// type. Wrapping it in [DatabaseException] keeps the
 /// public API self-contained.
-class DatabaseException implements Exception {
-  ///: constructs a [DatabaseException] with
-  /// the original cause (if any) and a message.
-  DatabaseException(this.message, [this.cause]);
+///
+/// In Phase 1, [DatabaseException] lives in
+/// `lib/src/orm/database_exception.dart` (engine-
+/// agnostic) so it can be exported from the
+/// d_rocket barrel without dragging the sqlite3
+/// types into consumer code that does not use
+/// the ORM. The class is re-exported from this
+/// file for backward compat with the 1.x API.
 
-  ///: human-readable description of the
-  /// failure (typically the SQL error code and message
-  /// from sqlite3, e.g. `"constraint failed: FOREIGN KEY
-  /// constraint failed (code 787)"`).
-  final String message;
-
-  ///: the original exception, if any. Lets
-  /// callers reach the underlying [SqliteException] for
-  /// advanced cases (e.g. inspecting `extendedResultCode`).
-  final Object? cause;
-
-  @override
-  String toString() => cause == null
-      ? 'DatabaseException: $message'
-      : 'DatabaseException: $message (cause: $cause)';
-}
+// (DatabaseException moved to orm/database_exception.dart.)
 
 /// helper: wraps a synchronous DB call in a
 /// try/catch that converts [SqliteException] (and any other
@@ -63,7 +52,7 @@ T _wrap<T>(T Function() op) {
   } on DatabaseException {
     rethrow;
   } catch (e) {
-    throw DatabaseException(e.toString(), e);
+    throw DatabaseException(e.toString(), cause: e);
   }
 }
 
@@ -74,7 +63,7 @@ Future<T> _wrapAsync<T>(Future<T> Function() op) async {
   } on DatabaseException {
     rethrow;
   } catch (e) {
-    throw DatabaseException(e.toString(), e);
+    throw DatabaseException(e.toString(), cause: e);
   }
 }
 
@@ -210,7 +199,7 @@ class SqliteQueryProvider implements AsyncQueryProvider {
         'the underlying engine is not SQLCipher. '
         'See doc/13-faq.md for the SQLCipher setup. '
         'Underlying error: ${e.toString()}',
-        e,
+        cause: e,
       );
     }
   }
@@ -307,5 +296,6 @@ class SqliteQueryProvider implements AsyncQueryProvider {
   /// still alive. Returns `false` after [disposeAsync]
   /// has been called. Useful for `Db.isOpen` and
   /// the diagnostics snapshot.
+  @override
   bool get isOpen => !_disposed;
 }

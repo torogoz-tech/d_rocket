@@ -14,6 +14,14 @@
 /// has been migrated to async and the legacy sync API on
 /// the providers is removed.
 abstract class AsyncQueryProvider {
+  /// Whether the underlying connection is still
+  /// alive. `false` after [disposeAsync] has
+  /// been called. The `Db.isOpen` getter
+  /// proxies to this. Useful for "is this
+  /// handle reusable?" checks at the call
+  /// site.
+  bool get isOpen;
+
   /// Executes a statement that returns no rows (e.g.
   /// `CREATE TABLE`, `INSERT`, `UPDATE`, `DELETE`).
   ///

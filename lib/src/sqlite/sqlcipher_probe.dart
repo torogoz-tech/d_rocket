@@ -44,6 +44,7 @@
 /// (e.g. a `--dart-define=SQLCIPHER=1` flag).
 library;
 
+import '../orm/database_exception.dart';
 import 'query_provider.dart';
 
 bool? _sqlcipherCache;

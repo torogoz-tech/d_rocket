@@ -13,10 +13,13 @@ export 'bulk_ops.dart';
 export 'change_tracker.dart';
 export 'column.dart';
 export 'column_meta.dart';
+export 'database_exception.dart';
+export 'db_engine.dart';
 export 'db_set.dart';
 export 'db_set_include.dart';
 export 'embedded.dart';
 export 'embedded_meta.dart';
+export 'engine_registry.dart';
 export 'navigation_meta.dart';
 export 'navigation_populator.dart';
 export 'navigation_registry.dart';
@@ -41,3 +44,10 @@ export 'primary_key.dart';
 export 'db_context.dart';
 export 'table.dart';
 export 'tracked_entry.dart';
+
+// `sqlite_engine.dart` is exported here so the
+// in-core SQLite engine is reachable via
+// `package:d_rocket/d_rocket.dart`. Phase 2 will
+// move this file to the `d_rocket_engine_sqlite`
+// package and the export will be removed.
+export 'sqlite_engine.dart';

@@ -455,7 +455,7 @@ class Db {
     } on Object catch (e) {
       throw DatabaseException(
         'Failed to rekey database: ${e.toString()}',
-        e,
+        cause: e,
       );
     }
   }
