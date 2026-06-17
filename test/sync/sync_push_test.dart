@@ -2,10 +2,12 @@
 // pipeline — `saveChangesAsync` populates the
 // pending queue, `syncAsync` pushes it + clears.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.11 — pendingSyncChanges: queue grows on saveChanges', () {
     late SqliteQueryProvider provider;
     late _SyncContext ctx;

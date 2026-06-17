@@ -4,10 +4,12 @@
 // columns (root's + leaf's). No JOINs needed at read
 // time.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.2.4 — TPC: schema + meta shape', () {
     test('a TPC root has isAbstract=true (no table)', () {
       final ColumnMeta idCol = ColumnMeta(

@@ -13,10 +13,12 @@
 // 6. Multiple entities in the same batch: inserts +
 // updates + deletes — the entire batch is atomic.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   late SqliteQueryProvider provider;
   late _Ctx ctx;
 

@@ -5,6 +5,113 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-06-17
+
+**BREAKING — engine split.** The SQLite engine
+that shipped inside `d_rocket` from 0.9.0 to
+1.2.x is now a separate package,
+[`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite).
+`d_rocket` core is now engine-agnostic. See
+`doc/MIGRATION_1_x_to_2_0.md` for the upgrade
+guide.
+
+* **The ORM engine is a separate package.**
+  Consumers who use `Db` / `DbContext` / `DbSet` /
+  `@Table` / auto-migrations must add
+  `d_rocket_engine_sqlite: ^2.0.0` to their
+  `pubspec.yaml` and call `dRocketSqlite()` once
+  at app startup before any `Db.open` /
+  `Db.inMemory` call. Without it, the ORM
+  throws a clear "no engine registered" error.
+
+* **The `package:sqlite3` dep is gone from
+  `d_rocket`.** It now lives in
+  `d_rocket_engine_sqlite`. Consumers who only
+  need `@Serializable`, `@RestClient`,
+  `IQueryable<T>`, `SyncProvider`, or
+  `WebSocketClient` no longer download
+  `libsqlite3` (the savings are ~500KB on
+  Android, ~700KB on iOS, ~1MB on desktop).
+
+* **Engine-agnostic DbEngine interface.**
+  `d_rocket` now exports a `DbEngine` contract
+  and an `EngineRegistry` slot. Each engine
+  package (`d_rocket_engine_sqlite`,
+  `d_rocket_engine_postgres`,
+  `d_rocket_engine_libsql_wasm`) registers
+  itself. `Db.open` / `Db.inMemory` are now
+  thin facades that look up the registered
+  engine and call its `open()` method.
+
+* **`redactPragmaKey` lives in d_rocket core.**
+  The function is a pure string transformation
+  and is used by `LoggingInterceptor` in the
+  REST layer. It is engine-agnostic even though
+  `PRAGMA key` is a SQLCipher statement.
+
+* **The `d_rocket:migration` CLI now ships with
+  d_rocket_engine_sqlite as a regular dep.**
+  This is a known limitation of the 2.0
+  cutover: the CLI's `run` / `status` /
+  `rollback` subcommands need a real engine
+  to apply migrations. The `add` / `list` /
+  `doctor` subcommands are engine-agnostic and
+  work without the engine. A future 2.1
+  release will split the CLI into two
+  executables (`d_rocket:migration` and
+  `d_rocket_engine_sqlite:migration`) to drop
+  the dep for users who never apply migrations
+  via the CLI.
+
+* **Phase 1 (this release): AsyncQueryProvider
+  refactor + DbEngine contract + EngineRegistry.**
+  The five LINQ operators that were missing in
+  1.x (`toLookup_`, `reverse_`,
+  `defaultIfEmpty_`, `zip_`, `sequenceEqual_`)
+  are added in this release.
+
+* **PHASE 2 (this release): d_rocket_engine_sqlite
+  package.** All SQLite-specific code moved
+  from `d_rocket/lib/src/sqlite/` to
+  `d_rocket_engine_sqlite/lib/src/`. The
+  `lib/src/orm/sqlite_engine.dart` shim from
+  1.2.x is gone; the real `SqliteEngine` lives
+  in the new package.
+
+* **`DatabaseException` lives in d_rocket core.**
+  It is the engine-agnostic exception type
+  raised by the ORM when a `Db.open` /
+  `Db.inMemory` fails.
+
+* **25 test files moved.** All 25 sqlite tests
+  that previously lived in `d_rocket/test/sqlite/`
+  moved to `d_rocket_engine_sqlite/test/`.
+  The 5 ORM tests that use a real engine
+  (`test/orm/db_set_async_test.dart`,
+  `save_changes_async_test.dart`, etc.) stay
+  in `d_rocket/test/orm/` and use the new
+  `test/_helpers.dart` shared helper that
+  calls `setUp(dRocketSqlite)` and
+  `tearDown(EngineRegistry.resetForTest)`.
+
+* **Breaking: `Db.open` /
+  `Db.inMemory` no longer auto-create a
+  SqliteQueryProvider.** In 1.x, calling
+  `Db.open` "just worked" because the SQLite
+  engine was bundled. In 2.0, the call
+  throws a `StateError` if no
+  `d_rocket_engine_*` package is registered.
+  Add `dRocketSqlite()` (or the equivalent
+  for the engine you chose) to your
+  `main()` before the first `Db.open`.
+
+* **Breaking: `redactPragmaKey` is a pure
+  string transformation in d_rocket core.**
+  In 1.x it was in `d_rocket/src/sqlite/`;
+  the import path is now
+  `package:d_rocket/d_rocket.dart` (the
+  function is in the d_rocket barrel).
+
 ## [1.2.2] — 2026-06-15
 
 Patch release. A documentation-parity pass

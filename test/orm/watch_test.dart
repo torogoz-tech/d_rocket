@@ -2,10 +2,12 @@
 // the reactive query stream that re-emits on
 // every `pollInterval` tick.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.8 — DbSet.watch(): shape', () {
     test('the watch method returns a Stream<List<T>>', () {
       final SqliteQueryProvider provider = SqliteQueryProvider.inMemory();

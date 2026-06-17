@@ -5,10 +5,12 @@
 // migrations have already been applied (idempotent
 // across re-runs).
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group(
       'Fase 5.3 — ctx.migrateAsync() async path (SQLite as AsyncQueryProvider)',
       () {

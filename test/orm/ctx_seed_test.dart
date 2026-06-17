@@ -1,10 +1,12 @@
 //: tests for the `seed` hook and
 // the `initializeDAsync` one-shot helper.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.7 — seed() hook: default', () {
     test('default seed() is a no-op', () async {
       final SqliteQueryProvider provider = SqliteQueryProvider.inMemory();

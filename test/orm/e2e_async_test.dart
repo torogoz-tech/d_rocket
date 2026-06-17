@@ -6,10 +6,12 @@
 // `runAsync`). This is the test mirror of the
 // end-to-end demo (`lib/example/end_to_end/main.dart`).
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   late SqliteQueryProvider provider;
   late _BookstoreContext ctx;
 

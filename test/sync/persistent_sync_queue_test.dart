@@ -15,10 +15,12 @@
 
 import 'dart:io';
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Db — crash mid-sync round-trip (the headline test)', () {
     test(
         'a row inserted into d_rocket_sync_queue via the provider '

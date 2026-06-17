@@ -5,10 +5,12 @@
 
 import 'dart:io';
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.12 — InMemorySyncStateStore: shape', () {
     test('empty store returns null + 0', () async {
       final InMemorySyncStateStore store = InMemorySyncStateStore();

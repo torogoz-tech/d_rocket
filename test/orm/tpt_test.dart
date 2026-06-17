@@ -4,10 +4,12 @@
 // table has the child's specific columns + a FK
 // (`animal_id`) to the root's `animals` table.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.2.3 — TPT: schema + meta shape', () {
     test('a TPT child has parentTable + joinedFkColumn set', () {
       final ColumnMeta idCol = ColumnMeta(

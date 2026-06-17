@@ -2,8 +2,12 @@ name: d_rocket
 description: >
   Dart/Flutter data-layer framework: @Serializable codegen,
   @RestClient with retry, deferred LINQ, and a code-first
-  SQLite ORM with migrations. See README for platform support.
-version: 1.2.2
+  engine-agnostic ORM (DbContext / DbSet / @Table /
+  migrations) with pluggable backends
+  (d_rocket_engine_sqlite, d_rocket_engine_postgres,
+  d_rocket_engine_libsql_wasm). See README for
+  platform support and engine selection.
+version: 2.0.0
 
 repository: https://github.com/torogoz-tech/d_rocket
 homepage: https://github.com/torogoz-tech/d_rocket
@@ -13,9 +17,9 @@ documentation: https://github.com/torogoz-tech/d_rocket#readme
 topics:
   - linq
   - orm
-  - sqlite
   - codegen
   - framework
+  - engine-agnostic
 
 environment:
   sdk: ^3.6.0
@@ -26,7 +30,31 @@ dependencies:
     sdk: flutter
   meta: ^1.17.0
   http: ^1.2.2
-  sqlite3: ^3.0.0
+  # Note: `package:sqlite3` is intentionally NOT a
+  # direct dependency of d_rocket core. It lives in
+  # `d_rocket_engine_sqlite` and is only pulled in
+  # when the consumer opts into the SQLite engine.
+  # Consumers who only need serialization, REST,
+  # LINQ, sync, or realtime never download
+  # `libsqlite3`.
+  #
+  # The `d_rocket:migration` CLI does need
+  # `d_rocket_engine_sqlite` to apply migrations
+  # (the `run` / `status` / `rollback` subcommands
+  # need a real provider). The `add` / `list` /
+  # `doctor` subcommands are engine-agnostic and
+  # work without the engine. We accept the
+  # `d_rocket` → `d_rocket_engine_sqlite` →
+  # `sqlite3` dependency chain for the CLI as a
+  # known limitation; consumers who never call
+  # `d_rocket:migration run` still pay the cost
+  # of the libsqlite3 binary, but only at the
+  # binary level (the code path is dead). A
+  # future 2.1 release will split the migration
+  # CLI into a `d_rocket:migration` (scaffolder)
+  # and a `d_rocket_engine_sqlite:migration`
+  # (runtime) executable to remove this dep.
+  d_rocket_engine_sqlite: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -34,7 +62,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   lints: ^6.0.0
   test: ^1.30.0
-  d_rocket_builder: ^1.0.0
+  d_rocket_builder: ^2.0.0
   build_runner: ^2.10.3
 
 platforms:

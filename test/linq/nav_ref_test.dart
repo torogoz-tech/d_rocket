@@ -1,4 +1,4 @@
-import 'package:d_rocket/d_rocket.dart';
+import 'package:d_rocket_engine_sqlite/d_rocket_engine_sqlite.dart';
 import 'package:test/test.dart';
 
 void main() {

@@ -3,10 +3,12 @@
 // `AsyncQueryProvider`. Mirrors EF Core 7+'s
 // `ExecuteUpdateAsync` / `ExecuteDeleteAsync`.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.6 — bulk operations: executeUpdateAsync', () {
     late SqliteQueryProvider provider;
 

@@ -37,7 +37,7 @@ library;
 
 import 'dart:io';
 
-import 'package:d_rocket/d_rocket.dart';
+import 'package:d_rocket_engine_sqlite/d_rocket_engine_sqlite.dart';
 
 const String _kBanner = '''
 ┌─────────────────────────────────────────────┐

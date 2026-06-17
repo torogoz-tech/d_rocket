@@ -3,10 +3,12 @@
 // when `saveChangesAsync` fires (instead of
 // waiting for the next poll tick).
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.8.1 — DbSet.watch(): change-tracker driven', () {
     late SqliteQueryProvider provider;
     late _BooksDbSet dbSet;

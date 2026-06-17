@@ -1,0 +1,74 @@
+feat(orm): add engine registry + db-agnostic engine interface
+
+Phase 1 of the 2.0.0 multi-engine architecture.
+The d_rocket ORM becomes database-agnostic: the
+Db.open factory will (in Phase 2) delegate to a
+registered DbEngine, and the engine ships as a
+separate pub.dev package.
+
+What's new:
+
+* EngineRegistry in lib/src/orm/engine_registry.dart
+  - Single static slot for the active DbEngine.
+  - findOrThrow getter for the active engine.
+  - In Phase 1, auto-registers the in-core SQLite
+    engine the first time findOrThrow is called;
+    Phase 2 removes that fallback and requires
+    explicit registration.
+  - resetForTest helper for the test suite.
+  - isRegistered getter for the README's "modular
+    dep" section.
+
+* DbEngine interface in lib/src/orm/db_engine.dart
+  - The contract every engine implements.
+  - name, isAvailable, open(path, password,
+    encryptionConfig) -> AsyncQueryProvider.
+
+* SqliteEngine facade in lib/src/orm/sqlite_engine.dart
+  - Wraps the in-core SqliteQueryProvider.
+  - Implements DbEngine.
+  - Exports registerDefaultEngine() as the
+    public helper for tests.
+
+* DatabaseException in lib/src/orm/database_exception.dart
+  - Engine-agnostic exception. New named-param
+    signature: (message, {cause, sql, code}).
+  - The 4 call sites in query_provider.dart and
+    db.dart were updated from positional to
+    named. The 1.x positional form is gone (it's
+    not a public API; the class is).
+
+* isOpen added to AsyncQueryProvider (engine-agnostic
+  contract). The SqliteQueryProvider.isOpen
+  implementation was annotated with @override.
+
+* orm.dart barrel now exports the four new
+  public files (engine_registry, db_engine,
+  database_exception, sqlite_engine).
+
+What's deferred to Phase 2 (the cutover):
+
+* Refactor Db.open / Db.inMemory to use the
+  registry. In Phase 1, Db continues to use
+  the in-core SqliteQueryProvider directly to
+  avoid touching the 25 sqlite test files.
+  The registry is a parallel, opt-in API.
+* Move SqliteEngine to d_rocket_engine_sqlite
+  package.
+* Remove auto-registration from EngineRegistry.
+* Remove package:sqlite3 from d_rocket's pubspec.
+* Add d_rocket_engine_sqlite.register() at the
+  test setup.
+
+Tests: 13 new cases in
+test/orm/engine_registry_test.dart covering the
+registry round-trip, the auto-registration path,
+the resetForTest helper, the SqliteEngine
+open/close, the SqliteEngine.isAvailable
+detection, and the new DatabaseException fields.
+
+Total: 879 pass + 1 skip (was 866, +13). 0
+analyzer warnings.
+
+Branch: feat/2.0-phase-1-engine-registry. No push
+(R9 freeze).

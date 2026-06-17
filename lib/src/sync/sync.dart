@@ -43,5 +43,6 @@ export 'sync_change.dart';
 export 'sync_change_type.dart';
 export 'sync_envelope.dart';
 export 'sync_provider.dart';
+export 'sync_queue_store.dart';
 export 'sync_state_store.dart';
 export 'sync_trigger.dart';

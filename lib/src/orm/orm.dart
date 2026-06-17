@@ -44,10 +44,3 @@ export 'primary_key.dart';
 export 'db_context.dart';
 export 'table.dart';
 export 'tracked_entry.dart';
-
-// `sqlite_engine.dart` is exported here so the
-// in-core SQLite engine is reachable via
-// `package:d_rocket/d_rocket.dart`. Phase 2 will
-// move this file to the `d_rocket_engine_sqlite`
-// package and the export will be removed.
-export 'sqlite_engine.dart';

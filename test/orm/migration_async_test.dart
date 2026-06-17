@@ -1,10 +1,12 @@
 // Tests for the async migration runner:
 // `MigrationRunner.runAsync` and `MigrationRunner.rollbackAsync`.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   late SqliteQueryProvider provider;
   late MigrationRunner runner;
   late _MigrationLog log;

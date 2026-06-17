@@ -11,6 +11,14 @@
 /// form (which is what d_rocket itself emits when
 /// applying the key).
 ///
+/// `PRAGMA key` / `PRAGMA rekey` are SQLCipher
+/// statements (the form that ships in
+/// `d_rocket_engine_sqlite`). The function is
+/// engine-agnostic and lives in d_rocket core so
+/// that the `LoggingInterceptor` in d_rocket's
+/// REST layer can use it without depending on a
+/// specific engine package.
+///
 /// ## Example
 ///
 /// ```dart
@@ -29,6 +37,8 @@
 /// not accept bound parameters in SQLite, so a
 /// `PRAGMA key = ?` form is a no-op in the engine
 /// and has no key value to redact.
+library;
+
 String redactPragmaKey(String sql) {
   return sql.replaceAllMapped(
     RegExp(

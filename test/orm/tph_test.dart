@@ -3,10 +3,12 @@
 // discriminator column. The Animal DbSet materialises
 // the right subclass instance at row-read time.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   late SqliteQueryProvider provider;
   late _ZooContext ctx;
 

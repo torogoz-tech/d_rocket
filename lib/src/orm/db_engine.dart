@@ -22,10 +22,24 @@
 /// 4 layers of d_rocket are identical across
 /// engines; only the engine implementation
 /// differs.
+///
+/// ## Encryption config
+///
+/// The [encryptionConfig] is typed as `Object?`
+/// because encryption parameters are
+/// engine-specific: SQLCipher uses
+/// `EncryptionConfig(kdfIterations, pageSize,
+/// hmacUse, memorySecurity)`; Postgres uses
+/// pgcrypto tunables; libsql WASM uses
+/// libsql-specific AES tunables. The d_rocket
+/// core cannot depend on a specific engine's
+/// config type, so the engine's `open` method
+/// is responsible for casting to the expected
+/// type and reporting a `DatabaseException` if
+/// a config of the wrong shape is passed in.
 library;
 
 import 'async_query_provider.dart';
-import '../sqlite/encryption_config.dart';
 
 abstract class DbEngine {
   /// A short identifier for the engine, e.g.
@@ -54,9 +68,19 @@ abstract class DbEngine {
   /// size, etc.). For engines that do not
   /// support encryption, the parameters are
   /// ignored.
+  ///
+  /// The [encryptionConfig] is typed as `Object?`
+  /// because the shape is engine-specific. The
+  /// engine's `open` method casts the value to
+  /// its expected type and throws a
+  /// `DatabaseException` (with a clear
+  /// "wrong engine config" message) if a config
+  /// of the wrong shape is passed in. d_rocket
+  /// core is engine-agnostic and cannot depend
+  /// on a specific engine's config class.
   Future<AsyncQueryProvider> open({
     String? path,
     String? password,
-    EncryptionConfig? encryptionConfig,
+    Object? encryptionConfig,
   });
 }

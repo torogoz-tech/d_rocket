@@ -5,10 +5,12 @@
 // Added + Modified, so deletes were silently
 // dropped.)
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('fix-5.13.1 — saveChangesAsync emits a delete SyncChange', () {
     late SqliteQueryProvider provider;
     late InMemorySyncProvider sync;

@@ -2,10 +2,12 @@
 // and `DbSet<T>.executeBulkDelete` — the typed
 // LINQ wrapper around the bulk operations.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.6.1 — DbSet.executeBulkUpdate', () {
     late SqliteQueryProvider provider;
     late _BooksDbSet dbSet;

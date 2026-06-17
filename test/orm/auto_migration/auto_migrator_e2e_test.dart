@@ -9,8 +9,9 @@
 
 import 'dart:io';
 
-import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
+
+import '../../_helpers.dart';
 
 EntityMeta _bookMeta({List<ColumnMeta>? extraColumns}) {
   final List<ColumnMeta> cols = <ColumnMeta>[
@@ -40,6 +41,8 @@ EntityMeta _bookMeta({List<ColumnMeta>? extraColumns}) {
 }
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Db.autoMigrate end-to-end', () {
     test('fresh install: autoMigrate creates the table', () async {
       final Db db = await Db.inMemory(

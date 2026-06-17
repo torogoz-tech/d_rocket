@@ -1,7 +1,5 @@
 import 'package:d_rocket/d_rocket.dart';
 
-import '../sync/sync_queue_store.dart';
-
 /// Abstract base class for every d_rocket ORM context.
 ///
 /// A `DbContext` owns:

@@ -1,36 +1,40 @@
 /// Engine registry for the db-agnostic ORM.
 ///
-/// Phase 1 introduces the [EngineRegistry]: a single
-/// static slot that holds the currently registered
-/// [DbEngine]. The `Db.open(...)` factory looks up
-/// the engine from this registry and delegates the
-/// actual database work to it.
+/// A single static slot that holds the currently
+/// registered [DbEngine]. The `Db.open(...)` factory
+/// (in `d_rocket_engine_sqlite`) looks up the engine
+/// from this registry and delegates the actual
+/// database work to it.
 ///
-/// In Phase 1, the registry is empty by default.
-/// The first time `Db.open` is called and the
-/// registry is empty, the in-core SQLite engine
-/// (see [SqliteEngine] in `lib/src/orm/sqlite_engine.dart`)
-/// is auto-registered. This preserves the 1.x
-/// "just call Db.open and it works" experience
-/// while preparing the cutover to Phase 2.
+/// ## Phase 2: explicit registration
 ///
-/// In Phase 2, the SQLite engine moves to a
-/// separate `d_rocket_engine_sqlite` package,
-/// the auto-registration is removed, and the
-/// dev must call `d_rocket_engine_sqlite.register()`
-/// explicitly before `Db.open` works.
+/// In 2.0 the registry no longer auto-registers
+/// an engine. The dev must call
+/// `d_rocket_engine_sqlite.register()`
+/// (or another `d_rocket_engine_*.register()`)
+/// once at app startup, before `Db.open` /
+/// `Db.inMemory` is called. Without the call,
+/// `findOrThrow` raises a `StateError` with a
+/// clear "add an engine package to your pubspec
+/// and call `register()`" message.
+///
+/// ```dart
+/// void main() async {
+///   d_rocket_engine_sqlite.register();
+///   initializeD();
+///   final db = await Db.open(path: 'app.db');
+/// }
+/// ```
 library;
 
 import 'package:meta/meta.dart';
 
 import 'db_engine.dart';
-import 'sqlite_engine.dart';
 
 class EngineRegistry {
   EngineRegistry._();
 
   static DbEngine? _engine;
-  static bool _autoRegistered = false;
 
   /// Register a [DbEngine] as the active engine.
   ///
@@ -38,45 +42,47 @@ class EngineRegistry {
   /// engine. The dev can swap engines between
   /// databases (test environment vs production, or
   /// the dev override for a specific test case).
+  ///
+  /// Idempotent across calls: only one engine is
+  /// active at a time. The most recent call wins.
   static void register(DbEngine engine) {
     _engine = engine;
   }
 
   /// Look up the registered engine.
   ///
-  /// If no engine is registered, the in-core SQLite
-  /// engine is auto-registered (Phase 1 only). This
-  /// preserves the 1.x behavior where `Db.open`
-  /// "just works" without any setup call.
-  ///
-  /// Phase 2 removes the auto-registration: if no
-  /// engine is registered, this getter throws a
-  /// `StateError` with a clear "add an engine
-  /// package to your pubspec and call
-  /// register()" message.
+  /// Throws a [StateError] with an actionable
+  /// message if no engine is registered. The
+  /// message points the dev at
+  /// `d_rocket_engine_sqlite.register()` (or
+  /// another engine's `register()`) and lists
+  /// the engine packages that ship in 2.0.
   static DbEngine get findOrThrow {
-    if (_engine != null) return _engine!;
-    if (!_autoRegistered) {
-      // Phase 1 fallback: auto-register the in-core
-      // SQLite engine. Phase 2 will replace this
-      // with a StateError.
-      register(const SqliteEngine());
-      _autoRegistered = true;
+    final DbEngine? engine = _engine;
+    if (engine == null) {
+      throw StateError(
+        'No d_rocket DbEngine registered. Add a '
+        'd_rocket_engine_* package to your pubspec '
+        '(d_rocket_engine_sqlite, '
+        'd_rocket_engine_postgres, or '
+        'd_rocket_engine_libsql_wasm) and call its '
+        'register() once at app startup, before any '
+        'Db.open / Db.inMemory call. See '
+        'https://github.com/torogoz-tech/d_rocket '
+        'for the engine selection guide.',
+      );
     }
-    return _engine!;
+    return engine;
   }
 
   /// Test helper: reset the registry to empty.
   ///
-  /// Use this in tests to verify the "no engine
-  /// registered → throws" path (after Phase 2
-  /// ships). In Phase 1, calling this and then
-  /// `Db.open` will trigger the auto-registration
-  /// again, which is the expected behavior.
+  /// After this, the next `findOrThrow` will throw
+  /// the "no engine registered" `StateError` until
+  /// the test calls [register] again.
   @visibleForTesting
   static void resetForTest() {
     _engine = null;
-    _autoRegistered = false;
   }
 
   /// Returns true if an engine is currently

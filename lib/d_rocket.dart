@@ -8,10 +8,14 @@
 /// 3. REST with steroids — typed HTTP client with interceptors,
 /// wrap-around clients (retry, rate limit, circuit breaker), and
 /// cancelable requests.
-/// 4. ORM (SQLite-first) — `Db.open(path)`,
-/// `db.set<Person>`, change tracking, code-first migrations,
-/// bulk operations, reactive queries. SQLite is the default
-/// and the only storage engine shipped out of the box.
+/// 4. ORM (engine-agnostic) — `DbContext` / `DbSet<T>` /
+/// `@Table` / change tracking / code-first migrations /
+/// auto-migrations. The actual database engine is a
+/// separate `d_rocket_engine_*` package. `d_rocket` ships
+/// the engine-agnostic core + the `EngineRegistry` slot.
+/// To use a real database, add `d_rocket_engine_sqlite`
+/// (or another engine) and call its `register()` once
+/// at app startup.
 /// 5. Sync (offline-first) — `SyncProvider` interface, push/pull
 /// pipeline, identity persistence, conflict resolution, retry
 /// with exponential backoff, sync triggers.
@@ -19,11 +23,14 @@
 ///
 /// ## Status
 ///
-/// `d_rocket` is at 1.2.0 (SQLite-First for Flutter).
-/// All four data layers are complete: LINQ, Serializer, REST
-/// (with wrap-around resilience + cancelable requests), ORM
-/// (with bulk + reactive queries), Sync (offline-first with
-/// conflict resolution), Realtime (WebSocket + SSE with codegen).
+/// `d_rocket` is at 2.0.0 (engine-agnostic, lockstep
+/// with the `d_rocket_engine_*` packages). All six
+/// data layers are complete: LINQ, Serializer, REST
+/// (with wrap-around resilience + cancelable requests),
+/// ORM (engine-agnostic, three engines in 2.0: SQLite,
+/// Postgres, libsql_wasm), Sync (offline-first with
+/// conflict resolution), Realtime (WebSocket + SSE with
+/// codegen).
 ///
 /// See `CHANGELOG.md` for the full history.
 library;
@@ -62,51 +69,54 @@ export 'src/rest/clients/retrying_http_client.dart';
 export 'src/rest/logging_interceptor.dart';
 export 'src/rest/rest.dart';
 
-// ─── Layer 4: ORM (SQLite-First,) ──────────────────────────
+// ─── Layer 4: ORM (engine-agnostic in 2.0) ────────────────
 //
-// The ORM ships with SQLite built-in. The user opens a database
-// with `Db.open(path: ...)`, then `db.set<T>` for typed
-// LINQ queries. Under the hood we have:
-// * `SqliteQueryProvider` — the sqflite wrapper (implements
-// the abstract `AsyncQueryProvider`).
-// * `Queryable<T>` + `asQueryable` — the LINQ-style
-// queryable, with `toListAsync_` / `firstOrDefaultAsync_` / etc.
-// * `SqlTranslator` + `SqlFragment` — turns the
-// Expr DSL into real SQL (SQLite dialect).
-// * `DbContext` + `DbSet<T>` — the ORM core, with
-// change tracking, migrations, bulk ops, watch.
+// In 2.0 the ORM core is engine-agnostic. The
+// `Db` facade, `SqliteQueryProvider`,
+// `Queryable<T>`, SQL `Fragment` / `Translator`,
+// `EncryptionConfig`, and the LINQ-SQL
+// `db.set<T>().where(...)` extensions all
+// moved to a separate `d_rocket_engine_sqlite`
+// package. Consumers add that package to their
+// `pubspec.yaml` and call
+// `d_rocket_engine_sqlite.register()` before
+// `Db.open` / `Db.inMemory`.
 //
-// The `d_rocket_builder` package emits the per-class
-// `*.d_rocket_orm.g.dart` parts and the central
-// `d_rocket_registry.g.dart` (with `initializeD`) that calls
-// `register<X>EntityMeta` for every `@Table` class.
-// The runtime here ships the annotations, the
+// The runtime here ships the engine-agnostic
+// ORM surface: the annotations (`@Table`,
+// `@Column`, `@ForeignKey`, `@Index`), the
 // `EntityMeta` / `ChangeTracker` / `DbSet<T>` /
-// `DbContext` types, and the `EntityRegistry` global
-// lookup.
+// `DbContext` types, the migration primitives,
+// the auto-migrator, the `EntityRegistry` global
+// lookup, and the `EngineRegistry` (the slot
+// where a `DbEngine` is plugged in).
+//
+// The `d_rocket_builder` package emits the per-
+// class `*.d_rocket_orm.g.dart` parts and the
+// central `d_rocket_registry.g.dart` (with
+// `initializeD`) that calls
+// `register<X>EntityMeta` for every `@Table`
+// class.
 export 'src/orm/orm.dart';
 export 'src/orm/auto_migration/auto_migration.dart';
 
-//: SQLite-First. The SQLite engine is bundled
-// directly in `d_rocket`. No more `d_rocket_provider_sqlite`
-// package to import — `Db.open(path: ...)` is all the
-// user needs. The internal `SqliteQueryProvider` is exported
-// for advanced use cases (e.g. sharing a DB between multiple
-// `Db` instances).
-export 'src/sqlite/db_context_extension.dart';
-export 'src/sqlite/db_set_extension.dart';
-export 'src/sqlite/encryption_config.dart';
-export 'src/sqlite/encryption_status.dart';
-export 'src/sqlite/fragment.dart';
-export 'src/sqlite/key_provider.dart';
-export 'src/sqlite/query_provider.dart';
-export 'src/sqlite/queryable.dart';
-export 'src/sqlite/db.dart';
-export 'src/sqlite/redact_pragma_key.dart';
-export 'src/sqlite/sqlcipher_probe.dart';
-export 'src/sqlite/translator.dart';
+//: LINQ-to-collections (no engine required).
+// `IQueryable<T>` / `IEnumerable<T>` / `Expr` /
+// `EnumerableQuery` work over any `Iterable<T>`
+// and don't need a database. The engine-specific
+// SQL `Queryable<T>` and the `db.set<T>().where`
+// extensions live in `d_rocket_engine_sqlite`.
 export 'src/linq/operators/group_by.dart' show IGrouping;
 export 'src/linq/operators/lookup.dart';
+
+//: `redactPragmaKey` is the SQL redaction utility used by
+// `LoggingInterceptor`. It lives in d_rocket core
+// (engine-agnostic) even though `PRAGMA key` /
+// `PRAGMA rekey` are SQLCipher statements; the
+// function is a pure string transformation and is
+// useful for any REST layer that needs to scrub
+// keys out of SQL traces before logging.
+export 'src/redact_pragma_key.dart';
 
 // ─── Layer 5: Sync (offline-first) ────────────────────────────────────
 //

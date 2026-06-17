@@ -3,10 +3,12 @@
 // `ctx.syncAsync(...)`, and the LWW conflict
 // resolution on remote changes.
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 5.9 — InMemorySyncProvider: shape', () {
     test('currentWatermarkAsync returns 0 for a fresh provider', () async {
       final InMemorySyncProvider provider = InMemorySyncProvider();

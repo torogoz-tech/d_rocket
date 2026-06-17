@@ -9,7 +9,7 @@
 // - Backward compat with pre—10 String-id style
 // migrations
 
-import 'package:d_rocket/d_rocket.dart';
+import '../_helpers.dart';
 import 'package:test/test.dart';
 
 class _Log {
@@ -105,6 +105,8 @@ class _DateBasedId extends MigrationBase {
 }
 
 void main() {
+  setUp(dRocketSqlite);
+  tearDown(EngineRegistry.resetForTest);
   group('Fase 10 — MigrationBase.version getter', () {
     test('parses numeric String id by default', () {
       expect(_CreateUsers().version, 1);
