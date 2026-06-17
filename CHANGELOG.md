@@ -15,6 +15,18 @@ that shipped inside `d_rocket` from 0.9.0 to
 `doc/MIGRATION_1_x_to_2_0.md` for the upgrade
 guide.
 
+**New: a second engine ships in 2.0.0.** The
+[`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres)
+package is the Postgres implementation of the
+`DbEngine` contract. It is the **second
+engine** in the d_rocket 2.0 multi-engine
+architecture (the third, `libsql_wasm`, is a
+2.1 feature). The Postgres engine is
+raw-SQL-only in 2.0.0 — the `Queryable<T>`
+SQL LINQ is a 2.1 feature. For 2.0.0 the user
+opens a `PgDb` and uses `db.provider.selectAsync`
+/ `executeAsync` directly.
+
 * **The ORM engine is a separate package.**
   Consumers who use `Db` / `DbContext` / `DbSet` /
   `@Table` / auto-migrations must add
