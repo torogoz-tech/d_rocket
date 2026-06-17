@@ -76,6 +76,46 @@ void main() {
       expect(result, isEmpty);
     });
 
+    test('B-09: join_ rejects 3-param resultSelector', () {
+      // join_ requires 2 params. We pass 3.
+      // The 3rd param would be silently ignored
+      // before the fix; now it must throw.
+      final bad = Expr.lambda(
+        <Expr>[Expr.param('o'), Expr.param('i'), Expr.param('k')],
+        Expr.const_('x'),
+      );
+      expect(
+        () => users.asQueryable().join_<_Post, int, String>(
+              inner: posts.asQueryable(),
+              outerKeySelector: userById,
+              innerKeySelector: postByUserId,
+              resultSelector: bad, // 3 params — wrong for join_
+            ),
+        throwsArgumentError,
+      );
+    });
+
+    test('B-09: groupJoin_ rejects 2-param resultSelector', () {
+      // groupJoin_ requires 3 params. We pass 2.
+      // Before the fix, this was silently accepted
+      // (the 3rd param defaulted to null). After
+      // the fix, the arity mismatch is caught
+      // at the call site.
+      final bad = Expr.lambda(
+        <Expr>[Expr.param('o'), Expr.param('i')],
+        Expr.const_('x'),
+      );
+      expect(
+        () => users.asQueryable().groupJoin_<_Post, int, String>(
+              inner: posts.asQueryable(),
+              outerKeySelector: userById,
+              innerKeySelector: postByUserId,
+              resultSelector: bad, // 2 params — wrong for groupJoin_
+            ),
+        throwsArgumentError,
+      );
+    });
+
     test('one-to-many: each user paired with each of their posts', () {
       // Just count the pairs.
       final count = users

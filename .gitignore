@@ -22,3 +22,6 @@ Thumbs.db
 *.iml
 rename_rocket.py
 commit_msg_rename.txt
+
+# Serena cache (per-project MCP state)
+.serena/

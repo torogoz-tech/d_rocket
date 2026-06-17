@@ -69,7 +69,7 @@ extension JoinOp<TOuter> on IQueryable<TOuter> {
         inner,
         _requireKey('join_', outerKeySelector),
         _requireKey('join_', innerKeySelector),
-        _requireResult('join_', resultSelector),
+        _requireResult('join_', resultSelector, 2),
       );
 
   /// LEFT OUTER JOIN: each outer element is paired with a list of
@@ -93,7 +93,7 @@ extension JoinOp<TOuter> on IQueryable<TOuter> {
         inner,
         _requireKey('groupJoin_', outerKeySelector),
         _requireKey('groupJoin_', innerKeySelector),
-        _requireResult('groupJoin_', resultSelector),
+        _requireResult('groupJoin_', resultSelector, 3),
       );
 }
 
@@ -203,20 +203,17 @@ LambdaExpr _requireKey(String opName, Expr selector) {
   return selector;
 }
 
-LambdaExpr _requireResult(String opName, Expr selector) {
+LambdaExpr _requireResult(String opName, Expr selector, int expected) {
   if (selector is! LambdaExpr) {
     throw ArgumentError(
       '$opName resultSelector must be a LambdaExpr, got ${selector.runtimeType}',
     );
   }
   final lambda = selector;
-  // join_ takes 2 params (outer, inner).
-  // groupJoin_ takes 3 params (outer, inners, key).
-  // We don't know which one we're in here, so we accept either.
-  if (lambda.params.length != 2 && lambda.params.length != 3) {
+  if (lambda.params.length != expected) {
     throw ArgumentError(
-      '$opName resultSelector must take 2 (outer, inner) or 3 '
-      '(outer, inners, key) parameters, got ${lambda.params.length}',
+      '$opName resultSelector must take exactly $expected parameter(s), '
+      'got ${lambda.params.length}',
     );
   }
   return lambda;
