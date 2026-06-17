@@ -157,41 +157,75 @@ class AutoMigrator {
     //    any DDL failure, the transaction
     //    rolls back and the database is
     //    unchanged.
+    //
+    //    Special case: when there are unsafe
+    //    diffs, we DO NOT write the new
+    //    snapshot. The unsafe diffs keep
+    //    showing up in `pendingSchemaDiff()`
+    //    on every reopen until the user
+    //    handles them (typically by writing a
+    //    hand-rolled migration that performs
+    //    the unsafe change explicitly, then
+    //    re-opening). The safe diffs were
+    //    applied, so the next open will not
+    //    re-apply them - the auto-migrator
+    //    reads the actual database schema
+    //    (via the snapshot, which is the v1
+    //    schema) and the entity list (v2) and
+    //    sees only the unsafe diffs as
+    //    pending.
+    //
+    //    Trade-off: if the user adds a SAFE
+    //    change while there is an outstanding
+    //    UNSAFE diff, the safe change will
+    //    not show up in pendingSchemaDiff
+    //    until the unsafe is handled (the
+    //    snapshot is the v1 schema, so the
+    //    diff is v2 - v1 = unsafe only). This
+    //    is intentional: a pending unsafe
+    //    diff is a louder signal than a
+    //    pending safe change, and we want the
+    //    user to handle the unsafe first.
+    final bool hasUnsafe = unsafe.isNotEmpty;
     if (safe.isNotEmpty) {
       await _provider.beginTransactionAsync();
       try {
         for (final SchemaDiff d in safe) {
-          // Multi-statement CREATE TABLE
-          // (split by newline) is executed one
-          // statement at a time. The
-          // SqliteQueryProvider's executeAsync
-          // takes a single statement, so we
-          // split on newlines (the snapshot's
-          // createTableSql output puts each
-          // statement on its own line).
-          final List<String> statements = _splitStatements(d.sql);
-          for (final String s in statements) {
-            await _provider.executeAsync(s);
-          }
+          // Each [SchemaDiff.sql] is exactly one
+          // SQL statement (multi-line, but a
+          // single statement). The sqlite3
+          // package's `execute` accepts multi-
+          // line SQL - newline characters inside
+          // a CREATE TABLE body are insignificant
+          // whitespace. So we pass the whole
+          // string as one call. We do NOT split
+          // on newlines (splitting is wrong: a
+          // multi-line CREATE TABLE is one
+          // statement, not many).
+          await _provider.executeAsync(d.sql);
         }
-        // Write the new snapshot INSIDE the
-        // transaction. If any DDL failed, the
-        // write is rolled back too, so the
-        // snapshot never gets ahead of the
-        // actual schema.
-        await _state.write(newSnapshot);
+        if (!hasUnsafe) {
+          // Write the new snapshot INSIDE the
+          // transaction. If any DDL failed,
+          // the write is rolled back too, so
+          // the snapshot never gets ahead of
+          // the actual schema.
+          await _state.write(newSnapshot);
+        }
         await _provider.commitAsync();
       } catch (_) {
         await _provider.rollbackAsync();
         rethrow;
       }
-    } else if (oldSnapshot == null) {
+    } else if (oldSnapshot == null && !hasUnsafe) {
       // Fresh install with no entities. Still
       // record the (empty) snapshot so the
       // next run knows we are not on a fresh
-      // install anymore.
+      // install anymore. (Unsafe is impossible
+      // on a fresh install - there is no old
+      // schema to drop.)
       await _state.write(newSnapshot);
-    } else {
+    } else if (!hasUnsafe) {
       // Nothing changed. Still record the new
       // snapshot so the schema state matches
       // the codegen-emitted entity list exactly
@@ -300,30 +334,5 @@ class AutoMigrator {
       }
     }
     return buf.toString();
-  }
-
-  /// helper: split a multi-statement SQL
-  /// string (one statement per line, no
-  /// semicolons required) into individual
-  /// statements. SQLite's executeAsync expects
-  /// one statement at a time.
-  List<String> _splitStatements(String sql) {
-    final List<String> out = <String>[];
-    for (final String line in sql.split('\n')) {
-      final String trimmed = line.trim();
-      if (trimmed.isEmpty) continue;
-      // Strip the trailing semicolon if
-      // present (the DDL emitters do not
-      // include one, but be defensive).
-      String stmt = trimmed;
-      if (stmt.endsWith(';')) {
-        stmt = stmt.substring(0, stmt.length - 1).trim();
-      }
-      if (stmt.isEmpty) continue;
-      // Skip pure comment lines.
-      if (stmt.startsWith('--')) continue;
-      out.add(stmt);
-    }
-    return out;
   }
 }
