@@ -5,6 +5,119 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-06-15
+
+Minor release. Adds the auto-migration system
+(opt-in): the framework detects diffs between
+the schema declared by the codegen-emitted
+entity list and the last applied schema on
+disk, applies the safe changes in a single
+transaction, and reports the unsafe changes
+for the user to handle manually.
+
+* **New `autoMigrate` flag on `Db.open` and
+  `Db.inMemory`.** When set, `Db.open` (and
+  `Db.inMemory`) run the auto-migrator after
+  any hand-written `MigrationStrategy`. The
+  flag is opt-in: existing callers that do
+  not pass `entityMetas:` see no change in
+  behaviour (no `d_rocket_schema_state`
+  table is created, no auto-migration runs).
+  The migration system still applies
+  hand-written `MigrationBase`s first, so
+  projects that mix hand-written and
+  auto-migrations can do so without conflict.
+
+* **Safe operations applied automatically.**
+  CREATE TABLE, CREATE INDEX, and ADD COLUMN
+  (nullable or with a default literal) are
+  safe and are applied in a single
+  transaction. The new schema snapshot is
+  written in the same transaction, so the
+  snapshot is never ahead of the actual
+  schema.
+
+* **Unsafe operations reported, never
+  applied.** DROP TABLE, DROP COLUMN,
+  DROP INDEX, MODIFY COLUMN (type /
+  nullability / default / FK change), and
+  the rename heuristic are unsafe. They are
+  returned in `Db.pendingSchemaDiff()` and
+  in the `AutoMigrationResult.unsafe` list
+  from `Db.runAutoMigrations()`. The user
+  is expected to handle them explicitly
+  (typically by writing a hand-rolled
+  migration that performs the unsafe
+  change). The auto-migrator never destroys
+  data silently.
+
+* **New public API.** `Db.runAutoMigrations()`
+  drives the auto-migration on demand
+  (returns the `AutoMigrationResult` with
+  the safe diffs that were applied, the
+  unsafe diffs that were reported, and the
+  new `SchemaSnapshot`). `Db.pendingSchemaDiff()`
+  returns the pending diff without applying
+  anything (useful for logging, dry-runs,
+  and CI checks). The `SchemaSnapshot` /
+  `SchemaTable` / `SchemaColumn` /
+  `SchemaIndex` / `SchemaForeignKey` /
+  `SchemaDiff` / `DiffSeverity` /
+  `SchemaOperationType` / `AutoMigrationResult`
+  types are exposed in the package barrel
+  for advanced users (custom diff tooling,
+  alternative orchestrators).
+
+* **New internal table
+  `d_rocket_schema_state`.** A single-row
+  key-value table that stores the last
+  applied `SchemaSnapshot` as JSON. The
+  table is intentionally separate from the
+  existing `_d_rocket_migrations` (which
+  tracks hand-written `MigrationBase` runs);
+  the two coexist without sharing data. The
+  `CHECK (id = 1)` constraint guards against
+  accidental multi-row inserts. The
+  snapshot's `version` field lets a 1.1.x
+  runtime detect a snapshot from a newer
+  d_rocket and refuse to migrate it (so a
+  downgrade does not silently corrupt the
+  schema).
+
+* **Snapshot persistence contract.** When
+  the auto-migrator runs and finds unsafe
+  diffs, the safe diffs are applied but the
+  new snapshot is NOT written to
+  `d_rocket_schema_state`. The unsafe diffs
+  keep showing up in
+  `Db.pendingSchemaDiff()` on every reopen
+  until the user handles them (typically by
+  writing a hand-rolled migration that
+  performs the unsafe change explicitly,
+  then re-opening). This is intentional: a
+  pending unsafe diff is a louder signal
+  than a pending safe change, and we want
+  the user to handle the unsafe first.
+
+* **Tests.** 27 new cases in
+  `test/orm/auto_migration/`. Covers the
+  snapshot round-trip, every diff type
+  (safe and unsafe), the round-trip via
+  `Db.open` / `Db.inMemory`, the drop
+  report (not applied) path, the file-
+  backed DB round-trip, the back-compat
+  `autoMigrate: false` default, and the
+  empty-`entityMetas` no-op. Full suite:
+  855 pass + 1 skip.
+
+* **No codegen changes.** The snapshot is
+  computed at runtime from the existing
+  `EntityMeta` list. The codegen did not
+  need to be touched. The
+  `d_rocket_builder` 1.2.0 release is a
+  no-op version bump (per the lockstep
+  convention established in 1.1.1).
+
 ## [1.1.1] — 2026-06-15
 
 Patch release. Three production-readiness fixes
