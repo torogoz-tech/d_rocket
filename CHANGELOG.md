@@ -5,6 +5,86 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-06-15
+
+Patch release. Three production-readiness fixes
+that close the data-loss and data-integrity risks
+flagged by an external review of d_rocket for a
+clinical-scenario use case.
+
+* **Sync queue is now persisted.** Before
+  1.1.1, the pending sync queue was a
+  `List<SyncChange>` in memory inside
+  `DbContext`. A crash between
+  `saveChangesAsync()` and `syncAsync()` lost
+  every queued change. Fix: a new internal
+  `SyncQueueStore` backs the queue with a
+  `d_rocket_sync_queue` table in the same
+  database as the user data (so it picks up
+  SQLCipher encryption for free when the main
+  DB is encrypted). `saveChangesAsync` inserts
+  the queued change inside the same
+  transaction as the data write; on
+  `syncAsync` success the rows are deleted in
+  a transaction; a failed sync leaves the
+  rows for the next call to retry. A
+  `maxQueueSize` cap (default 10,000 rows)
+  drops the oldest rows when the cap is
+  exceeded and logs a warning. No new
+  parameters on `Db.open` / `Db.inMemory` /
+  `Db.saveChangesAsync` / `Db.syncAsync` —
+  the persistence is fully transparent.
+  Existing callers get it for free. New
+  public API: `Db.pendingSyncChanges()` is
+  now an async getter that hydrates from the
+  persistent store on first call.
+
+* **FK enforcement is now on by default.**
+  `PRAGMA foreign_keys = ON` is emitted on
+  every `Db.open()` (in `SqliteQueryProvider`
+  in both the `inMemory` and `file`
+  factories). SQLite ships with FK
+  enforcement off for backwards
+  compatibility; without the PRAGMA,
+  `FOREIGN KEY (col) REFERENCES table(col)`
+  clauses in `CREATE TABLE` are parsed and
+  stored but never enforced at runtime.
+  This was a silent data-integrity risk: a
+  row could be inserted with a dangling
+  reference and the constraint violation
+  would only surface if a tool happened to
+  re-enable FKs. The codegen has been
+  emitting `REFERENCES` clauses correctly
+  for `@ForeignKey` since 1.0; the bug was
+  that the engine was not enforcing them by
+  default. The PRAGMA is a no-op when the
+  schema has no FK clauses.
+
+* **Two existing tests updated.** The
+  `relations_test.dart` and `include_test.dart`
+  cases were inserting rows with dangling
+  FKs (e.g. a sale with `book_id = 999` when
+  no such book existed), relying on the
+  broken default. The inserts are updated to
+  reference real rows, with a comment
+  explaining why.
+
+* **Tests added.** 4 new cases in
+  `test/sqlite/foreign_keys_enforcement_test.dart`
+  (the PRAGMA is set after every open, on
+  both factories, and an INSERT with a
+  dangling FK raises `SqliteException` —
+  the load-bearing test that would silently
+  pass if the PRAGMA were missing).
+  2 new cases in
+  `test/sync/persistent_sync_queue_test.dart`
+  (the file-backed round-trip and the
+  schema shape). 6 new cases in
+  `test/orm/migration_ddl_includes_indexes_test.dart`
+  (in `d_rocket_builder`, the codegen side
+  of the fix). Total: 12 new cases across
+  the two packages. 828 + 1 skipped.
+
 ## [1.1.0] — 2026-06-15
 
 Minor release. Expands the SQLCipher password

@@ -191,10 +191,16 @@ void main() {
       final _RelTestDbContext ctx = _RelTestDbContext(provider);
 
       ctx.books.add(Book(id: 0, title: 'Earthsea', authorId: 1));
+      ctx.books.add(Book(id: 0, title: 'Other', authorId: 1));
       ctx.saveChanges();
       ctx.sales.add(Sale(id: 0, bookId: 1, customer: 'Alice'));
       ctx.sales.add(Sale(id: 0, bookId: 1, customer: 'Bob'));
-      ctx.sales.add(Sale(id: 0, bookId: 999, customer: 'Carol'));
+      // The sale below must reference a real
+      // book id, because the test now runs with
+      // `PRAGMA foreign_keys = ON` (1.1.1). The
+      // book with id=2 was just inserted above
+      // so that this sale can pass the FK check.
+      ctx.sales.add(Sale(id: 0, bookId: 2, customer: 'Carol'));
       ctx.saveChanges();
 
       // @HasMany: load the book + its sales.

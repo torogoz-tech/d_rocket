@@ -41,6 +41,8 @@ library;
 
 import 'package:d_rocket/d_rocket.dart';
 
+import '../sync/sync_queue_store.dart';
+
 /// (SQLite-First): the user-facing database
 /// facade. Wraps a [SqliteQueryProvider] (the internal
 /// storage engine) and a [DbContext] (the ORM).
@@ -260,6 +262,18 @@ class Db {
   /// accessing the change tracker directly).
   DbContext get context => _ctx;
 
+  /// Returns a snapshot of the pending sync changes
+  /// (the local changes that have been committed
+  /// but not yet pushed to the remote). Awaits
+  /// hydration from the persistent queue on the
+  /// first call after process start, so the
+  /// returned list is consistent across app
+  /// restarts.
+  Future<List<SyncChange>> pendingSyncChanges() async {
+    await _ctx.ensureQueueHydrated();
+    return _ctx.pendingSyncChanges;
+  }
+
   /// Returns the underlying [SqliteQueryProvider]. Advanced
   /// use only — prefer `set<T>` for typed access.
   SqliteQueryProvider get provider => _provider;
@@ -384,7 +398,13 @@ class Db {
 /// provider. Users don't see this class; they interact
 /// with [Db] only.
 class _SqliteRocketContext extends DbContext {
-  _SqliteRocketContext(this._provider);
+  _SqliteRocketContext(this._provider) {
+    // Wire the persistent sync queue to the same
+    // connection as the user data. The queue
+    // table picks up SQLCipher encryption for
+    // free when the main DB is encrypted.
+    queueStore = SyncQueueStore(provider: _provider);
+  }
   final SqliteQueryProvider _provider;
 
   @override
