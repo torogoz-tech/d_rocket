@@ -44,14 +44,18 @@ import 'package:d_rocket/d_rocket.dart';
 // is unchanged.
 // (no sqlite3 import — sqflite uses Map<String, Object?>)
 
-/// The single shared dialect instance used
-/// by every [SqlTranslator] in this file.
-/// The default dialect IS the SQLite
-/// dialect (`DefaultDialect` extends
-/// `SqlDialect` with the SQLite-flavoured
-/// defaults). Const, so the file has zero
-/// dialect-state per query.
-const SqlDialect _kDialect = DefaultDialect();
+/// The single shared default dialect
+/// instance used by every [SqlTranslator]
+/// in this file. Const, so the file has
+/// zero dialect-state per query by default.
+///
+/// The instance is the [DefaultDialect]
+/// (which IS the SQLite dialect). Engines
+/// that need a different dialect (Postgres,
+/// MySQL, …) construct a [Queryable] with
+/// a custom [SqlDialect] (via the
+/// `dialect:` parameter of the factory).
+const SqlDialect _kDefaultDialect = DefaultDialect();
 
 /// A function that maps a `Row` to a user value of type [T].
 typedef ResultRowReader<T> = T Function(Map<String, Object?> row);
@@ -170,7 +174,23 @@ class _JoinOp {
 /// [SqliteJoinedQueryable]) because the grouping/joining happens
 /// in Dart on top of the SQL-fetched rows.
 class Queryable<T> extends IQueryable<T> {
-  final LegacySyncQueryProvider _provider;
+  //: the [LegacySyncQueryProvider] for
+  // the sync LINQ methods (`toList_`,
+  // `count_`, `first_`, …). Nullable so
+  // engines that are async-only (Postgres,
+  // libsql_wasm) can pass `null` and rely
+  // on the async API only.
+  final LegacySyncQueryProvider? _provider;
+
+  /// The SQL dialect (default = [DefaultDialect],
+  /// which IS the SQLite dialect). The
+  /// engine's `db.set<T>().asQueryable()` is
+  /// responsible for passing the
+  /// engine-specific dialect (e.g.
+  /// `PostgresDialect` for the Postgres
+  /// engine).
+  final SqlDialect _dialect;
+
   final String _table;
   final ResultRowReader<T> _reader;
 
@@ -268,6 +288,7 @@ class Queryable<T> extends IQueryable<T> {
 
   Queryable._(
     this._provider,
+    this._dialect,
     this._table,
     this._reader, {
     required EntityMeta meta,
@@ -314,7 +335,23 @@ class Queryable<T> extends IQueryable<T> {
   /// that re-emits whenever the tracker reports a
   /// [ChangeEvent] for any entity in the context.
   factory Queryable({
-    required LegacySyncQueryProvider provider,
+    //: [provider] (the [LegacySyncQueryProvider]) is
+    // optional. Engines that have a sync
+    // query path (SQLite) pass a non-null
+    // instance; engines that are async-
+    // only (Postgres, libsql_wasm) pass
+    // `null` and rely on [asyncProvider]
+    // for execution. The legacy sync LINQ
+    // methods (`toList_`, `count_`, `first_`,
+    // …) throw a clear error when called
+    // on a queryable with `provider == null`.
+    LegacySyncQueryProvider? provider,
+    //: [dialect] (the [SqlDialect]) defaults
+    // to [DefaultDialect] (which IS the
+    // SQLite dialect). Engines with a
+    // different dialect (Postgres, MySQL, …)
+    // pass their engine-specific dialect.
+    SqlDialect? dialect,
     required String table,
     required ResultRowReader<T> reader,
     EntityMeta? meta,
@@ -323,6 +360,7 @@ class Queryable<T> extends IQueryable<T> {
   }) =>
       Queryable._(
         provider,
+        dialect ?? _kDefaultDialect,
         table,
         reader,
         meta: meta ??
@@ -365,7 +403,12 @@ class Queryable<T> extends IQueryable<T> {
 
   /// Exposed for use by [SqliteGroupedQueryable] and
   /// [SqliteJoinedQueryable]. Not part of the public API.
-  LegacySyncQueryProvider get db => _provider;
+  ///
+  /// Nullable in 2.0.0: engines that are
+  /// async-only (Postgres, libsql_wasm) have
+  /// `_provider == null`. The `db` getter
+  /// returns `null` for those engines.
+  LegacySyncQueryProvider? get db => _provider;
 
   // ─── Operators (instance methods, not extensions) ─────────────────
 
@@ -386,6 +429,7 @@ class Queryable<T> extends IQueryable<T> {
     if (predicate is bool Function(T)) {
       return Queryable._(
         _provider,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -411,6 +455,7 @@ class Queryable<T> extends IQueryable<T> {
     }
     return Queryable._(
       _provider,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -454,6 +499,7 @@ class Queryable<T> extends IQueryable<T> {
           (Map<String, Object?> row) => _reader(row) as T2;
       return Queryable<T2>._(
         _provider,
+                _dialect,
         _table,
         placeholderReader,
         meta: _meta,
@@ -471,6 +517,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('select_', selector as Expr);
     return Queryable<T2>._(
       _provider,
+              _dialect,
       _table,
       (row) => row['result'] as T2,
       meta: _meta,
@@ -491,6 +538,7 @@ class Queryable<T> extends IQueryable<T> {
     if (keySelector is Comparable Function(T)) {
       return Queryable._(
         _provider,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -511,6 +559,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('orderBy_', keySelector as Expr);
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -532,6 +581,7 @@ class Queryable<T> extends IQueryable<T> {
     if (keySelector is Comparable Function(T)) {
       return Queryable._(
         _provider,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -552,6 +602,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('orderByDescending_', keySelector as Expr);
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -580,6 +631,7 @@ class Queryable<T> extends IQueryable<T> {
       }
       return Queryable._(
         _provider,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -606,6 +658,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('thenBy_', keySelector as Expr);
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -633,6 +686,7 @@ class Queryable<T> extends IQueryable<T> {
       }
       return Queryable._(
         _provider,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -659,6 +713,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('thenByDescending_', keySelector as Expr);
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -679,6 +734,7 @@ class Queryable<T> extends IQueryable<T> {
   Queryable<T> distinct_() {
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -696,6 +752,7 @@ class Queryable<T> extends IQueryable<T> {
   /// Appends a `LIMIT n` clause.
   Queryable<T> take_(int n) => Queryable._(
         _provider,
+                _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -718,6 +775,7 @@ class Queryable<T> extends IQueryable<T> {
   /// Appends an `OFFSET n` clause.
   Queryable<T> skip_(int n) => Queryable._(
         _provider,
+                _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -1015,8 +1073,18 @@ class Queryable<T> extends IQueryable<T> {
   /// mapped rows (no in-memory layer). Most terminals
   /// go through [_materialize] instead.
   List<T> _executeSql() {
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.toList_() / count_() / first_() / sum_() / '
+        'min_() / max_() require a sync query path. The engine '
+        'attached to this queryable is async-only (Postgres, '
+        'libsql_wasm, …); use the *Async_ variants instead: '
+        'toListAsync_() / countAsync_() / firstAsync_().',
+      );
+    }
     final frag = _buildSelect();
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     return rows.map(_reader).toList(growable: false);
   }
 
@@ -1069,8 +1137,15 @@ class Queryable<T> extends IQueryable<T> {
     if (joins.isEmpty) {
       return toList_();
     }
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.toListWithJoins_() requires a sync query path. '
+        'Use toListWithJoinsAsync_() for async-only engines.',
+      );
+    }
     final frag = _buildSelectWithJoins(joins);
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     if (rows.isEmpty) return <T>[];
     return _materializeJoins(rows, joins);
   }
@@ -1368,7 +1443,7 @@ class Queryable<T> extends IQueryable<T> {
       // a tiny adapter: pass the main alias as the
       // translator's table alias.
       final SqlTranslator tx =
-          SqlTranslator(tableAlias: mainAlias, dialect: _kDialect);
+          SqlTranslator(tableAlias: mainAlias, dialect: _dialect);
       final SqlFragment whereFrag = tx.translateLambda(_where);
       from.write(' WHERE ${whereFrag.sql}');
       binds.addAll(whereFrag.binds);
@@ -1377,7 +1452,7 @@ class Queryable<T> extends IQueryable<T> {
     // ORDER BY.
     for (final _OrderByClause clause in _orderBy) {
       final SqlTranslator tx =
-          SqlTranslator(tableAlias: mainAlias, dialect: _kDialect);
+          SqlTranslator(tableAlias: mainAlias, dialect: _dialect);
       final SqlFragment orderFrag = tx.translateLambda(clause.selector);
       from.write(
         ' ORDER BY ${orderFrag.sql}${clause.descending ? ' DESC' : ' ASC'}',
@@ -1527,11 +1602,18 @@ class Queryable<T> extends IQueryable<T> {
 
   /// Returns the number of rows that match the current state.
   int count_() {
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.count_() requires a sync query path. '
+        'Use countAsync_() for async-only engines.',
+      );
+    }
     final frag = _buildAggregate(
       sqlExpr: 'COUNT(*)',
       coalesceZero: false,
     );
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     return rows.first['n'] as int;
   }
 
@@ -1613,6 +1695,13 @@ class Queryable<T> extends IQueryable<T> {
       }
       return total;
     }
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.sum_() requires a sync query path. '
+        'Use sumAsync_() for async-only engines.',
+      );
+    }
     final lambda = _requireLambda('sum_', selector as Expr);
     final selFrag = _translate(lambda);
     final frag = _buildAggregate(
@@ -1620,7 +1709,7 @@ class Queryable<T> extends IQueryable<T> {
       coalesceZero: true,
       extraBinds: selFrag.binds,
     );
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     final v = rows.first['n'];
     return (v as num?) ?? 0;
   }
@@ -1643,6 +1732,13 @@ class Queryable<T> extends IQueryable<T> {
       }
       return total / n;
     }
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.average_() requires a sync query path. '
+        'Use averageAsync_() for async-only engines.',
+      );
+    }
     final lambda = _requireLambda('average_', selector as Expr);
     final selFrag = _translate(lambda);
     final frag = _buildAggregate(
@@ -1650,7 +1746,7 @@ class Queryable<T> extends IQueryable<T> {
       coalesceZero: false,
       extraBinds: selFrag.binds,
     );
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     final v = rows.first['n'];
     if (v == null) {
       throw StateError('average_ called on empty source');
@@ -1674,6 +1770,13 @@ class Queryable<T> extends IQueryable<T> {
       }
       return best;
     }
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.min_() requires a sync query path. '
+        'Use minAsync_() for async-only engines.',
+      );
+    }
     final lambda = _requireLambda('min_', selector as Expr);
     final selFrag = _translate(lambda);
     final frag = _buildAggregate(
@@ -1681,7 +1784,7 @@ class Queryable<T> extends IQueryable<T> {
       coalesceZero: false,
       extraBinds: selFrag.binds,
     );
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     final v = rows.first['n'];
     if (v == null) {
       throw StateError('min_ called on empty source');
@@ -1705,6 +1808,13 @@ class Queryable<T> extends IQueryable<T> {
       }
       return best;
     }
+    final LegacySyncQueryProvider? p = _provider;
+    if (p == null) {
+      throw StateError(
+        'Queryable<T>.max_() requires a sync query path. '
+        'Use maxAsync_() for async-only engines.',
+      );
+    }
     final lambda = _requireLambda('max_', selector as Expr);
     final selFrag = _translate(lambda);
     final frag = _buildAggregate(
@@ -1712,7 +1822,7 @@ class Queryable<T> extends IQueryable<T> {
       coalesceZero: false,
       extraBinds: selFrag.binds,
     );
-    final rows = _provider.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     final v = rows.first['n'];
     if (v == null) {
       throw StateError('max_ called on empty source');
@@ -1836,7 +1946,7 @@ class Queryable<T> extends IQueryable<T> {
   // ─── Helpers ───────────────────────────────────────────────────────
 
   SqlFragment _translate(LambdaExpr lambda) {
-    return SqlTranslator(dialect: _kDialect).translateLambda(lambda);
+    return SqlTranslator(dialect: _dialect).translateLambda(lambda);
   }
 
   LambdaExpr _requireLambda(String opName, Expr expr) {
@@ -1895,6 +2005,7 @@ class Queryable<T> extends IQueryable<T> {
   Queryable<T> reverse_() {
     return Queryable._(
       _provider,
+              _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -2009,8 +2120,15 @@ class SqliteGroupedQueryable<TKey, T> extends IQueryable<IGrouping<TKey, T>> {
 
   /// Executes the underlying SQL and groups the rows in Dart.
   Iterable<IGrouping<TKey, T>> _execute() {
+    final LegacySyncQueryProvider? p = _source.db;
+    if (p == null) {
+      throw StateError(
+        'SqliteGroupedQueryable requires a sync query path. '
+        'Use groupBy_Async() (when available) for async-only engines.',
+      );
+    }
     final frag = _source.buildSelect();
-    final rows = _source.db.selectWithBinds(frag.sql, frag.binds);
+    final rows = p.selectWithBinds(frag.sql, frag.binds);
     final groups = <Object, List<T>>{};
     final order = <Object>[];
     for (final row in rows) {
@@ -2253,9 +2371,15 @@ class SqliteSelectManyQueryable<R> extends IQueryable<R> {
     final innerList = _op.inner.toList();
     // Materialise the outer side via SQL (respects
     // chained where_/orderBy_/take_/skip_ on the source).
+    final LegacySyncQueryProvider? p = _source.db;
+    if (p == null) {
+      throw StateError(
+        'SqliteSelectManyQueryable requires a sync query path. '
+        'Use selectManyAsync_() (when available) for async-only engines.',
+      );
+    }
     final outerFrag = _source.buildSelect();
-    final outerRows =
-        _source.db.selectWithBinds(outerFrag.sql, outerFrag.binds);
+    final outerRows = p.selectWithBinds(outerFrag.sql, outerFrag.binds);
     final out = <R>[];
     final LambdaExpr resultLambda = _op.result is LambdaExpr
         ? _op.result as LambdaExpr
@@ -2334,7 +2458,8 @@ class SqliteSetOpQueryable<T> extends Queryable<T> {
     required Queryable<T> left,
     required Queryable<T> right,
     required _SetOpKind kind,
-    required LegacySyncQueryProvider provider,
+    LegacySyncQueryProvider? provider,
+    SqlDialect? dialect,
     required String table,
     required ResultRowReader<T> reader,
     required EntityMeta meta,
@@ -2344,6 +2469,7 @@ class SqliteSetOpQueryable<T> extends Queryable<T> {
         _kind = kind,
         super._(
           provider,
+          dialect ?? _kDefaultDialect,
           table,
           reader,
           meta: meta,
