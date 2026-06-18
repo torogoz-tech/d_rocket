@@ -223,6 +223,18 @@ class Queryable<T> extends IQueryable<T> {
   /// The pending `ORDER BY` chain (in order of precedence).
   final List<_OrderByClause> _orderBy;
 
+  /// (Phase 1a.1): true if the user called
+  /// `reverse_()`. When set, the SQL translator
+  /// flips each `ORDER BY` key from ASC to DESC
+  /// (or vice-versa) so the result is reversed
+  /// at the DB level (cheaper than materializing
+  /// + reversing in memory). When no `orderBy_`
+  /// is set, `reverse_` is undefined behaviour
+  /// (SQL has no "natural" row order) — the
+  /// translator throws a [StateError] in that
+  /// case.
+  final bool _reverse;
+
   /// LIMIT value (positive) or `null`.
   final int? _take;
 
@@ -296,6 +308,7 @@ class Queryable<T> extends IQueryable<T> {
     LambdaExpr? select,
     bool distinct = false,
     List<_OrderByClause>? orderBy,
+    bool reverse = false,
     int? take,
     int? skip,
     ChangeTracker? changeTracker,
@@ -309,6 +322,7 @@ class Queryable<T> extends IQueryable<T> {
         _select = select,
         _distinct = distinct,
         _orderBy = orderBy ?? const [],
+        _reverse = reverse,
         _take = take,
         _skip = skip,
         _changeTracker = changeTracker,
@@ -749,6 +763,134 @@ class Queryable<T> extends IQueryable<T> {
     );
   }
 
+  /// (Phase 1a.1): the `reverse_` LINQ operator.
+  ///
+  /// Inverts the order of the elements. Composable
+  /// with `orderBy_` / `orderByDescending_` / `thenBy_`:
+  /// the SQL translator flips the ASC/DESC on each
+  /// existing ORDER BY key (so the work is done in
+  /// the DB, not in memory).
+  ///
+  /// Requires a preceding `orderBy_` or
+  /// `orderByDescending_`. SQL has no "natural" row
+  /// order, so calling `reverse_()` on an unordered
+  /// source is undefined behaviour; the translator
+  /// throws a [StateError] in that case. This
+  /// matches C# (`InvalidOperationException`).
+  ///
+  /// Example:
+  ///
+  /// ```dart
+  /// // "Give me the 5 most-recent orders".
+  /// final recent = await db.orders
+  ///     .asQueryable()
+  ///     .orderBy_(u => u.createdAt)
+  ///     .reverse_()
+  ///     .take_(5)
+  ///     .toListAsync_();
+  /// ```
+  Queryable<T> reverse_() {
+    // (Phase 1a.1): the flag is checked at
+    // SQL-emission time, not here, so the
+    // error message can be more useful (it
+    // mentions the missing `orderBy_`). For
+    // now we just store the flag.
+    return Queryable._(
+      _provider,
+              _dialect,
+      _table,
+      _reader,
+      meta: _meta,
+      where: _where,
+      select: _select,
+      distinct: _distinct,
+      orderBy: _orderBy,
+      reverse: true,
+      take: _take,
+      skip: _skip,
+      changeTracker: _changeTracker,
+      asyncProvider: _asyncProvider,
+      memFilters: _memFilters,
+      memOrderBy: _memOrderBy,
+      memProject: _memProject,
+      memProjectSource: _memProjectSource,
+    );
+  }
+
+  /// (Phase 1a.2): the `defaultIfEmpty_` LINQ
+  /// operator.
+  ///
+  /// Returns a singleton list containing [defaultValue]
+  /// if the source is empty; otherwise returns the
+  /// source unchanged.
+  ///
+  /// This is the in-memory / post-fetch variant —
+  /// the SQL doesn't have a "default if empty"
+  /// operator, so the 2.0.0 implementation:
+  ///   1. materialises the SQL (or the in-memory
+  ///      source) into a list,
+  ///   2. checks `isEmpty`,
+  ///   3. returns `[defaultValue]` or the list
+  ///      accordingly.
+  ///
+  /// (The EF Core LINQ-to-SQL provider does have a
+  /// `LEFT OUTER JOIN`-based translation; we can
+  /// add it later if profiling shows the in-memory
+  /// check is a bottleneck. For the common case
+  /// ("if the user has no orders, return a default
+  /// Order row") the in-memory check is fine.)
+  ///
+  /// Example:
+  ///
+  /// ```dart
+  /// // "The default 'all' filter, or the user's
+  /// // custom filter if they have one".
+  /// final filters = await db.filters
+  ///     .asQueryable()
+  ///     .where_(u => u.userId == userId)
+  ///     .defaultIfEmpty_(defaultFilter)
+  ///     .toListAsync_();
+  /// ```
+  /// (Phase 1a.2): the `defaultIfEmpty_` LINQ
+  /// operator.
+  ///
+  /// Returns a singleton list containing [defaultValue]
+  /// if the source is empty; otherwise returns the
+  /// source unchanged.
+  ///
+  /// This is the in-memory / post-fetch variant —
+  /// the SQL doesn't have a "default if empty"
+  /// operator, so the 2.0.0 implementation:
+  ///   1. materialises the SQL (or the in-memory
+  ///      source) into a list,
+  ///   2. checks `isEmpty`,
+  ///   3. returns `[defaultValue]` or the list
+  ///      accordingly.
+  ///
+  /// (The EF Core LINQ-to-SQL provider does have a
+  /// `LEFT OUTER JOIN`-based translation; we can
+  /// add it later if profiling shows the in-memory
+  /// check is a bottleneck. For the common case
+  /// ("if the user has no orders, return a default
+  /// Order row") the in-memory check is fine.)
+  ///
+  /// Example:
+  ///
+  /// ```dart
+  /// // "The default 'all' filter, or the user's
+  /// // custom filter if they have one".
+  /// final filters = await db.filters
+  ///     .asQueryable()
+  ///     .where_(u => u.userId == userId)
+  ///     .defaultIfEmpty_(defaultFilter)
+  ///     .toListAsync_();
+  /// ```
+  Queryable<T> defaultIfEmpty_(T defaultValue) {
+    return _DefaultIfEmptyQueryable<T>._(
+      source: this,
+      defaultValue: defaultValue,
+    );
+  }
   /// Appends a `LIMIT n` clause.
   Queryable<T> take_(int n) => Queryable._(
         _provider,
@@ -1045,6 +1187,30 @@ class Queryable<T> extends IQueryable<T> {
           return clause.descending ? -cmp : cmp;
         });
       }
+      // (Phase 1a.1): the closure path
+      // doesn't have a SQL ORDER BY (it
+      // uses _memOrderBy), so the in-
+      // memory reverse is the only place
+      // to apply _reverse.
+      if (_reverse) {
+        rows = rows.reversed.toList(growable: false);
+      }
+    } else if (_orderBy.isNotEmpty && _reverse) {
+      // (Phase 1a.1): the SQL path has a
+      // SQL ORDER BY, and _buildSelect
+      // already flipped each key's ASC/DESC.
+      // No in-memory reverse needed (and if
+      // we did, we'd undo the SQL flip).
+    } else if (_reverse) {
+      // (Phase 1a.1): fallback: no SQL
+      // ORDER BY, no closure ORDER BY, but
+      // the user called reverse_(). This
+      // is the rare "reverse_() without
+      // any orderBy_" case (which the SQL
+      // path rejects with a StateError, so
+      // this branch is only hit in the
+      // sync path or in tests).
+      rows = rows.reversed.toList(growable: false);
     }
     //: in-memory LIMIT / OFFSET. The SQL
     // path skips these when _memOrderBy is set
@@ -1210,6 +1376,30 @@ class Queryable<T> extends IQueryable<T> {
           return clause.descending ? -cmp : cmp;
         });
       }
+      // (Phase 1a.1): the closure path
+      // doesn't have a SQL ORDER BY (it
+      // uses _memOrderBy), so the in-
+      // memory reverse is the only place
+      // to apply _reverse.
+      if (_reverse) {
+        result = result.reversed.toList(growable: false);
+      }
+    } else if (_orderBy.isNotEmpty && _reverse) {
+      // (Phase 1a.1): the SQL path has a
+      // SQL ORDER BY, and _buildSelect
+      // already flipped each key's ASC/DESC.
+      // No in-memory reverse needed (and if
+      // we did, we'd undo the SQL flip).
+    } else if (_reverse) {
+      // (Phase 1a.1): fallback: no SQL
+      // ORDER BY, no closure ORDER BY, but
+      // the user called reverse_(). This
+      // is the rare "reverse_() without
+      // any orderBy_" case (which the SQL
+      // path rejects with a StateError, so
+      // this branch is only hit in the
+      // sync path or in tests).
+      result = result.reversed.toList(growable: false);
     }
     return result;
   }
@@ -1878,10 +2068,17 @@ class Queryable<T> extends IQueryable<T> {
     for (int i = 0; i < _orderBy.length; i++) {
       final clause = _orderBy[i];
       final orderFrag = _translate(clause.selector);
+      // (Phase 1a.1): if the user called
+      // `reverse_()`, flip the ASC/DESC on
+      // each key. This is cheaper than
+      // materializing + reversing in memory.
+      final bool effectiveDescending = _reverse
+          ? !clause.descending
+          : clause.descending;
       if (i == 0) {
         // First ORDER BY clause — emit the keyword.
         parts.add(
-          'ORDER BY ${orderFrag.sql}${clause.descending ? ' DESC' : ' ASC'}',
+          'ORDER BY ${orderFrag.sql}${effectiveDescending ? ' DESC' : ' ASC'}',
         );
       } else {
         //: subsequent ORDER BY clauses
@@ -1890,10 +2087,26 @@ class Queryable<T> extends IQueryable<T> {
         // `ORDER BY` keyword (which would be a SQL
         // syntax error).
         parts.add(
-          ', ${orderFrag.sql}${clause.descending ? ' DESC' : ' ASC'}',
+          ', ${orderFrag.sql}${effectiveDescending ? ' DESC' : ' ASC'}',
         );
       }
       binds.addAll(orderFrag.binds);
+    }
+
+    // (Phase 1a.1): if the user called
+    // `reverse_()` but there's no ORDER BY,
+    // the SQL has no defined row order, so
+    // `reverse_` is undefined. C# throws
+    // InvalidOperationException for this;
+    // we throw a [StateError] with a clear
+    // message. The user must call `orderBy_`
+    // before `reverse_`.
+    if (_reverse && _orderBy.isEmpty) {
+      throw StateError(
+        'Queryable<T>.reverse_(): requires a preceding orderBy_ / '
+        'orderByDescending_ (SQL has no "natural" row order to '
+        'reverse). Add an orderBy_ clause before reverse_().',
+      );
     }
 
     //: defer LIMIT / OFFSET to the in-memory
@@ -1997,37 +2210,6 @@ class Queryable<T> extends IQueryable<T> {
     return expr;
   }
 
-  ///: `ORDER BY rowid DESC`. Reverses
-  /// the natural order of the result. Works on any
-  /// table that has an implicit `rowid` (i.e. NOT
-  /// declared `WITHOUT ROWID`). Composable with
-  /// `where_` / `take_` / `skip_` / `select_`.
-  Queryable<T> reverse_() {
-    return Queryable._(
-      _provider,
-              _dialect,
-      _table,
-      _reader,
-      meta: _meta,
-      where: _where,
-      select: _select,
-      distinct: _distinct,
-      orderBy: <_OrderByClause>[
-        _OrderByClause(
-          LambdaExpr(
-            <ParamExpr>[ParamExpr('u')],
-            Expr.member(ParamExpr('u'), 'rowid'),
-          ),
-          descending: true,
-        ),
-      ],
-      take: _take,
-      skip: _skip,
-      changeTracker: _changeTracker,
-      asyncProvider: _asyncProvider,
-    );
-  }
-
   /// (terminal): materialises the source
   /// and groups by [keySelector]. Returns an
   /// `ILookup<TKey, T>` — a multi-valued dictionary.
@@ -2040,6 +2222,29 @@ class Queryable<T> extends IQueryable<T> {
       );
     }
     return buildLookup<T, TKey>(toList_(), lambda);
+  }
+
+  /// (Phase 1a.3): async terminal for
+  /// `toLookup_`. Materialises the source via
+  /// the async path, then groups by the
+  /// [keySelector] in memory.
+  ///
+  /// The 2.0.0 idiom — use this when the
+  /// source is a SQL-backed `Queryable<T>`
+  /// (so the materialisation goes through
+  /// the engine, not the in-memory engine).
+  Future<ILookup<TKey, T>> toLookupAsync_<TKey>({
+    required Expr keySelector,
+  }) async {
+    final LambdaExpr lambda = _requireLambda('toLookup_', keySelector);
+    if (lambda.params.length != 1) {
+      throw ArgumentError(
+        'Queryable.toLookupAsync_: keySelector must take exactly 1 '
+        'parameter, got ${lambda.params.length}',
+      );
+    }
+    final List<T> list = await toListAsync_();
+    return buildLookup<T, TKey>(list, lambda);
   }
 
   /// (terminal): combines [other] with the
@@ -2058,6 +2263,59 @@ class Queryable<T> extends IQueryable<T> {
     ];
   }
 
+  /// (Phase 1a.4): async terminal for
+  /// `zip_`. Materialises both sides via
+  /// the async path, then combines them
+  /// element-wise with [combiner] (a
+  /// function `(left, right) => R`).
+  /// Stops at the shorter of the two
+  /// sides (matching C#'s `Enumerable.Zip`).
+  Future<List<R>> zipAsync_<TInner, R>(
+    Queryable<TInner> other,
+    R Function(T left, TInner right) combiner,
+  ) async {
+    final List<T> left = await toListAsync_();
+    final List<TInner> right = await other.toListAsync_();
+    final int n = left.length < right.length ? left.length : right.length;
+    return <R>[
+      for (int i = 0; i < n; i++) combiner(left[i], right[i]),
+    ];
+  }
+
+  /// (Phase 1a.5): the `sequenceEqual_` LINQ
+  /// operator. Returns `true` if the source and
+  /// [other] have the same length and all
+  /// corresponding elements are equal (per
+  /// the optional [equals] comparator; defaults
+  /// to `==`).
+  ///
+  /// In-memory (no native SQL equivalent). The
+  /// sync version materialises both sides via
+  /// `toList_()`. The async version
+  /// `sequenceEqualAsync_` materialises both
+  /// sides via `toListAsync_()`.
+  bool sequenceEqual_<TInner>(
+    Queryable<TInner> other, {
+    bool Function(T, TInner)? equals,
+  }) {
+    final List<T> left = toList_();
+    final List<TInner> right = other.toList_();
+    return _sequenceEqualCore<T, TInner>(left, right, equals);
+  }
+
+  /// (Phase 1a.5): async terminal. Same as
+  /// [sequenceEqual_] but materialises both sides
+  /// via the async path. The 2.0.0 idiom is to
+  /// use this for any queryable that runs SQL.
+  Future<bool> sequenceEqualAsync_<TInner>(
+    Queryable<TInner> other, {
+    bool Function(T, TInner)? equals,
+  }) async {
+    final List<T> left = await toListAsync_();
+    final List<TInner> right = await other.toListAsync_();
+    return _sequenceEqualCore<T, TInner>(left, right, equals);
+  }
+
   // ───: closure LINQ overloads ────────────────────
   //
   // The `where_` / `orderBy_` / `orderByDescending_`
@@ -2072,6 +2330,64 @@ class Queryable<T> extends IQueryable<T> {
   // The two can be chained — the SQL filter runs
   // first (efficient), then the closure filter
   // applies on the smaller result.
+}
+
+// ────────────────────────────────────────────────────────────────────
+// _DefaultIfEmptyQueryable<T> — result of defaultIfEmpty_.
+// ────────────────────────────────────────────────────────────────────
+
+/// (Phase 1a.2): the result of `defaultIfEmpty_`.
+///
+/// Extends [Queryable<T>] so the user can chain
+/// further operators and call the standard
+/// `toListAsync_` terminal. The wrapper applies
+/// the default-value logic in the async
+/// materialize path: if the source is empty,
+/// the result is `[defaultValue]`; otherwise,
+/// the result is the source unchanged.
+///
+/// The SQL path (inherited from the source via
+/// the wrapped `_buildSelect`) is unchanged —
+/// the default is applied AFTER the SQL
+/// materialization.
+class _DefaultIfEmptyQueryable<T> extends Queryable<T> {
+  final Queryable<T> source;
+  final T defaultValue;
+  _DefaultIfEmptyQueryable._({
+    required this.source,
+    required this.defaultValue,
+  }) : super._(
+          source._provider,
+          source._dialect,
+          source._table,
+          source._reader,
+          meta: source._meta,
+          where: source._where,
+          select: source._select,
+          distinct: source._distinct,
+          orderBy: source._orderBy,
+          reverse: source._reverse,
+          take: source._take,
+          skip: source._skip,
+          changeTracker: source._changeTracker,
+          asyncProvider: source._asyncProvider,
+          memFilters: source._memFilters,
+          memOrderBy: source._memOrderBy,
+          memProject: source._memProject,
+          memProjectSource: source._memProjectSource,
+        );
+
+  /// (Phase 1a.2): async materialisation.
+  /// Materialises the source via the async path,
+  /// then applies the default-if-empty logic.
+  @override
+  Future<List<T>> toListAsync_() async {
+    final List<T> list = await source.toListAsync_();
+    if (list.isEmpty) {
+      return <T>[defaultValue];
+    }
+    return list;
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -2491,6 +2807,30 @@ class SqliteSetOpQueryable<T> extends Queryable<T> {
         return leftList.where((T x) => !rightSet.contains(x)).toList();
     }
   }
+}
+
+// ───: Phase 1a helpers ────────────────────────────────────
+
+/// (Phase 1a.5): the shared core of
+/// `sequenceEqual_` and `sequenceEqualAsync_`.
+/// Returns `true` if [left] and [right] have
+/// the same length and all corresponding
+/// elements compare equal (per [equals] or
+/// `==`).
+bool _sequenceEqualCore<T, TInner>(
+  List<T> left,
+  List<TInner> right,
+  bool Function(T, TInner)? equals,
+) {
+  if (left.length != right.length) return false;
+  for (int i = 0; i < left.length; i++) {
+    if (equals != null) {
+      if (!equals(left[i], right[i])) return false;
+    } else {
+      if (left[i] != right[i]) return false;
+    }
+  }
+  return true;
 }
 
 /// (set operations): union/intersect/except.
