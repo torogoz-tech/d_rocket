@@ -126,6 +126,15 @@ export 'src/linq/operators/lookup.dart';
 export 'src/linq/sql/sql_dialect.dart';
 export 'src/linq/sql/sql_fragment.dart';
 export 'src/linq/sql/sql_translator.dart';
+//: the legacy sync query provider contract.
+// Engines that have a synchronous query
+// path (SQLite) implement this; engines
+// that are async-only (Postgres, libsql_wasm)
+// do not. The `Queryable<T>` in d_rocket
+// core uses this to decide whether the
+// legacy sync LINQ methods (toList_,
+// count_, first_, …) are available.
+export 'src/linq/sql/legacy_sync_query_provider.dart';
 
 //: `redactPragmaKey` is the SQL redaction utility used by
 // `LoggingInterceptor`. It lives in d_rocket core

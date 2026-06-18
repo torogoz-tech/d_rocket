@@ -35,8 +35,6 @@ library;
 
 import 'package:d_rocket/d_rocket.dart';
 
-import 'sql_dialect.dart';
-
 /// Walks an [Expr] tree and produces a [SqlFragment].
 ///
 /// The translator is stateless (no instance-level state). Each
