@@ -135,6 +135,14 @@ export 'src/linq/sql/sql_translator.dart';
 // legacy sync LINQ methods (toList_,
 // count_, first_, …) are available.
 export 'src/linq/sql/legacy_sync_query_provider.dart';
+//: the engine-agnostic `Queryable<T>`.
+// Operators (where_, select_, orderBy_,
+// take_, skip_, groupBy_, join_, toListAsync_,
+// countAsync_, firstAsync_, …) live in
+// d_rocket core. Each engine just supplies
+// the dialect (the 3-method contract above)
+// and the `AsyncQueryProvider` for execution.
+export 'src/linq/queryable.dart';
 
 //: `redactPragmaKey` is the SQL redaction utility used by
 // `LoggingInterceptor`. It lives in d_rocket core
