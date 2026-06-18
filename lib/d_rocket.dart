@@ -109,6 +109,22 @@ export 'src/orm/auto_migration/auto_migration.dart';
 export 'src/linq/operators/group_by.dart' show IGrouping;
 export 'src/linq/operators/lookup.dart';
 
+//: SQL infrastructure (engine-agnostic).
+// `SqlFragment` is the unit of SQL emission: a
+// SQL string + its bind parameters. Each
+// engine's translator walks the in-memory
+// `Expr` tree and produces a `SqlFragment`.
+// The engine's `AsyncQueryProvider` executes
+// the fragment; for engines that use a
+// different placeholder convention (e.g.
+// Postgres uses `$1, $2, ...`), the provider
+// rewrites the `?` placeholders. This keeps
+// the operator layer (where / select /
+// orderBy / take / skip / groupBy / join) in
+// d_rocket core; only the per-dialect
+// translation bits live in the engine.
+export 'src/linq/sql/sql_fragment.dart';
+
 //: `redactPragmaKey` is the SQL redaction utility used by
 // `LoggingInterceptor`. It lives in d_rocket core
 // (engine-agnostic) even though `PRAGMA key` /
