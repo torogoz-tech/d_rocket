@@ -36,6 +36,79 @@ abstract class DbContext {
   /// The shared change tracker.
   final ChangeTracker changeTracker = ChangeTracker();
 
+  /// (Phase 3.7): the ordered list of ORM
+  /// interceptors. Interceptors are invoked
+  /// at the command level (before/after
+  /// every SELECT / INSERT / UPDATE / DELETE)
+  /// and at the entity level (before/after
+  /// every entity in a `saveChanges` batch).
+  ///
+  /// Add interceptors via:
+  ///
+  /// ```dart
+  /// final db = await Db.open(url: '...', engine: ...);
+  /// db.context.interceptors
+  ///   ..add(TenantFilter(42))
+  ///   ..add(AuditLog());
+  /// ```
+  ///
+  /// The registry is empty by default (no
+  /// behavior change for users who don't
+  /// add interceptors). The order of
+  /// insertion is the order of invocation
+  /// — the output of interceptor N is the
+  /// input of interceptor N+1.
+  final InterceptorRegistry interceptors = InterceptorRegistry();
+
+  /// (Phase 3.7): monotonic counter for
+  /// `saveChanges()` batches. The current
+  /// value is passed to the
+  /// `ChangeSet.batchId` so interceptors
+  /// can correlate logs across multiple
+  /// batches.
+  int _nextBatchId = 1;
+
+  /// (Phase 3.7): looks up the [EntityMeta]
+  /// for an already-constructed entity
+  /// (by runtimeType, not by generic T).
+  /// Used to build the [ChangeEntry] in
+  /// `saveChangesAsync`.
+  ///
+  /// Returns a placeholder [EntityMeta] if
+  /// the entity's runtimeType is not
+  /// registered with the codegen's
+  /// [EntityRegistry] (this can happen in
+  /// unit tests that construct entities
+  /// without the codegen — the placeholder
+  /// lets the saveChanges flow continue;
+  /// the real [EntityMeta] is still
+  /// available on the [DbSet] for the
+  /// actual SQL emission).
+  EntityMeta entityMetaForRaw(Object entity) {
+    try {
+      return EntityRegistry.metaFor(entity.runtimeType);
+    } on StateError {
+      // Unregistered entity (e.g. a unit-
+      // test-only class). Return a minimal
+      // placeholder. The DbSet still has the
+      // real meta (via `_dbSetForEntity`)
+      // for the actual SQL.
+      return EntityMeta(
+        tableName: entity.runtimeType.toString(),
+        columns: const <ColumnMeta>[],
+        insertableColumns: const <ColumnMeta>[],
+        updatableColumns: const <ColumnMeta>[],
+        primaryKey: const ColumnMeta(
+          sqlName: 'id',
+          dartField: 'id',
+          dartType: int,
+        ),
+        primaryKeyIndex: 0,
+        pkOf: (Object e) => null,
+      );
+    }
+  }
+
   /// Lazily-constructed `DbSet<T>` instances, keyed by the
   /// entity `Type`. Populated on the first call to
   /// `dbSet<T>` for a given `T`.
@@ -135,6 +208,10 @@ abstract class DbContext {
     if (async != null) {
       created.attachAsyncProvider(async);
     }
+    // (Phase 3.7): wire the interceptor
+    // registry so the DbSet can invoke the
+    // chain on its read / write paths.
+    created.attachInterceptors(interceptors);
     return created;
   }
 
@@ -254,6 +331,38 @@ abstract class DbContext {
             e.state == EntityState.modified ||
             e.state == EntityState.removed)
         .toList();
+    // (Phase 3.7): build the ChangeSet
+    // snapshot for the interceptor hooks.
+    // The ChangeEntry for each entity carries
+    // the entity, its state, and its meta —
+    // the same shape that the
+    // onEntitySaving / onEntitySaved hooks
+    // see (so the per-entity interceptor
+    // and the batch interceptor agree on
+    // what's about to be saved).
+    final List<ChangeEntry> changeEntries = <ChangeEntry>[
+      for (final TrackedEntry e in entriesToSync)
+        ChangeEntry(
+          state: e.state,
+          entity: e.entity,
+          meta: entityMetaForRaw(e.entity),
+        ),
+    ];
+    final ChangeSet changeSet = ChangeSet(
+      entries: changeEntries,
+      context: this,
+      batchId: _nextBatchId++,
+    );
+    // (Phase 3.7): onSaveChangesStart —
+    // fires once per saveChanges() call,
+    // BEFORE the transaction begins. The
+    // interceptor can do global validation
+    // (reject the whole batch on a violated
+    // invariant) or set common fields on
+    // all entities.
+    for (final DbInterceptor i in interceptors.interceptors) {
+      await i.onSaveChangesStart(changeSet);
+    }
     await provider.beginTransactionAsync();
     int affected = 0;
     final Map<TrackedEntry, int> insertedPks = <TrackedEntry, int>{};
@@ -372,14 +481,35 @@ abstract class DbContext {
       // appended is already in `newChanges`.
       _pendingSyncChanges.addAll(newChanges);
       queueHydrated = true;
+      // (Phase 3.7): onSaveChangesEnd —
+      // fires once per saveChanges() call,
+      // AFTER the transaction has committed
+      // successfully. The interceptor can
+      // publish events, write audit logs,
+      // send notifications. `error: null`
+      // means the save succeeded.
+      for (final DbInterceptor i in interceptors.interceptors) {
+        await i.onSaveChangesEnd(changeSet, null);
+      }
       return affected;
-    } catch (_) {
+    } catch (e, st) {
       // Roll back the transaction; the change tracker
       // entries stay in their original states (Added,
       // Modified, Removed), so the user can fix the
       // cause and re-run `saveChangesAsync`.
       await provider.rollbackAsync();
-      rethrow;
+      // (Phase 3.7): onSaveChangesEnd —
+      // also fires on failure. The
+      // interceptor receives the error
+      // (re-thrown below) so it can log,
+      // notify, or compensate. The rethrow
+      // is done after the interceptor so
+      // the hook can observe the error
+      // before it bubbles up.
+      for (final DbInterceptor i in interceptors.interceptors) {
+        await i.onSaveChangesEnd(changeSet, e);
+      }
+      Error.throwWithStackTrace(e, st);
     }
   }
 

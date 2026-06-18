@@ -18,6 +18,7 @@ export 'db_engine.dart';
 export 'db_set.dart';
 export 'db_set_include.dart';
 export 'embedded.dart';
+export 'interceptor.dart';
 export 'embedded_meta.dart';
 export 'engine_registry.dart';
 export 'navigation_meta.dart';

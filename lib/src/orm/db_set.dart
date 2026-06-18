@@ -131,6 +131,23 @@ class DbSet<T> {
     return this;
   }
 
+  /// (Phase 3.7): the [InterceptorRegistry] for
+  /// the surrounding [DbContext]. Wired by
+  /// [DbContext.dbSet] so the DbSet can invoke
+  /// the interceptor chain on its read / write
+  /// paths. Null when the DbSet is constructed
+  /// outside a DbContext (rare, e.g. unit tests
+  /// that exercise the DbSet in isolation).
+  InterceptorRegistry? _interceptors;
+
+  /// (Phase 3.7): attaches the [InterceptorRegistry]
+  /// from the surrounding DbContext. Idempotent.
+  /// Returns `this` for chaining.
+  DbSet<T> attachInterceptors(InterceptorRegistry interceptors) {
+    _interceptors = interceptors;
+    return this;
+  }
+
   DbSet({
     required EntityMeta Function() metaAccessor,
     required ChangeTracker tracker,
@@ -737,6 +754,13 @@ class DbSet<T> {
         'configure the surrounding DbContext with one.',
       );
     }
+    // (Phase 3.7): onEntitySaving fires
+    // BEFORE the SQL is built, so the
+    // interceptor can mutate the entity
+    // (e.g. set created_at = now()).
+    // The SQL is then built from the
+    // (possibly-mutated) fields.
+    await _fireOnEntitySaving(entity, EntityState.added);
     // (TPH): see `insertOne`.
     final List<ColumnMeta> cols = meta.effectiveInsertableColumns;
     final String placeholders =
@@ -747,7 +771,25 @@ class DbSet<T> {
     final List<Object?> binds = <Object?>[
       for (final ColumnMeta c in cols) _readField(entity, c),
     ];
-    await _asyncProvider!.executeAsync(sql, binds);
+    final MutationResult result = await _runMutation(
+      baseSql: sql,
+      binds: binds,
+      table: meta.tableName,
+      operation: 'INSERT',
+      entity: entity,
+    );
+    if (!result.isSuccess) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+    // (Phase 3.7): onEntitySaved fires
+    // AFTER the SQL has run. The
+    // interceptor can inspect the result.
+    await _fireOnEntitySaved(
+      entity,
+      EntityState.added,
+      result.command,
+      result,
+    );
     return 1;
   }
 
@@ -763,6 +805,11 @@ class DbSet<T> {
         'DbSet<T>.updateOneAsync() requires an AsyncQueryProvider.',
       );
     }
+    // (Phase 3.7): onEntitySaving fires
+    // BEFORE the SQL is built, so the
+    // interceptor can mutate the entity
+    // (e.g. set updated_at = now()).
+    await _fireOnEntitySaving(entity, EntityState.modified);
     // (TPH): see `insertOne`.
     final List<ColumnMeta> cols = meta.effectiveUpdatableColumns;
     final String setClause =
@@ -774,7 +821,22 @@ class DbSet<T> {
       for (final ColumnMeta c in cols) _readField(entity, c),
       _readField(entity, meta.primaryKey),
     ];
-    await _asyncProvider!.executeAsync(sql, binds);
+    final MutationResult result = await _runMutation(
+      baseSql: sql,
+      binds: binds,
+      table: meta.tableName,
+      operation: 'UPDATE',
+      entity: entity,
+    );
+    if (!result.isSuccess) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+    await _fireOnEntitySaved(
+      entity,
+      EntityState.modified,
+      result.command,
+      result,
+    );
     return 1;
   }
 
@@ -787,11 +849,33 @@ class DbSet<T> {
         'DbSet<T>.deleteOneAsync() requires an AsyncQueryProvider.',
       );
     }
+    // (Phase 3.7): onEntitySaving fires
+    // BEFORE the SQL is built, so the
+    // interceptor can mark the entity
+    // for soft-delete (and the SQL
+    // will be transformed from DELETE to
+    // UPDATE by the onMutation interceptor).
+    await _fireOnEntitySaving(entity, EntityState.removed);
     final String sql = 'DELETE FROM ${meta.tableName} '
         'WHERE ${meta.primaryKey.sqlName} = ?';
-    await _asyncProvider!.executeAsync(
-      sql,
-      <Object?>[_readField(entity, meta.primaryKey)],
+    final List<Object?> binds = <Object?>[
+      _readField(entity, meta.primaryKey),
+    ];
+    final MutationResult result = await _runMutation(
+      baseSql: sql,
+      binds: binds,
+      table: meta.tableName,
+      operation: 'DELETE',
+      entity: entity,
+    );
+    if (!result.isSuccess) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+    await _fireOnEntitySaved(
+      entity,
+      EntityState.removed,
+      result.command,
+      result,
     );
     return 1;
   }
@@ -976,9 +1060,198 @@ class DbSet<T> {
     final String sql =
         'SELECT ${cols.map((ColumnMeta c) => meta.sqlColumnName(c)).join(', ')} '
         'FROM ${meta.tableName}';
-    final List<Object?> rawRows =
-        await _asyncProvider!.selectAsync(sql, const <Object?>[]);
+
+    // (Phase 3.7): the interceptor chain.
+    // Build the QueryCommand, run it through
+    // onQuery (so the user can rewrite SQL /
+    // add binds), then execute the possibly-
+    // modified command via selectAsync, then
+    // run the result through onQueryComplete
+    // (so the user can inspect / transform /
+    // log the result).
+    final List<Object?> rawRows = await _runQuery(
+      baseSql: sql,
+      binds: const <Object?>[],
+      table: meta.tableName,
+    );
     return _materialize(rawRows);
+  }
+
+  /// (Phase 3.7): runs a mutation through the
+  /// interceptor chain (onMutation →
+  /// executeAsync → onMutationComplete).
+  /// The base SQL is what the DbSet would
+  /// have sent without interceptors;
+  /// interceptors can transform it (e.g. add
+  /// `created_at`, convert DELETE to soft-
+  /// delete, encrypt columns).
+  ///
+  /// Note: `onEntitySaving` fires BEFORE this
+  /// method is called (at the insertOneAsync /
+  /// updateOneAsync / deleteOneAsync call
+  /// site) so the interceptor can mutate the
+  /// entity, and the SQL is built from the
+  /// mutated fields. `onEntitySaved` fires
+  /// AFTER this method returns.
+  Future<MutationResult> _runMutation({
+    required String baseSql,
+    required List<Object?> binds,
+    required String table,
+    required String operation,
+    Object? entity,
+  }) async {
+    MutationCommand cmd = MutationCommand(
+      sql: baseSql,
+      binds: binds,
+      table: table,
+      operation: operation,
+      entity: entity,
+    );
+    // onMutation: chain through all interceptors.
+    if (_interceptors != null) {
+      for (final DbInterceptor i in _interceptors!.interceptors) {
+        cmd = await i.onMutation(cmd);
+      }
+    }
+    // Execute the (possibly-rewritten) command.
+    final Stopwatch sw = Stopwatch()..start();
+    Object? error;
+    StackTrace? stackTrace;
+    int rowsAffected = 0;
+    int? lastInsertRowId;
+    try {
+      await _asyncProvider!.executeAsync(cmd.sql, cmd.binds);
+      // For INSERTs, capture the last insert
+      // row id (interceptable via
+      // onMutationComplete too).
+      if (operation == 'INSERT') {
+        try {
+          lastInsertRowId = await _asyncProvider!.lastInsertRowIdAsync();
+        } catch (_) {
+          // Some engines (Postgres in 2.0) don't
+          // support lastInsertRowId. Ignore.
+        }
+      }
+      rowsAffected = 1;
+    } catch (e, st) {
+      error = e;
+      stackTrace = st;
+    }
+    sw.stop();
+    MutationResult result = MutationResult(
+      rowsAffected: rowsAffected,
+      command: cmd,
+      lastInsertRowId: lastInsertRowId,
+      elapsed: sw.elapsed,
+      error: error,
+      stackTrace: stackTrace,
+    );
+    // onMutationComplete: chain through all interceptors.
+    if (_interceptors != null) {
+      for (final DbInterceptor i in _interceptors!.interceptors) {
+        result = await i.onMutationComplete(result);
+      }
+    }
+    return result;
+  }
+
+  /// (Phase 3.7): fires the `onEntitySaving`
+  /// chain for one entity. The interceptor
+  /// can modify the entity (e.g. set
+  /// `created_at`, validate fields, mark
+  /// for soft-delete) before the SQL is
+  /// built from its fields.
+  Future<void> _fireOnEntitySaving(
+    T entity,
+    EntityState state,
+  ) async {
+    if (_interceptors == null) return;
+    final ChangeEntry entry = ChangeEntry(
+      state: state,
+      entity: entity as Object,
+      meta: meta,
+    );
+    for (final DbInterceptor i in _interceptors!.interceptors) {
+      await i.onEntitySaving(entry);
+    }
+  }
+
+  /// (Phase 3.7): fires the `onEntitySaved`
+  /// chain for one entity. The interceptor
+  /// can inspect the result, log, or react
+  /// to errors.
+  Future<void> _fireOnEntitySaved(
+    T entity,
+    EntityState state,
+    MutationCommand command,
+    MutationResult result,
+  ) async {
+    if (_interceptors == null) return;
+    final ChangeEntry entry = ChangeEntry(
+      state: state,
+      entity: entity as Object,
+      meta: meta,
+      command: command,
+    );
+    for (final DbInterceptor i in _interceptors!.interceptors) {
+      await i.onEntitySaved(entry, result);
+    }
+  }
+
+  /// (Phase 3.7): runs a query through the
+  /// interceptor chain (onQuery → selectAsync →
+  /// onQueryComplete). The base SQL is what
+  /// the DbSet would have sent without
+  /// interceptors; interceptors can transform
+  /// it before the wire.
+  Future<List<Object?>> _runQuery({
+    required String baseSql,
+    required List<Object?> binds,
+    required String table,
+  }) async {
+    QueryCommand cmd = QueryCommand(
+      sql: baseSql,
+      binds: binds,
+      table: table,
+    );
+    // onQuery: chain through all interceptors.
+    if (_interceptors != null) {
+      for (final DbInterceptor i in _interceptors!.interceptors) {
+        cmd = await i.onQuery(cmd);
+      }
+    }
+    // Execute the (possibly-rewritten) command.
+    final Stopwatch sw = Stopwatch()..start();
+    Object? error;
+    StackTrace? stackTrace;
+    List<Object?> rows = const <Object?>[];
+    try {
+      rows = await _asyncProvider!.selectAsync(cmd.sql, cmd.binds);
+    } catch (e, st) {
+      error = e;
+      stackTrace = st;
+    }
+    sw.stop();
+    QueryResult result = QueryResult(
+      rows: rows,
+      command: cmd,
+      elapsed: sw.elapsed,
+      error: error,
+      stackTrace: stackTrace,
+    );
+    // onQueryComplete: chain through all interceptors.
+    if (_interceptors != null) {
+      for (final DbInterceptor i in _interceptors!.interceptors) {
+        result = await i.onQueryComplete(result);
+      }
+    }
+    // If the user code threw in an interceptor,
+    // rethrow here (after onQueryComplete so
+    // the error is visible in logs).
+    if (!result.isSuccess) {
+      Error.throwWithStackTrace(result.error!, result.stackTrace!);
+    }
+    return result.rows;
   }
 
   /// .e: chainable include of a navigation
