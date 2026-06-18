@@ -123,7 +123,9 @@ export 'src/linq/operators/lookup.dart';
 // orderBy / take / skip / groupBy / join) in
 // d_rocket core; only the per-dialect
 // translation bits live in the engine.
+export 'src/linq/sql/sql_dialect.dart';
 export 'src/linq/sql/sql_fragment.dart';
+export 'src/linq/sql/sql_translator.dart';
 
 //: `redactPragmaKey` is the SQL redaction utility used by
 // `LoggingInterceptor`. It lives in d_rocket core
