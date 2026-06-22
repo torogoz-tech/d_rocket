@@ -2,6 +2,12 @@
 
 > **Dart's data rocket — serialize, query, persist, sync.**
 
+[![ci](https://github.com/torogoz-tech/d_rocket/actions/workflows/ci.yml/badge.svg)](https://github.com/torogoz-tech/d_rocket/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/torogoz-tech/d_rocket/branch/main/graph/badge.svg)](https://codecov.io/gh/torogoz-tech/d_rocket)
+[![pana](https://img.shields.io/badge/pana-140%2F160-yellow)](https://pub.dev/packages/d_rocket/score)
+[![tests](https://img.shields.io/badge/tests-953%20pass%20%2B%2024%20skip-brightgreen)](https://github.com/torogoz-tech/d_rocket/actions/workflows/ci.yml)
+[![license](https://img.shields.io/github/license/torogoz-tech/d_rocket)](LICENSE)
+
 `d_rocket` is the engine-agnostic core of a single-package framework
 for the data layer of Dart and Flutter applications. It unifies
 the six concerns that, in most stacks, force you to glue together
