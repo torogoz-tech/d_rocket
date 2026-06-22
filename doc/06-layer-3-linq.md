@@ -157,6 +157,7 @@ one file per category.
 | `orderByDescending_(keySelector)` | `IQueryable<T> orderByDescending_(Expr keySelector)` | Descending sort by the selector's value. |
 | `thenBy_(keySelector)` | `IQueryable<T> thenBy_(Expr keySelector)` | Secondary ascending sort. Must follow `orderBy_`, `orderByDescending_`, or another `thenBy_`. Throws if the source is not ordered. |
 | `thenByDescending_(keySelector)` | `IQueryable<T> thenByDescending_(Expr keySelector)` | Secondary descending sort. |
+| `reverse_()` | `IQueryable<T> reverse_()` | Inverts the order of the elements. SQL: flips the ASC/DESC on each existing `ORDER BY` key in `_buildSelect` (portable across engines). **Requires a preceding `orderBy_()` or `orderByDescending_()`** — throws `StateError` at `toListAsync_()` time otherwise. Composable with `thenBy_` / `thenByDescending_` (all keys are flipped). |
 
 The sort materialises the source (no streaming sort
 in the in-memory provider). The SQL provider emits
@@ -233,11 +234,22 @@ no-arg and predicate forms.
 
 | Operator | Signature | Behavior |
 |---|---|---|
-| `toLookup_<TKey>({keySelector})` | `ILookup<TKey, T> toLookup_<TKey>({required Expr keySelector})` | Build a multi-valued dictionary. The result is `ILookup<TKey, T>` with `containsKey`, `operator []` (returns empty iterable for missing keys), `keys`, and `length`. |
+| `toLookup_<TKey>({keySelector})` | `ILookup<TKey, T> toLookup_<TKey>({required Expr keySelector})` | Build a multi-valued dictionary. The result is `ILookup<TKey, T>` with `containsKey`, `operator []` (returns empty iterable for missing keys), `keys`, and `length`. **Sync terminal** — materialises the source via `toList_()`. |
+| `toLookupAsync_<TKey>({keySelector})` | `Future<ILookup<TKey, T>> toLookupAsync_<TKey>({required Expr keySelector})` | Async terminal variant of `toLookup_<TKey>`. **The 2.0.0 idiom** — materialises the source via `toListAsync_()`. |
 
 `ILookup` is the `toDictionary` / `toLookup` of C#
 LINQ — like a `Map<TKey, List<T>>` with explicit
 "key may map to zero values" semantics.
+
+### Combine & compare
+
+| Operator | Signature | Behavior |
+|---|---|---|
+| `zip_<TInner>(other)` | `List<(T, TInner)> zip_<TInner>(IQueryable<TInner> other)` | Element-wise combine of `this` and `other`. Returns a list of `(T, TInner)` pairs, stopping at the shorter of the two. **Sync terminal** — materialises both sides via `toList_()`. |
+| `zipAsync_<TInner, R>(other, combiner)` | `Future<List<R>> zipAsync_<TInner, R>(IQueryable<TInner> other, R Function(T, TInner) combiner)` | Async terminal variant of `zip_<TInner>`. The `combiner` is a function `(left, right) => R`. **The 2.0.0 idiom** — materialises both sides via `toListAsync_()`. |
+| `sequenceEqual_<TInner>(other, {equals})` | `bool sequenceEqual_<TInner>(IQueryable<TInner> other, {bool Function(T, TInner)? equals})` | Returns `true` if the source and `other` have the same length and all corresponding elements are equal (per the optional `equals` comparator; defaults to `==`). **Sync terminal**. |
+| `sequenceEqualAsync_<TInner>(other, {equals})` | `Future<bool> sequenceEqualAsync_<TInner>(IQueryable<TInner> other, {bool Function(T, TInner)? equals})` | Async terminal variant of `sequenceEqual_<TInner>`. **The 2.0.0 idiom**. |
+| `defaultIfEmpty_(defaultValue)` | `Queryable<T> defaultIfEmpty_(T defaultValue)` | Returns a `Queryable<T>` that materialises to `[defaultValue]` if the source is empty, or the source itself otherwise. Implemented as a `Queryable<T>` subclass that delegates the SQL emission to the source and applies the default-if-empty logic in `toListAsync_` (and via the iterator for the sync path). |
 
 ## Two forms: explicit AST (the current runtime)
 

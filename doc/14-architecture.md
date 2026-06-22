@@ -32,36 +32,101 @@ extend the framework.
                                     ▼
                   ┌─────────────────────────────────────┐
                   │                                     │
-                  │         d_rocket runtime            │
+                  │      d_rocket CORE (2.0.0)          │
+                  │      engine-agnostic                 │
                   │                                     │
                   │  ┌─────────────┐  ┌─────────────┐  │
                   │  │ serializer  │  │ rest        │  │
                   │  └─────────────┘  └─────────────┘  │
                   │  ┌─────────────┐  ┌─────────────┐  │
                   │  │ linq        │  │ orm         │  │
+                  │  │ (35 ops)    │  │ (DbContext) │  │
                   │  └─────────────┘  └─────────────┘  │
                   │  ┌─────────────┐  ┌─────────────┐  │
                   │  │ sync        │  │ realtime    │  │
                   │  └─────────────┘  └─────────────┘  │
+                  │  ┌──────────────────────────────┐  │
+                  │  │ DbEngine contract (3 methods)│  │
+                  │  │ SqlDialect   (3 methods)     │  │
+                  │  │ EngineRegistry               │  │
+                  │  └──────────────────────────────┘  │
                   │                                     │
                   └─────────────────┬───────────────────┘
                                     │
-                                    ▼
-                  ┌─────────────────────────────────────┐
-                  │                                     │
-                  │        platform plugins             │
-                  │                                     │
-                  │   - package:sqlite3 (engine)        │
-                  │   - package:http (REST)             │
-                  │   - dart:io WebSocket (realtime)    │
-                  │                                     │
-                  └─────────────────────────────────────┘
+                ┌───────────────────┼───────────────────┐
+                │                   │                   │
+                ▼                   ▼                   ▼
+      ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+      │ d_rocket_engine_ │ │ d_rocket_engine_ │ │ d_rocket_engine_ │
+      │ sqlite (2.0.0)   │ │ postgres (2.0.0) │ │ libsql_wasm      │
+      │                  │ │                  │ │ (2.1.0)         │
+      │ - SqliteEngine   │ │ - PgEngine       │ │ - LibSqlEngine   │
+      │ - SqliteProvider │ │ - PgPool         │ │ - WasmProvider   │
+      │ - SqliteDialect  │ │ - PgDialect      │ │ - WasmDialect    │
+      │                  │ │                  │ │                  │
+      │ package:sqlite3  │ │ package:postgres │ │ @libsql/client   │
+      │ (sqlcipher opt)  │ │ (libpq)          │ │ (browser)        │
+      └──────────────────┘ └──────────────────┘ └──────────────────┘
 ```
 
-The runtime is a single Dart package. The codegen is a
-separate `build_runner` integration. The platform
-plugins are well-known Dart packages — `d_rocket` is
-a user, not a re-implementer, of these primitives.
+The runtime is split into two tiers in 2.0.0:
+
+* **Core** (`d_rocket`) — engine-agnostic. Contains all
+  six layers, the `DbEngine` contract, the `SqlDialect`
+  contract (3 methods), and the `EngineRegistry`. No DB
+  driver dependency.
+* **Engines** (one package per engine) — implements
+  `DbEngine`. Each engine is a thin wrapper around a
+  Dart DB driver (`package:sqlite3`, `package:postgres`,
+  `@libsql/client`).
+
+The same `DbContext`, `DbSet<T>`, `@Table`, and LINQ
+code runs on every engine. Switching engines is a
+1-line change in `main.dart` (the
+`dRocketSqlite()` / `dRocketPostgres()` /
+`dRocketLibsqlWasm()` registration call).
+
+The codegen is a separate `build_runner` integration.
+The platform plugins are well-known Dart packages —
+`d_rocket` is a user, not a re-implementer, of these
+primitives.
+
+### 2.0.0 — the engine contract
+
+The boundary between core and engines is a single
+interface: `DbEngine` (3 methods). The `SqlDialect`
+interface is also 3 methods. Everything else is
+engine-agnostic.
+
+```dart
+abstract interface class DbEngine {
+  String get name;
+  Future<DbConnection> open(DatabaseConfig config);
+  SqlDialect get dialect;
+}
+
+abstract interface class DbConnection {
+  Future<List<Map<String, Object?>>> select(
+    String sql, [List<Object?>? binds]);
+  Future<int> execute(String sql, [List<Object?>? binds]);
+  Future<void> beginTransaction();
+  Future<void> commit();
+  Future<void> rollback();
+  Future<void> close();
+}
+
+abstract interface class SqlDialect {
+  String contains(String column, String pattern);
+  String mapLiteral(List<(String, String)> pairs);
+  String parameter(int index);
+}
+```
+
+The default `SqlDialect` (`DefaultDialect`) is
+SQLite-flavoured. The Postgres engine uses
+`PostgresLikeDialect` (3 method overrides, ~20 lines).
+Adding a new engine (e.g. MySQL for 2.2.0) means
+implementing these 3 interfaces.
 
 ## The six layers, internally
 

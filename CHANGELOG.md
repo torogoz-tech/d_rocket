@@ -5,14 +5,14 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] — 2026-06-17
+## [2.0.0] — 2026-06-22
 
 **BREAKING — engine split.** The SQLite engine
 that shipped inside `d_rocket` from 0.9.0 to
 1.2.x is now a separate package,
 [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite).
 `d_rocket` core is now engine-agnostic. See
-`doc/MIGRATION_1_x_to_2_0.md` for the upgrade
+`doc/11-migration-1-x-to-2-0.md` for the upgrade
 guide.
 
 **New: a second engine ships in 2.0.0.** The
@@ -123,6 +123,76 @@ opens a `PgDb` and uses `db.provider.selectAsync`
   the import path is now
   `package:d_rocket/d_rocket.dart` (the
   function is in the d_rocket barrel).
+
+### Phase 1a — 5 missing LINQ operators
+
+* **`reverse_()` — now portable (BREAKING for
+  users who relied on the SQLite-only
+  `ORDER BY rowid DESC` 1.x contract).**
+  The 2.0.0 implementation flips the ASC/DESC
+  on each existing `ORDER BY` key at the SQL
+  level. **Requires a preceding `orderBy_()` or
+  `orderByDescending_()`** — throws `StateError`
+  at `toListAsync_()` time otherwise. Works on
+  every engine (SQLite, Postgres, and the
+  upcoming libSQL/WASM).
+* **`defaultIfEmpty_(T defaultValue)` — new.**
+  Returns a singleton list containing
+  `[defaultValue]` if the source is empty;
+  otherwise returns the source unchanged.
+  Implemented as a `Queryable<T>` subclass that
+  delegates the SQL emission to the source
+  and applies the default-if-empty logic in
+  `toListAsync_` (and via the iterator for the
+  sync path). EF-Core-style `LEFT OUTER JOIN`
+  translation is a 2.1.0 candidate if profiling
+  shows the in-memory check is a bottleneck.
+* **`toLookupAsync_<TKey>(...)` — new async
+  variant of the existing `toLookup_<TKey>(...)`.**
+  Materializes the source via the async path
+  and groups by the key selector in memory.
+  The 2.0.0 idiom for any queryable that runs
+  SQL.
+* **`zipAsync_<TInner, R>(other, combiner)` —
+  new async variant of the existing
+  `zip_<TInner>(other)`.** Materializes both
+  sides via the async path and combines them
+  element-wise with the `combiner` function.
+  Stops at the shorter of the two sides
+  (matching C#'s `Enumerable.Zip`).
+* **`sequenceEqual_<TInner>(other, {equals})` and
+  `sequenceEqualAsync_<TInner>(other, {equals})` —
+  new in 2.0.0.** Returns `true` if the source
+  and `other` have the same length and all
+  corresponding elements are equal (per the
+  optional `equals` comparator; defaults to
+  `==`). Both sync and async variants.
+
+Total LINQ operator count: **35** (was 30 in 1.x).
+
+### Phase 3.5.4d — cross-engine parity tests
+
+* **25 SQL parity tests** (`test/linq/sql_parity_test.dart`):
+  the same `Expr` tree produces the same SQL
+  on `DefaultDialect` and `PostgresLikeDialect`,
+  modulo the 3 documented differences
+  (`INSTR` vs `STRPOS`, `json_object` vs
+  `jsonb_build_object`, and the `?` → `$1, $2, ...`
+  placeholder rewriting that the engine does
+  at the wire).
+* **6 SQLite runtime parity tests**
+  (`d_rocket_engine_sqlite/test/runtime_parity_test.dart`):
+  the same queries return the same results on
+  SQLite in-memory. Always runs.
+* **11 Postgres runtime parity tests**
+  (`d_rocket_engine_postgres/test/runtime_parity_test.dart`):
+  5 placeholder-rewrite tests + 6 runtime
+  parity tests against a real Postgres
+  connection. Gated on `TEST_PG_URL`.
+
+Total test count: **953 pass** + 24 skip
+(3 packages: d_rocket + d_rocket_engine_sqlite +
+d_rocket_engine_postgres).
 
 ## [1.2.2] — 2026-06-15
 

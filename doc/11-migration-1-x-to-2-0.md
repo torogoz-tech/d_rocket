@@ -256,3 +256,91 @@ are unchanged in 2.0:
 See
 [CHANGELOG.md](../CHANGELOG.md) for the
 full list of changes in 2.0.0.
+
+---
+
+## 11. New LINQ operators (Phase 1a)
+
+Five LINQ operators that were missing in 1.x or only
+existed as sync terminals in 1.x:
+
+| Operator | Status in 1.x | Status in 2.0.0 |
+|---|---|---|
+| `reverse_()` | SQLite-specific (`ORDER BY rowid DESC`) | Portable (flips existing `ORDER BY`) — **requires a preceding `orderBy_()`** |
+| `defaultIfEmpty_(T)` | Not available | New — in-memory wrapper |
+| `toLookup_<K>(...)` | Sync only | Sync + `toLookupAsync_<K>(...)` |
+| `zip_<T2>(...)` | Sync only | Sync + `zipAsync_<T2, R>(...)` |
+| `sequenceEqual_<T2>(...)` | Not available | New — sync + `sequenceEqualAsync_<T2>(...)` |
+
+### 11.1 `reverse_()` — the breaking change
+
+**Before (1.x):**
+
+```dart
+// Worked because the 1.x implementation
+// emitted ORDER BY rowid DESC (SQLite-specific).
+final result = await db.orders
+    .asQueryable()
+    .reverse_()
+    .toListAsync_();
+```
+
+**After (2.0.0):**
+
+```dart
+// 2.0.0 requires a preceding orderBy_():
+// the SQL translator flips the ASC/DESC on
+// each key, not a hardcoded "rowid DESC".
+final result = await db.orders
+    .asQueryable()
+    .orderBy_(o => o.id)   // ← required in 2.0.0
+    .reverse_()
+    .toListAsync_();
+```
+
+If you skip the `orderBy_()`, the translator throws
+`StateError` at `toListAsync_()` time. The error
+message tells you exactly what to do.
+
+### 11.2 `defaultIfEmpty_()` — new in 2.0.0
+
+```dart
+// "All my filters, or a default filter if I have none".
+final filters = await db.userFilters
+    .asQueryable()
+    .where_(f => f.userId == userId)
+    .defaultIfEmpty_(defaultFilter)
+    .toListAsync_();
+```
+
+The operator is a `Queryable<T>` subclass that delegates
+the SQL emission to the source and applies the
+default-if-empty logic in `toListAsync_` (and via the
+iterator for the sync path).
+
+### 11.3 Async variants of `toLookup_`, `zip_`, `sequenceEqual_`
+
+The 1.x `toLookup_<K>(...)`, `zip_<T2>(...)` were
+sync terminals — for async sources you had to call
+`toList_()` first. 2.0.0 adds async variants:
+
+```dart
+// 1.x:
+final lookup = buildLookup(
+  await q.toListAsync_(), keySelector,
+);
+
+// 2.0.0:
+final lookup = await q.toLookupAsync_<K>(
+  keySelector: keySelector,
+);
+
+// Same pattern for zip_ and sequenceEqual_:
+final pairs = await q1.zipAsync_<T2, R>(q2, combiner);
+final equal = await q1.sequenceEqualAsync_<T2>(q2);
+```
+
+The `*Async_` variants are the recommended path for
+any queryable that runs SQL.
+
+
