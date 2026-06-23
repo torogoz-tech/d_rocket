@@ -88,7 +88,7 @@ void main() {
     )
   ''');
 
-  // 3. Insert.
+  // 3. INSERT — via a prepared statement.
   final ins = provider.database.prepare(
     'INSERT INTO books (id, title, authorId) VALUES (?, ?, ?)',
   );
@@ -107,12 +107,29 @@ void main() {
     ),
   );
 
-  // 5. Run a deferred-execution LINQ query.
+  // 5. SELECT — deferred-execution LINQ query.
   final titles = books
       .select_<String>((b) => b.title)
       .toList_();
   print(titles);
   // [A Wizard of Earthsea, The Left Hand of Darkness]
+
+  // 6. UPDATE — single row, parameterised.
+  provider.execute(
+    'UPDATE books SET title = ? WHERE id = ?',
+    ['The Farthest Shore', 1],
+  );
+
+  // 7. DELETE — by primary key.
+  provider.execute(
+    'DELETE FROM books WHERE id = ?',
+    [2],
+  );
+
+  // 8. Confirm the final state.
+  final remaining = books.toList_();
+  print(remaining.map((b) => b.title));
+  // [The Farthest Shore]
 
   provider.dispose();
 }
