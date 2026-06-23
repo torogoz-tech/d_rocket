@@ -1,18 +1,36 @@
-# Layer 4 — ORM (SQLite)
+# Layer 4 — ORM (engine-agnostic)
 
 The ORM provides annotation-driven entity declaration,
-change-tracked mutations, and LINQ push-down to SQLite.
-The user declares `@Table` classes, the codegen
+change-tracked mutations, and LINQ push-down to the
+engine. The user declares `@Table` classes, the codegen
 emits a `fromRow` factory and an `EntityMeta` for each,
 and the runtime provides a `DbContext` base
 class that the user subclasses to wire the `DbSet<T>`
 getters.
 
-The ORM is **provider-agnostic** — it talks to any
-`AsyncQueryProvider`. The bundled SQLite provider
-ships in the same package and is wired in at
-construction time. Other providers (Postgres, MySQL,
-IndexedDB) can be plugged in via the same contract.
+The ORM is **engine-agnostic** — it talks to any
+`AsyncQueryProvider`. In 2.0.0 three engines ship
+in separate packages:
+
+- `d_rocket_engine_sqlite` — `package:sqlite3` (file
+  or `sqlite::memory:`). Has **both** sync and async
+  LINQ.
+- `d_rocket_engine_postgres` — `package:postgres`
+  (wire protocol, pure Dart, no FFI). Async-only LINQ.
+- `d_rocket_engine_web` — IndexedDB via `package:idb_shim`
+  (browser). Async-only LINQ.
+
+Pick the engine that matches the target platform, add
+its package to your `pubspec.yaml`, and call its
+registration helper (`dRocketSqlite()`,
+`dRocketPostgres()`, or `dRocketWeb()`) once at app
+startup before any `Db.open` / `PgDb.open` / `WebDb.open`
+call.
+
+> **Note (1.x → 2.0):** the SQLite provider used to
+> ship inside `d_rocket`. In 2.0.0 the ORM core was
+> decoupled from the engine and the SQLite provider
+> moved to a separate `d_rocket_engine_sqlite` package.
 
 ---
 

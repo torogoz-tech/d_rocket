@@ -114,25 +114,49 @@ class M2026_06_12_AddCustomerEmailIndex extends MigrationBase {
 }
 ```
 
-## Auto-migrations (1.2.0+)
+## Auto-migrations (2.0.0+)
 
-As of **1.2.0** d_rocket ships a second migration
+As of **2.0.0** d_rocket ships a second migration
 system that is the **recommended default for the
 steady-state add-column / add-index / add-table
-work**. Set `autoMigrate: true` on `Db.open` and
-pass the list of codegen-emitted `EntityMeta`s:
+work**. The flow is:
+
+1. The codegen emits the `EntityMeta` for every
+   `@Table` class into a central
+   `d_rocket_registry.g.dart`.
+2. `initializeD()` (called at app startup)
+   registers those `EntityMeta`s in the
+   `EntityRegistry`.
+3. `db.pendingSchemaDiff()` returns the
+   computed diff between the live DB schema and
+   the codegen-emitted schema. The diff is a list
+   of `SchemaChange` records (CREATE TABLE, ADD
+   COLUMN, CREATE INDEX, etc.).
+4. The runner applies the **safe** changes (CREATE
+   TABLE, ADD COLUMN, CREATE INDEX) in a single
+   transaction via `db.runAutoMigrations()`. The
+   **unsafe** changes (DROP, MODIFY) require a
+   hand-written `@Migration` callback.
 
 ```dart
 dRocketSqlite();
-final db = await Db.open(
-  path: 'app.db',
-  entityMetas: <EntityMeta>[
-    Patient.entityMeta,
-    Observation.entityMeta,
-  ],
-  autoMigrate: true,
-);
+initializeD();
+final db = await Db.inMemory();
+
+// What would change if the runtime applied the
+// codegen-emitted schema right now?
+final diff = await db.pendingSchemaDiff();
+print(diff); // [SchemaChange.addColumn(...), ...]
+
+// Apply the safe subset (CREATE TABLE, ADD COLUMN).
+await db.runAutoMigrations();
 ```
+
+> **Note (1.x → 2.0):** the 1.2.0 API
+> `Db.open(entityMetas: [...], autoMigrate: true)` is
+> gone in 2.0.0. The 2.0.0 flow is async, two-step,
+> and the diff is observable to the dev before any
+> SQL is issued.
 
 The auto-migrator runs **after** the manual
 `MigrationStrategy` (if one was provided). The
