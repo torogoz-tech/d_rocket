@@ -427,13 +427,15 @@ class DbSet<T> {
   /// or `null` if no match.
   ///
   /// The primary use case is typed navigation between
-  /// `@BelongsTo` / `@HasMany` relations:
+  /// `@ForeignKey` relations:
   ///
   /// ```dart
-  /// // @BelongsTo: load the author of a book
+  /// // load the author of a book via the
+  /// // @ForeignKey on Book.authorId
   /// final Author? author = ctx.authors.firstBy(
   /// column: 'id', value: book.authorId);
-  /// // @HasMany: load the first sale of a book
+  /// // load the first sale of a book via the
+  /// // @ForeignKey on Sale.bookId
   /// final Sale? first = ctx.sales.firstBy(
   /// column: 'book_id', value: book.id);
   /// ```
@@ -475,11 +477,12 @@ class DbSet<T> {
   /// this `DbSet<T>` whose [column] equals [value].
   ///
   /// The primary use case is typed navigation for
-  /// `@HasMany`:
+  /// `@ForeignKey`:
   ///
   /// ```dart
-  /// // @HasMany: load every sale of a book
-  /// final List`<Sale>` sales = ctx.sales.allBy(
+  /// // load every sale of a book via the
+  /// // @ForeignKey on Sale.bookId
+  /// final List<Sale> sales = ctx.sales.where(
   /// column: 'book_id', value: book.id);
   /// ```
   ///

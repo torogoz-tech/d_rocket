@@ -51,31 +51,28 @@ import 'package:d_rocket_engine_sqlite/d_rocket_engine_sqlite.dart';
 
 part 'app.g.dart';
 
-@Table(name: 'users')
+@Table()
 class User {
-  @PrimaryKey() late int id;
+  @PrimaryKey(autoIncrement: true) late int id;
   @Column() late String name;
 }
 
-@Serializable
-class _UserDto extends User {}
-
 // Boot the engine once at app startup.
-void main() {
+void main() async {
   dRocketSqlite();
-  runApp(const MyApp());
-}
-
-// Use the DbContext for queries.
-Future<void> example() async {
-  final db = await Db.open(
-    connectionString: ':memory:',
-    entities: const [User],
+  initializeD();
+  final db = await Db.open(path: 'app.db');
+  // Use the registered table context.
+  await db.tables.insert(
+    (db.tables.entityMetaFor(User).newRow() as User)..name = 'alice',
   );
-  await db.users.insert(User()..id = 1..name = 'alice');
-  final users = await db.users.toList();
 }
 ```
+
+> **Note:** the actual `Db.insert` API uses the entity's
+> generated `newRow()` helper, not a hand-built constructor.
+> See [d_rocket/doc/04-layer-1-serialization.md](https://github.com/torogoz-tech/d_rocket/blob/main/doc/04-layer-1-serialization.md)
+> for the full pattern.
 
 ## Generated code
 

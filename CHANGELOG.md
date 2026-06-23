@@ -184,15 +184,19 @@ Total LINQ operator count: **35** (was 30 in 1.x).
   (`d_rocket_engine_sqlite/test/runtime_parity_test.dart`):
   the same queries return the same results on
   SQLite in-memory. Always runs.
-* **11 Postgres runtime parity tests**
-  (`d_rocket_engine_postgres/test/runtime_parity_test.dart`):
+* **18 Postgres parity tests**
+  (`d_rocket_engine_postgres/test/`):
   5 placeholder-rewrite tests + 6 runtime
-  parity tests against a real Postgres
-  connection. Gated on `TEST_PG_URL`.
+  parity tests + 7 LINQ parity tests, against
+  a real Postgres connection. Gated on
+  `TEST_PG_URL`.
 
-Total test count: **953 pass** + 24 skip
-(3 packages: d_rocket + d_rocket_engine_sqlite +
-d_rocket_engine_postgres).
+Total test count: **~1,184 pass** (across the
+6 packages: d_rocket, d_rocket_builder,
+d_rocket_lints, d_rocket_engine_sqlite,
+d_rocket_engine_postgres, d_rocket_engine_web).
+Some Postgres tests are `skip`-gated when no
+Postgres server is reachable.
 
 ## [1.2.2] — 2026-06-15
 
