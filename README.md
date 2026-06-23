@@ -13,27 +13,40 @@
 `d_rocket` is the engine-agnostic core of a single-package framework
 for the data layer of Dart and Flutter applications. It unifies the
 six concerns that, in most stacks, force you to glue together half
-a dozen different libraries:
+a dozen different libraries.
 
-| Layer | What you get |
-|---|---|
-| **Serialization** | `@Serializable` classes with type-safe `fromJson` / `toJson`, union types, custom formatters, and policies for unknown keys. |
-| **REST** | `@RestClient` interfaces with retry, backoff, rate limiting, circuit breaker, response cache, and a full interceptor chain. |
-| **LINQ** | Deferred-execution `Queryable<T>` with 35 operators (filter, project, group, join, aggregate, set, quantifier, element, page). |
-| **ORM (engine-agnostic)** | `DbContext`, change-tracked `DbSet<T>`, code-first + auto-migrations, `saveChanges()`, eager-loading `include_<T>()`, reactive `watch()`. |
-| **Sync (offline-first)** | `SyncProvider` interface, persistent `SyncOp` queue (survives crashes), push / pull pipelines, conflict-resolution policies. |
-| **Realtime** | `@WebSocketRoute` and `@SseRoute`, typed `Stream<T>`, reconnection with exponential backoff, heartbeat. |
+## The six layers
+
+| # | Layer | What you get | Annotation | Docs |
+|---|---|---|---|---|
+| 1 | **Serialization** | `@Serializable` classes with type-safe `fromJson` / `toJson`, union types via `@SerializableUnion`, custom formatters, naming policies (`@JsonKey` + `JsonNaming`), and `unknownKeyPolicy` for forward-compat. | `@Serializable` | [doc/04](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
+| 2 | **REST** | `@RestClient` interfaces with `@HttpGet`/`@HttpPost`/`@HttpPut`/`@HttpPatch`/`@HttpDelete`/`@HttpHead`, parameter binding via `@Path`/`@Query`/`@Header`/`@Body`/`@Field`/`@Part`/`@RawBody`, **retry** with backoff, **rate limiting**, **circuit breaker**, **response cache**, **streaming** `Stream<T>` endpoints, **cancelable** requests via `CancelToken`, and a full **interceptor chain**. | `@RestClient` | [doc/05](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
+| 3 | **LINQ** | Deferred-execution `Queryable<T>` with **35+ operators** across filter, project, order, page, group, join, aggregate, set, quantifier, element, convert. Engine-agnostic AST (`Expr.lambda` for SQL push-down). **Both** sync (`*_`) and async (`*Async_`) terminals. | none — `IQueryable<T>` | [doc/06](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
+| 4 | **ORM** (engine-agnostic) | `DbContext` with change-tracked `DbSet<T>`, code-first + `@Migration` callbacks, **auto-migrator** with `pendingSchemaDiff()`, eager-loading `include_<TNav>()`, reactive `watch()`, `DbInterceptor` chain, `redactPragmaKey` for SQL logging. `saveChanges()` flushes inserts/updates/deletes in a single transaction. | `@Table` + `@PrimaryKey` + `@Column` + `@ForeignKey` + `@Index` + `@Embedded` | [doc/07](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
+| 5 | **Sync** (offline-first) | `SyncProvider` interface, `RestSyncProvider` HTTP+JSON impl, persistent identity (`clientId` + watermark) that survives process restarts, push + pull pipelines, **conflict resolution** (LWW, server-wins, client-wins, custom callback), triggers (periodic + signal + manual), retry with exponential backoff. | `class SyncProvider` (no annotation) | [doc/08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>`, reconnection with exponential backoff, **heartbeat / ping**, reuses the Layer 1 JSON serializer for payloads. | `@WebSocketClient` + `@SseClient` | [doc/09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
+
+A single `initializeD()` call (emitted by `d_rocket_builder` into
+`d_rocket_registry.g.dart`) wires every annotated class in your
+project. There is no per-file `registerAll()`, no abstract
+`AsyncQueryProvider` to wire by hand.
 
 ## Engines
 
 The DB engine is a separate package. The same `DbContext` /
 `DbSet<T>` / LINQ code runs on:
 
-| Engine | Backend | Status |
-|---|---|---|
-| [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite) | `package:sqlite3` | stable |
-| [`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres) | `package:postgres` (wire protocol) | stable |
-| [`d_rocket_engine_web`](https://pub.dev/packages/d_rocket_engine_web) | IndexedDB (via `idb_shim`) | stable |
+| Engine | Backend | Status | LINQ surface |
+|---|---|---|---|
+| [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite) | `package:sqlite3` (file or `sqlite::memory:`) | stable | sync + async |
+| [`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres) | `package:postgres` (wire protocol, no FFI) | stable | async only |
+| [`d_rocket_engine_web`](https://pub.dev/packages/d_rocket_engine_web) | IndexedDB via `idb_shim` (browser) | stable | async only |
+
+> **Note:** the engine-agnostic LINQ is provided by `d_rocket`
+> core. Each engine supplies a `QueryProvider` (sync, async, or
+> both) and a `SqlDialect` so the in-memory `Expr` tree is
+> translated to the engine's SQL dialect. SQLite has both sync
+> and async; Postgres and Web are async-only.
 
 ## Install
 
