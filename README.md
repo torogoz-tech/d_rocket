@@ -53,30 +53,77 @@ dev_dependencies:
 import 'package:d_rocket/d_rocket.dart';
 import 'package:d_rocket_engine_sqlite/d_rocket_engine_sqlite.dart';
 
-part 'app.g.dart';
+// `d_rocket_registry.g.dart` is emitted by
+// `dart run build_runner build` from the
+// entities you annotate. It exports `initializeD()`.
+import 'books.g.dart';
 
-@Table()
-class User {
-  @PrimaryKey(autoIncrement: true) late int id;
-  @Column() late String name;
+part 'books.g.dart';
+
+// ─── Domain model: a plain class, no `late` fields,
+// no annotation noise. The codegen scans for
+// `extends Record` and emits a registration
+// snippet into `books.g.dart`. ───
+
+class Book extends Record {
+  Book({required this.id, required this.title, required this.authorId});
+  final int id;
+  final String title;
+  final int authorId;
 }
 
-// Boot the engine once at app startup.
-void main() async {
+void main() {
+  // 1. Register the engine + the domain.
   dRocketSqlite();
   initializeD();
-  final db = await Db.open(path: 'app.db');
-  // Use the registered table context.
-  await db.tables.insert(
-    (db.tables.entityMetaFor(User).newRow() as User)..name = 'alice',
+
+  // 2. Open a connection (in-memory here;
+  // use `SqliteQueryProvider.open(path: 'app.db')` for disk).
+  final provider = SqliteQueryProvider.inMemory();
+  provider.execute('''
+    CREATE TABLE books (
+      id       INTEGER PRIMARY KEY,
+      title    TEXT NOT NULL,
+      authorId INTEGER NOT NULL
+    )
+  ''');
+
+  // 3. Insert.
+  final ins = provider.database.prepare(
+    'INSERT INTO books (id, title, authorId) VALUES (?, ?, ?)',
   );
+  ins.execute([1, 'A Wizard of Earthsea', 1]);
+  ins.execute([2, 'The Left Hand of Darkness', 1]);
+  ins.close();
+
+  // 4. Build a typed queryable over the table.
+  final books = Queryable<Book>(
+    provider: provider,
+    table: 'books',
+    reader: (row) => Book(
+      id: row['id']! as int,
+      title: row['title']! as String,
+      authorId: row['authorId']! as int,
+    ),
+  );
+
+  // 5. Run a deferred-execution LINQ query.
+  final titles = books
+      .select_<String>((b) => b.title)
+      .toList_();
+  print(titles);
+  // [A Wizard of Earthsea, The Left Hand of Darkness]
+
+  provider.dispose();
 }
 ```
 
-> **Note:** the actual `Db.insert` API uses the entity's
-> generated `newRow()` helper, not a hand-built constructor.
-> See [d_rocket/doc/04-layer-1-serialization.md](https://github.com/torogoz-tech/d_rocket/blob/main/doc/04-layer-1-serialization.md)
-> for the full pattern.
+The full surface (`where_`, `orderBy_`, `take_`, `join_`,
+`groupBy_`, `aggregate`, …) lives in
+`package:d_rocket/d_rocket.dart` and follows the
+[deferred-execution LINQ semantics](https://github.com/torogoz-tech/d_rocket/blob/main/doc/02-layer-3-linq.md).
+A 35-query worked example is in
+[`example/bookstore.dart`](https://github.com/torogoz-tech/d_rocket_engine_sqlite/blob/main/example/bookstore.dart).
 
 ## Generated code
 
