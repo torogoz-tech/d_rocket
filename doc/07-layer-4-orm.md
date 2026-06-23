@@ -700,7 +700,7 @@ ctx.books.attachAsyncProvider(sqliteProvider);
 // the generic typed hook.
 ctx.books.attach<SqliteQueryProvider>(sqliteProvider);
 
-// (Phase 3.7): wire the interceptor chain. The
+// Wire the interceptor chain. The
 // surrounding DbContext does this automatically when
 // you go through dbSet<T>(), so most user code never
 // needs to call it.
