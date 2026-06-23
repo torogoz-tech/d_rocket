@@ -3,7 +3,7 @@
 > Dart's data rocket — serialize, query, persist, sync.
 
 <p align="center">
-  <img src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=A%20modern%2C%20sleek%20rocket%20launching%20through%20a%20stylized%20database%20disk%2C%20with%20a%20trail%20of%20code%20streams%20representing%20six%20layers%20%28serialization%2C%20REST%2C%20LINQ%2C%20ORM%2C%20sync%2C%20realtime%29%2C%20deep%20navy%20blue%20to%20electric%20cyan%20gradient%2C%20geometric%20hexagonal%20accents%2C%20professional%20Dart%20framework%20brand%20banner%2C%20clean%20composition%2C%20no%20text&image_size=landscape_16_9" alt="d_rocket banner" width="100%">
+  <img src="assets/banner.png" alt="d_rocket banner" width="100%">
 </p>
 
 [![ci](https://github.com/torogoz-tech/d_rocket/actions/workflows/ci.yml/badge.svg)](https://github.com/torogoz-tech/d_rocket/actions/workflows/ci.yml)
