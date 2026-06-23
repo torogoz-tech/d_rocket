@@ -1,19 +1,20 @@
 # Release notes — `d_rocket 1.0.0`
 
 > **Historical release notes.** For the current state of d_rocket,
-> see [`doc/STATUS.md`](STATUS.md) and the
+> see [`STATUS.md`](STATUS.md) and the
 > [CHANGELOG](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/CHANGELOG.md).
-> The 1.0.0 release shipped 2026-06-06; subsequent releases
-> (1.1.0, 1.1.1, 1.2.0) are documented in the CHANGELOG.
+> The `1.x` line is in maintenance mode; the `2.0.0` release
+> (engine-agnostic multi-engine) is current.
 
-**2026-06-06** — first stable release of the unified
-**`d_rocket`** package and its companion codegen package
-**`d_rocket_builder`**.
+**The 1.0.0 release** of the unified **`d_rocket`** package and
+its companion codegen package **`d_rocket_builder`** shipped
+as the first stable release that bundles the entire stack —
+runtime, codegen, and central registry — under a single coherent
+API.
 
-After three years of evolution across five independent packages
-(`d_serializer`, `d_serializer_builder`, `d_rest`, `d_rest_build`,
-`d_builder`), **`d_rocket`** ships the entire stack — runtime,
-codegen, and central registry — under a single coherent API.
+The 1.0.0 release absorbed the five previously-separate
+packages (`d_serializer`, `d_serializer_builder`, `d_rest`,
+`d_rest_build`, `d_builder`).
 
 ## What's in `1.0.0`
 
@@ -24,7 +25,7 @@ The four layers of d_rocket are public API in `1.0.0`:
 | **1. Serialization** | `Serializer`, `JsonFactory`, `JsonEncoder`, `SerializerSnapshot`, `JsonKey`, `JsonNaming`, `Format`, `Serializable`, `SerializableUnion`, `UnknownKeyPolicy` |
 | **2. REST with steroids** | `RestClient`, `Route`, `HttpVerb` family (7 verbs), `Parameter` family (7 annotations), `RestRequest`, `RestResponse<T>`, `Decoder`, `RequestCodec`, `RestException` (3 subtypes), `RestInterceptor`, `CompositeInterceptor`, `HttpClient`, `HttpPackageClient`, `RestConfig`, `DRest`, `dRest`, `invokeRequest<T>` |
 | **3. LINQ-style queries** | `IQueryable<T>`, `Expression<T>`, 30+ LINQ operators (filtering, projection, ordering, paging, set ops, joins, grouping, aggregates, quantifiers, element, conversions) |
-| **4. ORM (Fase 3 MVP)** | `RocketTable`, `PrimaryKey`, `Column`, `EntityMeta`, `ColumnMeta`, `EntityRegistry`, `EntityState` (5 values), `TrackedEntry`, `ChangeTracker`, `DbSet<T>`, `RocketDbContext` |
+| **4. ORM** | `Table`, `PrimaryKey`, `Column`, `EntityMeta`, `ColumnMeta`, `EntityRegistry`, `EntityState` (5 values), `TrackedEntry`, `ChangeTracker`, `DbSet<T>`, `DbContext` |
 
 All four layers share a **single entry point**:
 
@@ -32,7 +33,7 @@ All four layers share a **single entry point**:
 import 'package:my_app/d_rocket_registry.g.dart';
 
 void main() {
-  initializeD();  // wires up every Record + Serializable + RestClient + RocketTable
+  initializeD();  // wires up every Record + Serializable + RestClient + Table
   runApp(const MyApp());
 }
 ```
@@ -56,17 +57,17 @@ non-colliding output suffix:
 
 A single Dart file can freely mix all four annotation kinds
 (`extends Record` + `@Serializable` + `@RestClient` +
-`@RocketTable`) without any build_runner output-collision — the
+`@Table`) without any build_runner output-collision — the
 non-default suffixes keep each codegen in its own namespace.
 
 ## Migration from legacy packages
 
 The five legacy packages (`d_serializer`, `d_serializer_builder`,
-`d_rest`, `d_rest_build`, `d_builder`) are **discontinued** in
-this release. They remain in the monorepo for migration reference
-and emergency fallback, but no further development will happen
-there. The full migration table is in
-[`MIGRATION_LEGACY_TO_d_rocket.md`](MIGRATION_LEGACY_TO_d_rocket.md).
+`d_rest`, `d_rest_build`, `d_builder`) are **discontinued** as
+of this release. They remain in the monorepo for migration
+reference and emergency fallback, but no further development
+will happen there. The full migration table is in
+[`MIGRATION_LEGACY.md`](MIGRATION_LEGACY.md).
 
 In short:
 
@@ -91,8 +92,8 @@ dev_dependencies:
 
 The public API of `d_serializer 1.3.0` and `d_rest 0.1.0` is
 re-exported from `d_rocket 1.0.0` byte-for-byte identically. The
-only breaking change is the codegen output suffix and the central
-`initializeD()` call.
+only breaking change is the codegen output suffix and the
+central `initializeD()` call.
 
 ## Test counts at `1.0.0`
 
@@ -109,33 +110,45 @@ in `d_rest`, 6 in `d_rest_build`, 2 in `d_builder`) so users
 who have not yet migrated can keep using the legacy packages
 with confidence.
 
-## Roadmap after `1.0.0`
+## What came after 1.0.0
 
-Fase 3.5+ features (the `1.x` line):
+The 1.x line added, in order:
 
-- `@ForeignKey`, `@Index` annotations for the ORM.
-- `DbSet<T>.toList()` / `findById()` (currently require a
-  codegen-supplied `fromRow` helper; the MVP throws with a clear
-  message).
-- LINQ-to-SQL over `DbSet<T>` (compose with `SqliteQueryable`).
-- Code-first migrations (`MigrationRunner`).
-- Auto-PK back-propagation to the in-memory entity after insert.
+- `1.1.0` — reactive queries (`watch()`) + bulk operations.
+- `1.1.1` — production-readiness (sync queue persistence,
+  `PRAGMA foreign_keys = ON`, codegen emits `CREATE INDEX` and
+  `REFERENCES`).
+- `1.2.0` — auto-migration (`Db.open(entityMetas: [...],
+  autoMigrate: true)`, schema diff, safe vs unsafe changes,
+  `d_rocket_schema_state` table).
+- `1.2.1` — doc parity pass; closed the B-09 validation gap in
+  `join_` / `groupJoin_` arity.
+- `1.2.2` — last 1.x release (constraint bump for downstream
+  consumers).
 
-Each of these is a self-contained PR. The codegen output names
-will not change; existing `*.d_rocket_*.g.dart` files remain
-valid through the `1.x` line.
-
-The `2.0.0` line is not on the roadmap. The package is designed
-to evolve in place — new annotation parameters, new
-`EntityState` values, new LINQ operators — without breaking the
-codegen output format.
+The `2.0.0` line is the engine-agnostic multi-engine release
+described in [`RELEASE_2.0.0.md`](RELEASE_2.0.0.md). Each
+codegen output name is preserved through the 1.x → 2.0
+transition; existing `*.d_rocket_*.g.dart` files remain valid
+after the engine registration helper is added
+(`dRocketSqlite()` / `dRocketPostgres()` / `dRocketWeb()`).
 
 ## Thanks
 
 To everyone who tried the legacy `d_serializer`, `d_rest`, and
-`d_builder` packages over the past three years, and especially to
-the early adopters who filed the bugs that turned into the
-HANDOFF.md §6 collision fix and the central `initializeD()`
-pattern.
+`d_builder` packages, and especially to the early adopters who
+filed the bugs that turned into the central `initializeD()`
+pattern and the `record_registry` codegen output.
 
-`d_rocket 1.0.0` is the new home. Welcome.
+`d_rocket 1.0.0` was the first unified release. `d_rocket
+2.0.0` is its successor on the `2.x` line.
+
+## Release cadence
+
+The `d_rocket` 2.x line ships a new release on the **first
+Tuesday of every month** (or the next business day if that
+Tuesday is a holiday in the maintainer's locale). Bug fixes
+can ship at any time as patch releases of the latest minor
+version. See
+[RELEASE_CADENCE.md](RELEASE_CADENCE.md) for the full policy
+and the next scheduled release date.
