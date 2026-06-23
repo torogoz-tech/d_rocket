@@ -825,7 +825,7 @@ transaction by the caller).
 
 ## `DbInterceptor` + `InterceptorRegistry`
 
-`DbInterceptor` is the Phase 3.7 hook contract for
+`DbInterceptor` is the hook contract for
 cross-cutting ORM concerns: tenant filtering, audit
 logs, soft-delete, encryption, query rewriting. A
 `DbContext` owns one `InterceptorRegistry`; each

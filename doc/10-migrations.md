@@ -197,7 +197,7 @@ for (final diff in pending) {
 }
 ```
 
-### CLI: `migration check` (2.0.0 — Fase 11a)
+### CLI: `migration check` (2.0.0)
 
 The same diff is exposed via the CLI:
 

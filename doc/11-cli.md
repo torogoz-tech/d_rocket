@@ -134,7 +134,7 @@ $ dart run d_rocket:migration verify 005
 This is useful in CI to confirm no migration has been
 silently edited.
 
-### `check` (2.0.0 — Fase 11a)
+### `check` (2.0.0)
 
 Compute the pending schema diff between your codegen-
 supplied entity metas and the actual schema in a

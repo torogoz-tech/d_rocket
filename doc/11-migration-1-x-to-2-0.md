@@ -372,7 +372,7 @@ fallback is correct, just slower).
 
 ---
 
-## 11. New LINQ operators (Phase 1a)
+## 11. New LINQ operators
 
 Five LINQ operators that were missing in 1.x or only
 existed as sync terminals in 1.x:
