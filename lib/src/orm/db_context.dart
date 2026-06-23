@@ -1072,6 +1072,8 @@ abstract class DbContext {
     String? clientId,
     SyncStateStore? stateStore,
     RetryPolicy? retryPolicy,
+    void Function(SyncProgress)? onProgress,
+    List<SyncFilter> filters = const <SyncFilter>[],
   }) async {
     // (clientId): prefer the
     // bootstrap-set id; fall back to the
@@ -1113,6 +1115,89 @@ abstract class DbContext {
       // the in-memory list.
       localChanges = List<SyncChange>.of(_pendingSyncChanges);
     }
+    // (2.0.0): selective sync. Apply the
+    // caller-supplied filters to the
+    // local change queue. A change is
+    // included iff every filter's
+    // `matches` returns true (AND
+    // composition — the ScopedSyncFilter
+    // gives more control). Note: filtered-
+    // out changes stay in the local queue
+    // (we don't drain them) — they will be
+    // picked up by a future sync with a
+    // wider filter.
+    List<SyncChange> filteredChanges = localChanges;
+    if (filters.isNotEmpty) {
+      final int before = filteredChanges.length;
+      filteredChanges = localChanges
+          .where((c) => filters.every((f) => f.matches(c)))
+          .toList();
+      if (filteredChanges.length < before) {
+        _emitProgress(
+          onProgress,
+          SyncProgress(
+            phase: SyncPhase.starting,
+            processed: before,
+            total: before,
+            message: 'filters removed ${before - filteredChanges.length} '
+                'change(s)',
+          ),
+        );
+      }
+    }
+    // (2.0.0): bandwidth-aware. If
+    // `autoSkipOnOffline` is set (the
+    // default) and the device is offline,
+    // we skip the round-trip and emit a
+    // `done` event with an empty list.
+    // The queue is NOT drained — the next
+    // online sync will pick up the same
+    // changes.
+    if (autoSkipOnOffline) {
+      final ConnectivityState state = await connectivity.current();
+      if (!state.isOnline) {
+        _emitProgress(
+          onProgress,
+          SyncProgress(
+            phase: SyncPhase.done,
+            processed: 0,
+            total: filteredChanges.length,
+            message: 'skipped: device is offline '
+                '(${state.networkType.name})',
+          ),
+        );
+        return <SyncChange>[];
+      }
+    }
+    // (2.0.0): emit progress for the
+    // "starting" + "pushing" phases. The
+    // pushing phase is "we have N local
+    // changes to send" — we emit one event
+    // before the round-trip and one per
+    // local change as it gets pushed.
+    // Note: the actual byte-level push is
+    // atomic from the provider's perspective
+    // (it's one HTTP call), so the
+    // per-change emit is symbolic — the
+    // caller usually cares about the
+    // applying phase more.
+    _emitProgress(
+      onProgress,
+      SyncProgress(
+        phase: SyncPhase.starting,
+        total: filteredChanges.length,
+        message: 'hydrating local queue',
+      ),
+    );
+    _emitProgress(
+      onProgress,
+      SyncProgress(
+        phase: SyncPhase.pushing,
+        processed: 0,
+        total: filteredChanges.length,
+        message: 'pushing ${filteredChanges.length} local change(s)',
+      ),
+    );
     final int lastWatermark = _clientWatermark;
     final SyncEnvelope envelope = SyncEnvelope(
       clientId: resolvedId,
@@ -1126,21 +1211,71 @@ abstract class DbContext {
     final RetryPolicy policy = retryPolicy ?? const NoRetryPolicy();
     SyncEnvelope remote;
     try {
-      remote = await _syncWithRetry(provider, envelope, policy);
-    } catch (_) {
+      remote = await _syncWithRetry(
+        provider,
+        envelope,
+        policy,
+        onProgress: onProgress,
+      );
+    } catch (e, st) {
       // The retry policy exhausted its attempts
       // (or threw on a non-retryable error).
       // We do NOT drain the queue — the next
       // syncAsync call will retry the same
       // changes.
+      _emitProgress(
+        onProgress,
+        SyncProgress(
+          phase: SyncPhase.error,
+          processed: 0,
+          error: e,
+          stackTrace: st,
+          message: e.toString(),
+        ),
+      );
       rethrow;
     }
+    _emitProgress(
+      onProgress,
+      SyncProgress(
+        phase: SyncPhase.pulling,
+        processed: 0,
+        total: remote.changes.length,
+        message: 'received ${remote.changes.length} remote change(s)',
+      ),
+    );
     // (apply): for each remote
     // change, apply locally with last-write-wins.
+    // (2.0.0): filters are also applied to
+    // the remote changes — we only apply the
+    // ones that pass the filter. The rest are
+    // dropped (we don't store them locally
+    // and we don't ask the server to re-send
+    // them; this is the contract).
     final List<SyncChange> applied = <SyncChange>[];
+    int i = 0;
     for (final SyncChange change in remote.changes) {
+      final bool keep = filters.isEmpty ||
+          filters.every((f) => f.matches(change));
+      if (!keep) {
+        i++;
+        continue;
+      }
       await _applyRemoteChange(change);
       applied.add(change);
+      i++;
+      _emitProgress(
+        onProgress,
+        SyncProgress(
+          phase: SyncPhase.applying,
+          processed: applied.length,
+          total: remote.changes
+              .where((c) =>
+                  filters.isEmpty || filters.every((f) => f.matches(c)))
+              .length,
+          message: 'applied $applied.length/$i',
+        ),
+      );
     }
     // (drain, fix-1.1.1): on a successful
     // sync, clear both the persistent store
@@ -1161,8 +1296,61 @@ abstract class DbContext {
     if (stateStore != null) {
       await stateStore.setWatermarkAsync(_clientWatermark);
     }
+    _emitProgress(
+      onProgress,
+      SyncProgress(
+        phase: SyncPhase.done,
+        processed: applied.length,
+        total: applied.length,
+        message: 'sync complete: ${applied.length} change(s) applied',
+      ),
+    );
     return applied;
   }
+
+  /// (2.0.0): internal helper — fires
+  /// the callback AND emits on the
+  /// [syncProgress] event bus. The
+  /// callback is the sync caller (one
+  /// subscriber per call); the event bus
+  /// is the persistent stream the UI
+  /// subscribes to (multiple subscribers,
+  /// replay-1).
+  void _emitProgress(
+    void Function(SyncProgress)? callback,
+    SyncProgress progress,
+  ) {
+    if (callback != null) {
+      callback(progress);
+    }
+    _syncProgressBus.emit(progress);
+  }
+
+  /// (2.0.0): broadcast stream of
+  /// [SyncProgress] events. Subscribers
+  /// always see the latest event first
+  /// (replay-1). Owned by the context;
+  /// closed in `dispose`.
+  SyncProgressEventBus get syncProgress => _syncProgressBus;
+  final SyncProgressEventBus _syncProgressBus = SyncProgressEventBus();
+
+  /// (2.0.0): the connectivity provider.
+  /// The default is
+  /// [NoopConnectivityProvider] (always
+  /// online, wifi). Set this to a real
+  /// implementation (e.g. backed by
+  /// `package:connectivity_plus`) to make
+  /// sync bandwidth-aware.
+  ConnectivityProvider connectivity = NoopConnectivityProvider();
+
+  /// (2.0.0): when `true`, sync is
+  /// automatically skipped if the device
+  /// is offline. Default `true`. Set to
+  /// `false` to force sync even when
+  /// offline (will fail with a network
+  /// error, but the error is caught by
+  /// the retry policy).
+  bool autoSkipOnOffline = true;
 
   /// (internal): wraps
   /// `provider.syncAsync` in a retry loop. On
@@ -1172,8 +1360,9 @@ abstract class DbContext {
   Future<SyncEnvelope> _syncWithRetry(
     SyncProvider provider,
     SyncEnvelope envelope,
-    RetryPolicy policy,
-  ) async {
+    RetryPolicy policy, {
+    void Function(SyncProgress)? onProgress,
+  }) async {
     int attempt = 0;
     while (true) {
       try {
@@ -1187,6 +1376,16 @@ abstract class DbContext {
         if (decision.isGiveUp) {
           rethrow;
         }
+        _emitProgress(
+          onProgress,
+          SyncProgress(
+            phase: SyncPhase.retrying,
+            processed: attempt + 1,
+            total: -1,
+            message: 'attempt ${attempt + 1} failed, '
+                'retrying in ${decision.after.inMilliseconds}ms',
+          ),
+        );
         await Future<void>.delayed(decision.after);
         attempt++;
       }

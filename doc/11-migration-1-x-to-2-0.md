@@ -259,6 +259,104 @@ full list of changes in 2.0.0.
 
 ---
 
+## What's NEW in 2.0 (not in 1.x)
+
+### `d_rocket_lints` is a separate package
+
+In 1.x, the IDE lints
+(`d_rocket_untranslated_closure_linq`,
+`d_rocket_n_plus_one`) shipped inside
+`d_rocket_builder`. In 2.0.0 they ship as
+a dedicated dev-dependency:
+
+```yaml
+# pubspec.yaml — 2.0+
+dev_dependencies:
+  d_rocket_lints: ^2.0.0
+```
+
+Then enable in `analysis_options.yaml`:
+
+```yaml
+analyzer:
+  plugins:
+    - custom_lint
+```
+
+`d_rocket_builder` re-exports the lints so
+existing consumers don't break; new projects
+should depend on `d_rocket_lints` directly.
+
+### `d_rocket:migration check` (CI-friendly schema diff)
+
+The `check` subcommand computes the pending
+schema diff between your codegen-supplied
+entity metas and the actual SQLite schema.
+It exits 1 if any unsafe diffs (e.g.
+`DROP TABLE`), which is the signal you want
+in CI to gate merges:
+
+```bash
+$ dart run d_rocket:migration check \
+    --db app.db \
+    --entities lib/db/entities.dart
+```
+
+The entities file is a small Dart file you
+write that exports a top-level
+`List<EntityMeta> entityMetas`. See
+[doc/11-cli.md](./11-cli.md) for the full
+reference.
+
+### Postgres engine ships as `d_rocket_engine_postgres`
+
+The Postgres engine is a separate package
+in 2.0.0. Add it as a regular dependency
+and call `dRocketPostgres()` at startup:
+
+```yaml
+dependencies:
+  d_rocket: ^2.0.0
+  d_rocket_engine_postgres: ^2.0.0
+```
+
+```dart
+dRocketPostgres();
+final db = await PgDb.open(url: 'postgres://...');
+```
+
+`PgDb` mirrors the SQLite `Db` facade for
+the Postgres engine; the
+`db.set<T>().where(…).toListAsync_()`
+flow works the same way (Postgres dialect
+uses `STRPOS` + `jsonb_build_object`).
+
+### Web engine ships as `d_rocket_engine_web`
+
+For browser apps, IndexedDB-backed
+storage:
+
+```yaml
+dependencies:
+  d_rocket: ^2.0.0
+  d_rocket_engine_web: ^2.0.0
+```
+
+```dart
+dRocketWeb();
+final db = await WebDb.open(
+  config: WebEngineConfig(databaseName: 'my_app'),
+);
+```
+
+Known 2.0 limitations (deferred to 2.1):
+cursor push-down on `idb_shim` 2.9.2 hangs;
+the runtime falls back to in-memory
+materialization for those paths (the
+fallback is correct, just slower).
+
+---
+
 ## 11. New LINQ operators (Phase 1a)
 
 Five LINQ operators that were missing in 1.x or only

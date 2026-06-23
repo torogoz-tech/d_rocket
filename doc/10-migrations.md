@@ -172,6 +172,36 @@ for (final diff in pending) {
 }
 ```
 
+### CLI: `migration check` (2.0.0 — Fase 11a)
+
+The same diff is exposed via the CLI:
+
+```bash
+$ dart run d_rocket:migration check \
+    --db app.db \
+    --entities lib/db/entities.dart
+```
+
+The CLI requires a `lib/db/entities.dart` file that
+exports your entity metas (one line per entity).
+The CLI spawns a worker under `.d_rocket/` that
+runs the diff against your SQLite DB and exits 1
+if any unsafe diffs. Wire it into CI:
+
+```yaml
+# .github/workflows/ci.yml
+- name: d_rocket schema check
+  run: |
+    dart run d_rocket:migration check \
+      --db app.db \
+      --entities lib/db/entities.dart
+```
+
+Exit codes: 0 on success (no unsafe diffs),
+1 on unsafe diffs, 2 on usage error, 3 on worker
+runtime error. See `doc/11-cli.md` for the full
+reference.
+
 The conservative default: when the auto-migrator
 runs and finds unsafe diffs, the safe diffs are
 applied but the new snapshot is **not** written

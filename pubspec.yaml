@@ -1,12 +1,10 @@
 name: d_rocket
-description: >
+description: >-
   Dart/Flutter data-layer framework: @Serializable codegen,
   @RestClient with retry, deferred LINQ, and a code-first
-  engine-agnostic ORM (DbContext / DbSet / @Table /
-  migrations) with pluggable backends
+  engine-agnostic ORM with pluggable backends
   (d_rocket_engine_sqlite, d_rocket_engine_postgres,
-  d_rocket_engine_libsql_wasm). See README for
-  platform support and engine selection.
+  d_rocket_engine_web).
 version: 2.0.0
 
 repository: https://github.com/torogoz-tech/d_rocket
@@ -30,6 +28,7 @@ dependencies:
     sdk: flutter
   meta: ^1.17.0
   http: ^1.2.2
+  crypto: ^3.0.5
   # Note: `package:sqlite3` is intentionally NOT a
   # direct dependency of d_rocket core. It lives in
   # `d_rocket_engine_sqlite` and is only pulled in

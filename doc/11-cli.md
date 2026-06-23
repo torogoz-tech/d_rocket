@@ -134,6 +134,98 @@ $ dart run d_rocket:migration verify 005
 This is useful in CI to confirm no migration has been
 silently edited.
 
+### `check` (2.0.0 — Fase 11a)
+
+Compute the pending schema diff between your codegen-
+supplied entity metas and the actual schema in a
+SQLite database. Surfaces unsafe diffs (e.g.
+`DROP TABLE`) so you can fix them before merging.
+CI-friendly: exits with code 1 when any unsafe
+diff is found.
+
+```bash
+$ dart run d_rocket:migration check \
+    --db app.db \
+    --entities lib/db/entities.dart
+🔎 Computing schema diff...
+   db: /abs/path/app.db
+   entities: lib/db/entities.dart
+
+✅ Schema is in sync (no diffs).
+# exit code 0
+```
+
+When there are diffs, the output lists each one
+with severity, type, target, SQL, and reason:
+
+```
+Found 2 diff(s) (1 safe, 1 unsafe):
+  ✓  SAFE     createTable on users
+            sql:    CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)
+            reason: New entity; CREATE TABLE IF NOT EXISTS is idempotent and non-destructive.
+  ❌ UNSAFE   dropTable on legacy_audit_log
+            sql:    DROP TABLE legacy_audit_log
+            reason: Entity removed from code; dropping the table would lose all its data. Confirm
+                    manually and write a hand-rolled migration that does the drop explicitly.
+
+❌ 1 unsafe diff(s) found. Resolve before merging: write a hand-rolled migration that
+performs the unsafe operation explicitly (auto-migrator does NOT auto-apply unsafe diffs).
+# exit code 1
+```
+
+#### `--entities <dart_file>`
+
+The entities file is a small Dart file the user
+writes that exports a top-level
+`List<EntityMeta> entityMetas`:
+
+```dart
+// lib/db/entities.dart
+import 'package:d_rocket/d_rocket.dart';
+import 'package:my_app/models/user.dart';
+import 'package:my_app/models/order.dart';
+
+final List<EntityMeta> entityMetas = <EntityMeta>[
+  User.entityMeta,
+  Order.entityMeta,
+];
+```
+
+The CLI validates that the file exists and declares
+`entityMetas` before spawning the worker.
+
+#### `--db <path>`
+
+The path to the SQLite database file to compare
+against. Required.
+
+#### Implementation
+
+Under the hood, the CLI writes a temp worker
+under `.d_rocket/check_worker.dart` and runs it
+as a `dart run` subprocess. The worker uses the
+user's `pubspec.yaml` to resolve
+`d_rocket` + `d_rocket_engine_sqlite`, computes
+the diff via `AutoMigrator.computePendingDiff()`,
+and emits the diff as JSON between
+`DR_CHECK_JSON_BEGIN` / `DR_CHECK_JSON_END`
+markers. The CLI parses the JSON, prints a
+human-readable summary, and exits 0 / 1
+based on the unsafe-diff count.
+
+The temp worker is gitignored by convention
+(`.d_rocket/`). Re-running `check` overwrites
+it; no stale state.
+
+#### Supported engines (2.0.0)
+
+- ✅ **SQLite** (`d_rocket_engine_sqlite`).
+- ⏸️ Postgres + web engines: supported
+  programmatically via `db.pendingSchemaDiff()`,
+  but the CLI is SQLite-only in 2.0.0 (the worker
+  hardcodes `SqliteQueryProvider.file(...)`).
+  Postgres/web CLI support is a 2.1 item.
+
 ---
 
 ## `d_rocket:closure`

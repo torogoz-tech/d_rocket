@@ -1648,33 +1648,36 @@ class DbSet<T> {
   /// emission is the initial state (so subscribers
   /// don't have to wait for the first tick).
   Stream<List<T>> _watchGenerator(Duration pollInterval) async* {
-    //: listen to the tracker's
-    // changes. The listener triggers a re-emit
-    // by completing `_changeCompleter`.
-    Completer<void> changeCompleter = Completer<void>();
-    final StreamSubscription<ChangeEvent> sub =
-        _tracker.changes.listen((ChangeEvent _) {
-      if (!changeCompleter.isCompleted) {
-        changeCompleter.complete();
-      }
-    });
-    try {
-      while (true) {
-        yield await toListAsync_();
-        // Race: the next emission is triggered by
-        // EITHER the periodic timer OR a tracker
-        // change. Whichever fires first wins.
+    while (true) {
+      yield await toListAsync_();
+      //: each iteration creates a
+      // fresh `Completer` and a fresh
+      // single-event listener. This is the
+      // fix for the closure-capture bug: a
+      // long-lived listener with a reassigned
+      // completer doesn't see the new completer
+      // (the listener's closure captured the
+      // original reference). Re-creating both
+      // per iteration is the simplest correct
+      // pattern.
+      final Completer<void> changeCompleter = Completer<void>();
+      final StreamSubscription<ChangeEvent> sub =
+          _tracker.changes.listen((ChangeEvent _) {
+        if (!changeCompleter.isCompleted) {
+          changeCompleter.complete();
+        }
+      });
+      try {
+        // Race: the next emission is triggered
+        // by EITHER the periodic timer OR a
+        // tracker change. Whichever fires first
+        // wins.
         final Future<void> timer = Future<void>.delayed(pollInterval);
         final Future<void> trigger = changeCompleter.future;
         await Future.any(<Future<void>>[timer, trigger]);
-        // Reset the completer for the next tick.
-        if (changeCompleter.isCompleted) {
-          // ignore: discarded_futures
-          changeCompleter = Completer<void>();
-        }
+      } finally {
+        await sub.cancel();
       }
-    } finally {
-      await sub.cancel();
     }
   }
 }
