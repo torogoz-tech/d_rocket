@@ -35,17 +35,15 @@ project. There is no per-file `registerAll()`.
 The DB engine is a separate package. The same `DbContext` /
 `DbSet<T>` / LINQ code runs on:
 
-| Engine | Backend | Status | LINQ surface |
-|---|---|---|---|
-| [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite) | `package:sqlite3` (file or `sqlite::memory:`) | stable | sync + async |
-| [`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres) | `package:postgres` (wire protocol, no FFI) | stable | async only |
-| [`d_rocket_engine_web`](https://pub.dev/packages/d_rocket_engine_web) | IndexedDB via `idb_shim` (browser) | stable | async only |
+| Engine | Backend | LINQ |
+|---|---|---|
+| [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite) | `package:sqlite3` (file or `sqlite::memory:`) | sync + async |
+| [`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres) | `package:postgres` (wire protocol) | async only |
+| [`d_rocket_engine_web`](https://pub.dev/packages/d_rocket_engine_web) | IndexedDB via `idb_shim` (browser) | async only |
 
-> **Note:** the engine-agnostic LINQ is provided by `d_rocket`
-> core. Each engine supplies a `QueryProvider` (sync, async, or
-> both) and a `SqlDialect` so the in-memory `Expr` tree is
-> translated to the engine's SQL dialect. SQLite has both sync
-> and async; Postgres and Web are async-only.
+> The engine-agnostic LINQ is provided by `d_rocket` core. Each
+> engine supplies a `QueryProvider` and a `SqlDialect` so the
+> in-memory `Expr` tree is translated to the engine's SQL dialect.
 
 ## Install
 
