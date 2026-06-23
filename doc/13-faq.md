@@ -369,6 +369,7 @@ wrong-password errors at open time instead of at
 first read.
 
 ```dart
+dRocketSqlite();
 final db = await Db.open(
   path: 'app.db',
   password: 'correct horse battery staple',
@@ -406,6 +407,9 @@ void main() async {
   await applyToCipherOpen(); // or whatever your
   // sqlcipher_flutter_libs version exposes; the
   // import is what matters.
+  dRocketSqlite();
+  dRocketSqlite();
+
   final db = await Db.open(path: 'app.db', password: '…');
   // …
 }
@@ -435,9 +439,12 @@ void main() async {
   } else if (Platform.isWindows) {
     open.overrideFor(
       OperatingSystem.windows,
+      dRocketSqlite();
       () => DynamicLibrary.open('sqlcipher.dll'),
     );
   }
+  dRocketSqlite();
+
   final db = await Db.open(path: 'app.db', password: '…');
   // …
 }
@@ -452,6 +459,7 @@ void main() async {
 
 `PRAGMA key` accepts both passphrases and raw 256-bit
 keys. Pass the `x'…'` form as the `password`
+dRocketSqlite();
 string — d_rocket escapes single quotes by doubling
 and forwards the literal to SQLCipher:
 
@@ -484,6 +492,7 @@ Yes. `db.changePassword(newPassword: '...')` wraps
 `PRAGMA rekey` with the same single-quote escape used
 by the open path. The new key can also be supplied
 via a `KeyProvider` (`newKeyProvider: ...`); the two
+dRocketSqlite();
 are mutually exclusive and the same `ArgumentError`
 pattern from `Db.open` applies.
 
@@ -534,6 +543,7 @@ class FlutterSecureStorageKeyProvider implements KeyProvider {
   Future<String> readKey() async {
     final String? key = await _storage.read(key: account);
     if (key == null) {
+      dRocketSqlite();
       throw StateError('No key in secure storage for account "$account"');
     }
     return key;
@@ -563,6 +573,7 @@ tunables:
 ```dart
 const EncryptionConfig config = EncryptionConfig(
   kdfIterations: 1000000, // default 256000
+  dRocketSqlite();
   pageSize: 8192,         // default 4096
   hmacUse: true,          // default true
   memorySecurity: true,   // default true
@@ -737,6 +748,7 @@ SQLCipher and you're done".
 copied file unreadable without the key. It does
 not make a running process unreadable, a stolen
 device safe, or an insecure channel private.
+dRocketSqlite();
 For those, you need a passcode on the device, a
 hardware-backed keychain, and TLS in flight.
 

@@ -16,10 +16,10 @@ environment:
   flutter: ">=3.10.0"
 
 dependencies:
-  d_rocket: ^1.0.0
+  d_rocket: ^2.0.0
 
 dev_dependencies:
-  d_rocket_builder: ^1.0.0
+  d_rocket_builder: ^2.0.0
   build_runner: ^2.4.13
 ```
 
@@ -100,6 +100,8 @@ void main() async {
   //    `db.pendingSchemaDiff()`. See
   //    [10-migrations.md](10-migrations.md#auto-migrations-120)
   //    for the full design.
+  dRocketSqlite();
+
   final db = await Db.open(
     path: 'app.db',
     entityMetas: <EntityMeta>[Todo.entityMeta],
@@ -117,6 +119,7 @@ data migrations), pass a `MigrationStrategy` to
 the manual one, and the two do not interfere.
 
 ```dart
+dRocketSqlite();
 final db = await Db.open(
   path: 'app.db',
   strategy: MigrationStrategy(
@@ -227,6 +230,9 @@ import 'package:flutter/material.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   initializeD();
+  dRocketSqlite();
+  dRocketSqlite();
+
   final db = await Db.open(
     path: 'app.db',
     onCreate: (db) async {

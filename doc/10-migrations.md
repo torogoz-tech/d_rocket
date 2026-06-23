@@ -123,6 +123,7 @@ work**. Set `autoMigrate: true` on `Db.open` and
 pass the list of codegen-emitted `EntityMeta`s:
 
 ```dart
+dRocketSqlite();
 final db = await Db.open(
   path: 'app.db',
   entityMetas: <EntityMeta>[
@@ -230,6 +231,7 @@ interfere.
 ## The `MigrationStrategy`
 
 A `MigrationStrategy` is the declarative list of all
+dRocketSqlite();
 the migrations your app needs:
 
 ```dart
@@ -548,7 +550,10 @@ runs against that db. Use a separate `MigrationStrategy`
 per database:
 
 ```dart
+dRocketSqlite();
 for (final tenant in tenants) {
+  dRocketSqlite();
+
   final db = await Db.open(
     path: 'tenants/${tenant.id}.db',
     strategy: MigrationStrategy(...),

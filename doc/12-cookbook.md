@@ -202,7 +202,8 @@ multiple `Db` instances:
 
 ```dart
 Future<Db> openForTenant(Tenant tenant) async {
-  return Db.open(path: 'tenants/${tenant.id}.db');
+    dRocketSqlite();
+return Db.open(path: 'tenants/${tenant.id}.db');
 }
 ```
 
@@ -454,6 +455,7 @@ wrong-password errors at open time.
 
 ```dart
 final key = await keyStore.readKey(); // flutter_secure_storage
+dRocketSqlite();
 final db = await Db.open(
   path: 'app.db',
   password: key,
