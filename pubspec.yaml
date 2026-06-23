@@ -37,23 +37,18 @@ dependencies:
   # LINQ, sync, or realtime never download
   # `libsqlite3`.
   #
-  # The `d_rocket:migration` CLI does need
-  # `d_rocket_engine_sqlite` to apply migrations
-  # (the `run` / `status` / `rollback` subcommands
-  # need a real provider). The `add` / `list` /
-  # `doctor` subcommands are engine-agnostic and
-  # work without the engine. We accept the
-  # `d_rocket` → `d_rocket_engine_sqlite` →
-  # `sqlite3` dependency chain for the CLI as a
-  # known limitation; consumers who never call
-  # `d_rocket:migration run` still pay the cost
-  # of the libsqlite3 binary, but only at the
-  # binary level (the code path is dead). A
-  # future 2.1 release will split the migration
-  # CLI into a `d_rocket:migration` (scaffolder)
-  # and a `d_rocket_engine_sqlite:migration`
-  # (runtime) executable to remove this dep.
-  d_rocket_engine_sqlite: ^2.0.0
+  # The `d_rocket:migration` CLI subcommands that
+  # actually need a SQLite engine (`run` /
+  # `status` / `rollback`) generate a worker Dart
+  # file that runs in the user's project graph
+  # (see `lib/src/cli/migration_check.dart`).
+  # The user's `pubspec.yaml` is what supplies
+  # `d_rocket_engine_sqlite` at worker runtime;
+  # `d_rocket` itself stays engine-agnostic and
+  # has no hard dep on any engine package. This
+  # keeps the dependency graph acyclic: the
+  # engines depend on `d_rocket`, never the
+  # other way around.
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +58,14 @@ dev_dependencies:
   test: ^1.30.0
   d_rocket_builder: ^2.0.0
   build_runner: ^2.10.3
+  # `d_rocket_engine_sqlite` is a dev-only
+  # dependency: the engine-agnostic runtime
+  # stays free of any engine package, but the
+  # test suite in `test/` exercises the ORM
+  # against a real SQLite provider. End-users
+  # who import `d_rocket` never see this
+  # dep and never download `package:sqlite3`.
+  d_rocket_engine_sqlite: ^2.0.0
 
 platforms:
   android:

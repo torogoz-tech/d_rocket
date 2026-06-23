@@ -226,6 +226,59 @@ it; no stale state.
   hardcodes `SqliteQueryProvider.file(...)`).
   Postgres/web CLI support is a 2.1 item.
 
+#### `status` / `run` / `rollback` (2.0.0)
+
+The three subcommands that need a real SQLite engine
+were split out of `d_rocket:migration` into a separate
+binary in `d_rocket_engine_sqlite`. The reason is the
+dependency graph: `d_rocket` is engine-agnostic and
+must NOT have a hard dep on any engine package. The
+scaffolder (`add` / `list` / `doctor`) is engine-free
+and stays in `d_rocket:migration`; the runtime
+(`status` / `run` / `rollback`) ships in
+`d_rocket_engine_sqlite:migration`.
+
+```bash
+# Scaffolder (engine-free, in d_rocket)
+$ dart run d_rocket:migration add add_inventory_table
+$ dart run d_rocket:migration list
+$ dart run d_rocket:migration doctor
+$ dart run d_rocket:migration check --db app.db --entities lib/db/entities.dart
+
+# Runtime (needs d_rocket_engine_sqlite, in the engine)
+$ dart run d_rocket_engine_sqlite:migration status --db app.db
+$ dart run d_rocket_engine_sqlite:migration run --db app.db
+$ dart run d_rocket_engine_sqlite:migration run --db app.db --target 5
+$ dart run d_rocket_engine_sqlite:migration rollback --db app.db
+```
+
+The scaffolder (`d_rocket:migration`) preserves
+backward-compatible behavior for `add` / `list` /
+`doctor` / `check`. If the user types one of the
+runtime subcommands against the scaffolder
+(`d_rocket:migration status`), the scaffolder prints
+a clear redirect message:
+
+```
+⚠️  The `status` subcommand needs a SQLite engine.
+It moved to `d_rocket_engine_sqlite:migration` in 2.0.0.
+
+  Add `d_rocket_engine_sqlite` to your pubspec:
+
+    dependencies:
+      d_rocket_engine_sqlite: ^2.0.0
+
+  Then run:
+
+    dart run d_rocket_engine_sqlite:migration status --db app.db
+```
+
+The dependency graph is now acyclic: `d_rocket` has no
+hard dep on any engine package. The three engines
+(`d_rocket_engine_sqlite`, `d_rocket_engine_postgres`,
+`d_rocket_engine_web`) all depend on `d_rocket`, never
+the other way around.
+
 ---
 
 ## `d_rocket:closure`

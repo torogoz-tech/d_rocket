@@ -72,6 +72,20 @@ are listed below.
   `runAutoMigrations()` (applies the safe subset). The
   1.2.x `Db.open(entityMetas: [...], autoMigrate: true)`
   flow is gone.
+- The migration CLI is split in two halves to keep the
+  dependency graph acyclic:
+  - `d_rocket:migration` (the scaffolder) keeps the
+    `add` / `list` / `doctor` subcommands. Engine-agnostic.
+    The `status` / `run` / `rollback` subcommands print a
+    redirect message telling the user to add
+    `d_rocket_engine_sqlite` and re-run via
+    `dart run d_rocket_engine_sqlite:migration`.
+  - `d_rocket_engine_sqlite:migration` (the runtime) ships
+    in the engine package and handles the three subcommands
+    that need a real SQLite engine. It depends on `d_rocket`
+    (not the other way around).
+  See [`11-cli.md`](11-cli.md#migration-cli) for the full
+  rationale.
 
 ### Sync (Layer 5)
 

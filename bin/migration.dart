@@ -39,7 +39,6 @@ import 'dart:io';
 
 import 'package:d_rocket/src/cli/migration_check.dart';
 import 'package:d_rocket/src/cli/migration_codegen.dart';
-import 'package:d_rocket_engine_sqlite/d_rocket_engine_sqlite.dart';
 
 const String _kBanner = '''
 ┌─────────────────────────────────────────────┐
@@ -70,11 +69,27 @@ Future<int> main(List<String> args) async {
     case 'check':
       return _runCheck(_parseFlags(rest));
     case 'status':
-      return _runStatus(_parseFlags(rest));
     case 'run':
-      return _runMigrate(_parseFlags(rest));
     case 'rollback':
-      return _runRollback(_parseFlags(rest));
+      // As of `d_rocket 2.0.0`, the runtime half of
+      // the migration CLI moved to a separate binary
+      // because the runtime needs a real SQLite
+      // engine, and `d_rocket` is engine-agnostic.
+      stderr.writeln(
+        '⚠️  The `$command` subcommand needs a SQLite engine. '
+        'It moved to `d_rocket_engine_sqlite:migration` in 2.0.0.',
+      );
+      stderr.writeln('');
+      stderr.writeln('  Add `d_rocket_engine_sqlite` to your pubspec:');
+      stderr.writeln('');
+      stderr.writeln('    dependencies:');
+      stderr.writeln('      d_rocket_engine_sqlite: ^2.0.0');
+      stderr.writeln('');
+      stderr.writeln('  Then run:');
+      stderr.writeln('');
+      stderr.writeln('    dart run d_rocket_engine_sqlite:migration '
+          '$command ${rest.join(' ')}'.trim());
+      return 2;
     case 'help':
     case '--help':
     case '-h':
@@ -590,162 +605,8 @@ Future<int> _runCheck(_Flags flags) async {
   }
   stdout.writeln(
     '✓ $safeCount safe diff(s); auto-migrator will apply them on next '
-    'Db.open(autoMigrate: true).',
+    '`await db.runAutoMigrations()`.',
   );
   return 0;
 }
 
-// ───: DB executor (status / run / rollback) ───────
-//
-// MVP scope: the CLI connects to a raw SQLite file
-// (via `SqliteQueryProvider.file`) and runs a stripped
-// `MigrationRunner` against it. It does NOT auto-import
-// your migration classes — for that, use
-// `Db.open(strategy: ...)` programmatically.
-//
-// The runner here is a thin shim that wraps the raw
-// provider's `execute` / `select` into the
-// `MigrationExecutor` / `MigrationSelector` typedefs.
-
-class _RawSqliteRunner {
-  _RawSqliteRunner(String path) {
-    _provider = SqliteQueryProvider.file(path);
-  }
-  late final SqliteQueryProvider _provider;
-
-  Future<int> currentVersion() async {
-    return _buildRunner().currentVersionAsync();
-  }
-
-  Future<List<AppliedMigration>> applied() async {
-    return _buildRunner().appliedAsync();
-  }
-
-  /// Applies the `exec` callback as a single
-  /// migration. The CLI uses this for `run —target N`
-  /// to perform a no-op-migration run (the user's
-  /// strategy is what actually picks the subset).
-  Future<int> upgradeTo(int target) async {
-    // Without the migration classes on hand, we
-    // can't pick the subset to run. We just print
-    // the current state and the target.
-    final from = await currentVersion();
-    stdout.writeln(
-      'current: v$from, target: v$target '
-      '(${target > from ? "upgrade" : "downgrade"})',
-    );
-    stdout.writeln(
-      '⚠️  This CLI MVP does NOT load your migration classes. '
-      'Use `Db.open(strategy: MigrationStrategy(...))` '
-      'programmatically to actually apply migrations.',
-    );
-    return from == target ? 0 : 1;
-  }
-
-  MigrationRunner _buildRunner() {
-    return MigrationRunner(
-      createExecutor: () => (String sql, [List<Object?>? binds]) {
-        if (binds != null && binds.isNotEmpty) {
-          _provider.execute(sql, binds);
-        } else {
-          _provider.execute(sql);
-        }
-      },
-      createSelector: () => (String sql, [List<Object?>? binds]) {
-        if (binds != null && binds.isNotEmpty) {
-          return _provider.selectWithBinds(sql, binds);
-        }
-        return _provider.select(sql);
-      },
-      createAsyncExecutor: () => (String sql, [List<Object?>? binds]) async {
-        if (binds != null && binds.isNotEmpty) {
-          _provider.execute(sql, binds);
-        } else {
-          _provider.execute(sql);
-        }
-      },
-      createAsyncSelector: () => (String sql, [List<Object?>? binds]) async {
-        if (binds != null && binds.isNotEmpty) {
-          return _provider.selectWithBinds(sql, binds);
-        }
-        return _provider.select(sql);
-      },
-    );
-  }
-
-  Future<void> close() async {
-    await _provider.disposeAsync();
-  }
-}
-
-Future<int> _runStatus(_Flags f) async {
-  if (f.dbPath == null) {
-    stderr.writeln('Error: --db <path> is required');
-    return 2;
-  }
-  final runner = _RawSqliteRunner(f.dbPath!);
-  try {
-    final v = await runner.currentVersion();
-    stdout.writeln('schema version: v$v');
-    final list = await runner.applied();
-    if (list.isEmpty) {
-      stdout.writeln('(no migrations applied yet)');
-    } else {
-      stdout.writeln('');
-      stdout
-          .writeln('  id    version  name                          applied_at');
-      stdout.writeln(
-          '  ----  -------  ----------------------------  -----------------');
-      for (final m in list) {
-        stdout.writeln(
-          '  ${m.id.padRight(4)}  '
-          '${(m.version ?? 0).toString().padLeft(7)}  '
-          '${m.name.padRight(28)}  '
-          '${m.appliedAt.toIso8601String()}',
-        );
-      }
-    }
-    return 0;
-  } finally {
-    await runner.close();
-  }
-}
-
-Future<int> _runMigrate(_Flags f) async {
-  if (f.dbPath == null) {
-    stderr.writeln('Error: --db <path> is required');
-    return 2;
-  }
-  final runner = _RawSqliteRunner(f.dbPath!);
-  try {
-    if (f.target != null) {
-      final code = await runner.upgradeTo(f.target!);
-      return code;
-    }
-    // No target: just print the current state.
-    final v = await runner.currentVersion();
-    stdout.writeln('current: v$v');
-    stdout.writeln(
-      '⚠️  Apply all pending migrations programmatically via '
-      '`Db.open(strategy: MigrationStrategy(...))`. '
-      'See the README for the full pattern.',
-    );
-    return 0;
-  } finally {
-    await runner.close();
-  }
-}
-
-Future<int> _runRollback(_Flags f) async {
-  if (f.dbPath == null) {
-    stderr.writeln('Error: --db <path> is required');
-    return 2;
-  }
-  stderr.writeln(
-    '⚠️  `rollback` requires the migration classes on hand to '
-    'call `MigrationBase.down()`. Use '
-    '`Db.open(strategy: ...)` programmatically, or '
-    '`run --db <path> --target N` to downgrade to vN.',
-  );
-  return 0;
-}
