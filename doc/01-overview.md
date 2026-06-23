@@ -18,9 +18,9 @@ rest:
 | 1 | **Serialization** | JSON ↔ Dart | `@Serializable`, `@SerializableUnion` |
 | 2 | **REST** | Typed HTTP clients | `@RestClient`, `@HttpGet` / `@HttpPost` / ... |
 | 3 | **LINQ** | Query composition | `IQueryable<T>` (no annotation — queryable) |
-| 4 | **ORM (SQLite)** | Local persistence | `@Table`, `@PrimaryKey`, `@Column`, `@ForeignKey`, `@Embedded`, `@Index` |
-| 5 | **Sync (offline-first)** | Push/pull against a backend | `SyncProvider` (no annotation — class) |
-| 6 | **Realtime** | WebSocket / SSE | `@WebSocketRoute`, `@SseRoute` |
+| 4 | **ORM (engine-agnostic)** | Local + remote persistence | `@Table`, `@PrimaryKey`, `@Column`, `@ForeignKey`, `@Index`, `@Embedded`, `@Migration` |
+| 5 | **Sync (offline-first)** | Push/pull against a backend | `class SyncProvider` (no annotation) |
+| 6 | **Realtime** | WebSocket / SSE | `@WebSocketClient`, `@SseClient` |
 
 A single `initializeD()` call wires every annotated class in your
 project. There is no per-file `registerAll()`, no abstract
@@ -69,27 +69,34 @@ contexts:
 **Lives in:** `lib/src/linq/`.
 **Docs:** [06-layer-3-linq.md](06-layer-3-linq.md).
 
-### Layer 4 — ORM (SQLite)
+### Layer 4 — ORM (engine-agnostic)
 
 `@Table` defines a row. `Db.open(path: 'app.db')`
-opens the file. `DbSet<T>` is the typed table handle.
-`saveChanges()` flushes inserts, updates, and deletes in a single
-transaction. Eager-loading via `include_<T>()`. Reactive
-queries via `watch()`. SQLite is bundled via `package:sqlite3`
-— no provider indirection, no abstract pattern.
+opens a connection **after** `dRocketSqlite()` (or
+`dRocketPostgres()` / `dRocketWeb()`) registers the
+engine. `DbSet<T>` is the typed table handle.
+`saveChanges()` flushes inserts, updates, and deletes
+in a single transaction. Eager-loading via
+`include_<TNav>()`. Reactive queries via `watch()`.
+A `DbInterceptor` chain lets you audit, soft-delete,
+or rewrite every entity-level event.
 
-**Lives in:** `lib/src/orm/` and `lib/src/sqlite/`.
+**Lives in:** `lib/src/orm/` (engine-agnostic core)
+**Engines:** `d_rocket_engine_sqlite` (`package:sqlite3`),
+`d_rocket_engine_postgres` (`package:postgres`),
+`d_rocket_engine_web` (IndexedDB via `idb_shim`).
 **Docs:** [07-layer-4-orm.md](07-layer-4-orm.md).
 
-**Key 1.2.0 feature — auto-migrations.** When
-`Db.open(entityMetas: [...], autoMigrate: true)`
-is set, d_rocket computes the diff between the
-codegen-emitted schema and the last applied
-snapshot, applies the safe changes in a single
-transaction, and reports the unsafe changes
-(DROP, MODIFY) via `db.pendingSchemaDiff()`. The
-conservative default: nothing is destroyed
-silently.
+**Key 2.0.0 feature — auto-migrator.** When the
+codegen emits the `EntityMeta[]` list and
+`initializeD()` registers it with the context,
+`db.pendingSchemaDiff()` reports the diff between
+the live DB schema and the codegen-emitted schema.
+The runner applies the **safe** changes (CREATE
+TABLE, ADD COLUMN) in a single transaction and
+returns the **unsafe** changes (DROP, MODIFY) for
+the dev to review. The conservative default: nothing
+is destroyed silently.
 
 ### Layer 5 — Sync (offline-first)
 
@@ -133,9 +140,11 @@ Layer 1 is reused for inbound and outbound payloads.
      interceptors, retry, and serialization wired in;
    - per-entity `EntityMeta` (table name, columns,
   indexes, primary-key, embedded fields) for the
-  ORM. The auto-migrator (1.2.0) reads the
-  `EntityMeta` list at runtime to compute schema
+  ORM. The 2.0.0 auto-migrator reads the
+  `EntityMeta[]` list at runtime to compute schema
   diffs;
+   - per-`@WebSocketClient` / `@SseClient` typed stream
+     implementations;
    - a single `d_rocket_registry.g.dart` with the central
      `initializeD()` that registers every annotated class
      in the project.
@@ -145,12 +154,12 @@ Layer 1 is reused for inbound and outbound payloads.
    `then` chain, no callback hell. `await db.set<T>().toListAsync_()`
    is the natural shape.
 
-4. **SQLite-bundled.** `Db.open(path: 'app.db')` works
-   out of the box. `package:sqlite3` is the only engine
-   shipped. If you want a different engine, the
-   `AsyncQueryProvider` contract is open for you to implement
-   your own provider — but in the vast majority of cases you
-   just want SQLite, and it's right there.
+4. **Engine-agnostic.** The ORM core lives in `d_rocket`.
+   Three engines ship separately: `d_rocket_engine_sqlite`,
+   `d_rocket_engine_postgres`, `d_rocket_engine_web`. The
+   `EngineRegistry` + `DbEngine` contracts are open for you
+   to implement your own engine — see
+   [14-architecture.md](14-architecture.md#extending-the-engine).
 
 5. **Offline-first.** The local database is the source of
    truth for reads. Writes queue into a `SyncOp` log; the
@@ -161,10 +170,11 @@ Layer 1 is reused for inbound and outbound payloads.
 
 ## What d_rocket is **not**
 
-- **Not an ORM for any database but SQLite.** Other engines
-  can be plugged in via `AsyncQueryProvider`, but the bundled
-  engine is SQLite. If you need Postgres or MySQL, the
-  `d_rocket_provider_*` family is where to look.
+- **Not a single-engine ORM.** The ORM is engine-agnostic;
+  three engines ship in 2.0.0 (SQLite, Postgres, IndexedDB)
+  and the engine contract is open for you to implement
+  your own (see
+  [14-architecture.md](14-architecture.md#extending-the-engine)).
 
 - **Not a web framework.** No router, no controller, no
   template engine. `d_rocket` is the data layer; the
@@ -180,10 +190,10 @@ Layer 1 is reused for inbound and outbound payloads.
   it; it adds typed interfaces, interceptors, retry, and
   resilience on top.
 
-- **Not a migration of `d_serializer` or `d_rest`.** Those
+- **Not a fork of `d_serializer` or `d_rest`.** Those
   were absorbed into `d_rocket` at version 1.0.0. The
-  migration path is documented in
-  [CHANGELOG.md](../CHANGELOG.md).
+  1.x → 2.0 migration is documented in
+  [11-migration-1-x-to-2-0.md](11-migration-1-x-to-2-0.md).
 
 ## The runtime + codegen relationship
 
@@ -199,10 +209,11 @@ A typical project depends on both:
 
 ```yaml
 dependencies:
-  d_rocket: ^1.0.0   # runtime
+  d_rocket: ^2.0.0   # runtime
+  d_rocket_engine_sqlite: ^2.0.0   # pick one engine
 
 dev_dependencies:
-  d_rocket_builder: ^1.0.0   # codegen
+  d_rocket_builder: ^2.0.0   # codegen
   build_runner: ^2.4.13
 ```
 
@@ -231,28 +242,34 @@ lib/
       http_get.dart             ← verbs
       ...
       interceptors/            ← the chain
-      clients/                 ← wrap-around clients (retry, rate limit, ...)
+      clients/                 ← wrap-around clients (retry, rate limit, circuit breaker, cache)
     linq/                      ← Layer 3
       queryable.dart
       operators/                ← every operator
       expr.dart                 ← the AST
-    sqlite/                    ← Layer 4 (engine)
-      query_provider.dart
-      queryable.dart
-      sql_translator.dart       ← LINQ → SQL
-    orm/                       ← Layer 4 (context, migrations)
-      db.dart
+    orm/                       ← Layer 4 (engine-agnostic)
+      db_engine.dart
+      engine_registry.dart
       db_context.dart
       db_set.dart
-      navigation_populator.dart
       change_tracker.dart
+      entity_meta.dart
+      entity_registry.dart
+      column_meta.dart
+      auto_migration/          ← the 2.0 auto-migrator
+        auto_migration.dart
+        auto_migrator.dart
+        schema_diff.dart
+        schema_snapshot.dart
+        schema_state.dart
     sync/                      ← Layer 5
       sync_provider.dart
-      sync_op.dart
-      conflict_resolver.dart
+      conflict_policy.dart
+      rest_sync_provider.dart
     realtime/                  ← Layer 6
-      websocket_client.dart
-      sse_client.dart
+      websocket.dart
+      sse.dart
+      annotations.dart
   example/
     bookstore.dart              ← complete runnable example
 bin/
@@ -262,6 +279,27 @@ test/
   ...
 docs/
   ...                          ← this folder
+
+# The DB engine lives in a separate package:
+packages/d_rocket_engine_sqlite/
+  lib/
+    src/
+      db.dart                  ← `Db.open`, `Db.inMemory`
+      sql/query_provider.dart  ← the SQLite QueryProvider
+      db_set_extension.dart    ← LINQ → SQL push-down
+      sql/sql_translator.dart
+      sql/encryption_config.dart
+packages/d_rocket_engine_postgres/
+  lib/
+    src/
+      pgdb.dart                ← `PgDb.open`
+      postgres_query_provider.dart
+      listen_notify.dart
+packages/d_rocket_engine_web/
+  lib/
+    src/
+      web_db.dart              ← `WebDb.open`
+      sql/query_provider.dart  ← IndexedDB-backed
 ```
 
 ## When to use which layer
