@@ -19,12 +19,12 @@ a dozen different libraries.
 
 | # | Layer | Features | Doc |
 |---|---|---|---|
-| 1 | **Serialization** | `@Serializable` → `fromJson` / `toJson`; union types via `@SerializableUnion`; custom formatters; `@JsonKey` + `JsonNaming`; `unknownKeyPolicy` for forward-compat. | [doc/04](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
-| 2 | **REST** | `@RestClient` + `@HttpGet`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Head`; `@Path`/`@Query`/`@Header`/`@Body`/`@Field`/`@Part`/`@RawBody`; **retry**, **rate limit**, **circuit breaker**, **response cache**, **streaming** `Stream<T>`, **cancelable** `CancelToken`, full **interceptor chain**. | [doc/05](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
-| 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [doc/06](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
-| 4 | **ORM** (engine-agnostic) | `DbContext` + change-tracked `DbSet<T>`; code-first + `@Migration` callbacks; **auto-migrator** with `pendingSchemaDiff()`; `include_<TNav>()` eager-loading; reactive `watch()`; `DbInterceptor` chain; `redactPragmaKey`. `saveChanges()` flushes inserts/updates/deletes in one transaction. | [doc/07](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
-| 5 | **Sync** (offline-first) | `SyncProvider` + `RestSyncProvider` HTTP+JSON; persistent identity (`clientId` + watermark) surviving restarts; push + pull pipelines; **conflict resolution** (LWW, server-wins, client-wins, custom); triggers (periodic + signal + manual); retry with backoff. | [doc/08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
-| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>`; reconnect with exponential backoff; **heartbeat / ping**; reuses Layer 1 JSON serializer. | [doc/09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
+| 1 | **Serialization** | `@Serializable` → `fromJson` / `toJson`; union types via `@SerializableUnion`; custom formatters; `@JsonKey` + `JsonNaming`; `unknownKeyPolicy`. | [04-layer-1-serialization](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
+| 2 | **REST** | `@RestClient` + `@HttpGet`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Head`; `@Path`/`@Query`/`@Header`/`@Body`/`@Field`/`@Part`/`@RawBody`; **retry**, **rate limit**, **circuit breaker**, **response cache**, streaming `Stream<T>`, `CancelToken`, interceptor chain. | [05-layer-2-rest](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
+| 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators**. Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [06-layer-3-linq](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
+| 4 | **ORM** | `DbContext` + `DbSet<T>` with change tracking; `@Migration`; **auto-migrator**; `include_<TNav>()`; `watch()`; `DbInterceptor`; `redactPragmaKey`. | [07-layer-4-orm](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
+| 5 | **Sync** | `SyncProvider` + `RestSyncProvider`; persistent identity; push + pull; conflict resolution (LWW + custom); triggers; retry. | [08-layer-5-sync](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` codegen → `Stream<T>`; reconnect + backoff; heartbeat; reuses Layer 1 JSON. | [09-layer-6-realtime](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
 
 A single `initializeD()` call (emitted by `d_rocket_builder` into
 `d_rocket_registry.g.dart`) wires every annotated class in your
@@ -53,8 +53,8 @@ dependencies:
   d_rocket_engine_sqlite: ^2.0.0   # pick one engine
 
 dev_dependencies:
-  d_rocket_builder: ^2.0.0         # code generation
-  build_runner: ^4.0.0
+  d_rocket_builder: ^2.0.0
+  build_runner: ^2.4.13
 ```
 
 ## Quick start
@@ -87,59 +87,43 @@ Future<void> main() async {
   dRocketSqlite();
   initializeD();
 
-  // 2. Open a connection. `Db.inMemory()` is
-  // a convenience for `Db.open(path: 'sqlite::memory:')`.
+  // 2. Open a connection.
   final db = await Db.inMemory();
 
-  // 3. Schema (the codegen would do this via
-  // auto-migrations; for the bare-bones example
-  // we issue raw DDL).
+  // 3. Schema.
   await db.provider.executeAsync('''
     CREATE TABLE books (
-      id       INTEGER PRIMARY KEY,
-      title    TEXT NOT NULL,
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
       authorId INTEGER NOT NULL
     )
   ''');
 
-  // 4. INSERT — stage with `.add()` then flush.
-  db.set<Book>().add(
-        Book(id: 1, title: 'A Wizard of Earthsea', authorId: 1),
-      );
-  db.set<Book>().add(
-        Book(id: 2, title: 'The Left Hand of Darkness', authorId: 1),
-      );
+  // 4. INSERT.
+  db.set<Book>().add(Book(id: 1, title: 'A Wizard of Earthsea', authorId: 1));
+  db.set<Book>().add(Book(id: 2, title: 'The Left Hand of Darkness', authorId: 1));
   await db.saveChanges();
 
-  // 5. SELECT — typed LINQ over the change-tracked set.
-  final titles = await db.set<Book>()
-      .asQueryable()
-      .select_<String>((b) => b.title)
-      .toListAsync_();
-  print(titles);
+  // 5. SELECT (LINQ).
+  final titles = await db.set<Book>().asQueryable()
+      .select_<String>((b) => b.title).toListAsync_();
   // [A Wizard of Earthsea, The Left Hand of Darkness]
 
-  // 6. UPDATE — load, mutate, stage as `markModified`.
-  final List<Book> all = await db
-      .set<Book>()
-      .asQueryable()
-      .toListAsync_()
-      .then((v) => v.cast<Book>());
+  // 6. UPDATE.
+  final List<Book> all = await db.set<Book>().asQueryable()
+      .toListAsync_().then((v) => v.cast<Book>());
   final first = all.firstWhere((b) => b.id == 1);
   first.title = 'The Farthest Shore';
   db.set<Book>().markModified(first);
   await db.saveChanges();
 
-  // 7. DELETE — stage with `.remove()` then flush.
+  // 7. DELETE.
   db.set<Book>().remove(first);
   await db.saveChanges();
 
   // 8. Final state.
-  final remaining = await db.set<Book>()
-      .asQueryable()
-      .toListAsync_()
-      .then((v) => v.cast<Book>());
-  print(remaining.map((b) => b.title));
+  final remaining = await db.set<Book>().asQueryable()
+      .toListAsync_().then((v) => v.cast<Book>());
   // [The Left Hand of Darkness]
 
   await db.close();
