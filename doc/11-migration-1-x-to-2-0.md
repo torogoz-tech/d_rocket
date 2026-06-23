@@ -217,19 +217,34 @@ dep (because the `run` / `status` /
 engine), but you only pay the cost if you
 run those subcommands.
 
-## Future: Postgres + libsql_wasm
+## Multi-engine: Postgres + Web (shipped in 2.0.0)
 
-When
-[`d_rocket_engine_postgres`](../d_rocket_engine_postgres/README.md)
-and
-[`d_rocket_engine_libsql_wasm`](../d_rocket_engine_libsql_wasm/README.md)
-ship, the migration for those is the
-same: add the engine package, call its
-`register()`, swap the import. The
+In 2.0.0 two more engines shipped alongside
+SQLite:
+
+- [`d_rocket_engine_postgres`](../d_rocket_engine_postgres/README.md)
+  — `package:postgres` (wire protocol, no FFI).
+  Async-only LINQ.
+- [`d_rocket_engine_web`](../d_rocket_engine_web/README.md)
+  — IndexedDB via `package:idb_shim` (browser).
+  Async-only LINQ.
+
+The migration for these is the same as for SQLite:
+add the engine package to your `pubspec.yaml`, call
+its registration helper (`dRocketPostgres()` or
+`dRocketWeb()`) once at app startup, and swap
+`Db.open` for `PgDb.open` or `WebDb.open`. The
 `DbEngine` / `EngineRegistry` /
-`AsyncQueryProvider` contract is
-identical across engines; only the engine
-package changes.
+`AsyncQueryProvider` contract is identical across
+engines; only the engine package changes.
+
+> **Note (historical):** the 1.x → 2.0 migration
+> guide originally proposed a `d_rocket_engine_libsql_wasm`
+> engine for browsers. That engine was dropped during
+> 2.0.0 in favor of the IndexedDB-backed `d_rocket_engine_web`
+> (which works without a WASM binary and avoids the
+> `package:libsql` ↔ `package:sqlite3` FFI conflicts
+> on Flutter web).
 
 ## What did NOT change in 2.0
 

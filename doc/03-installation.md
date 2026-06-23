@@ -43,10 +43,10 @@ environment:
   flutter: ">=3.10.0"
 
 dependencies:
-  d_rocket: ^1.0.0
+  d_rocket: ^2.0.0
 
 dev_dependencies:
-  d_rocket_builder: ^1.0.0
+  d_rocket_builder: ^2.0.0
   build_runner: ^2.4.13
 ```
 
@@ -171,36 +171,54 @@ options:
 2. Build a custom `AsyncQueryProvider` that talks to
    IndexedDB and ship it as a `d_rocket_provider_*` package.
 
-## 5. The custom lint rules
+## 5. The lint rules
 
-`d_rocket_builder` ships two custom lint rules via
-`package:custom_lint_builder`:
-
-- `d_rocket_n_plus_one` — flags LINQ queries that trigger
-  N+1 round-trips.
-- `d_rocket_closure` — flags LINQ operators used on raw
-  `Iterable<T>` without an `Expr` (these evaluate in-memory
-  only and can't be pushed to SQL).
-
-To enable them, add the plugin to your `analysis_options.yaml`:
-
-```yaml
-analyzer:
-  plugins:
-    - custom_lint
-
-linter:
-  rules:
-    - d_rocket_n_plus_one
-    - d_rocket_closure
-```
-
-The rules need `custom_lint` to run. Add it as a
-dev_dependency if you don't already have it:
+In 2.0.0 the lints moved to a separate
+[`d_rocket_lints`](https://pub.dev/packages/d_rocket_lints)
+package, implemented on top of
+`package:analysis_server_plugin` (the modern
+replacement for `custom_lint_builder`). Add it to
+your dev_dependencies and enable the plugin in
+`analysis_options.yaml`:
 
 ```yaml
 dev_dependencies:
-  custom_lint: ^0.6.0
+  d_rocket_lints: ^2.0.0
+```
+
+```yaml
+# analysis_options.yaml
+analyzer:
+  plugins:
+    - d_rocket_lints
+```
+
+The two diagnostic codes (the names the analyzer
+emits) are:
+
+- `d_rocket_n_plus_one` — flags LINQ queries that
+  trigger N+1 round-trips. Promotes the
+  `include_<TNav>()` codegen helper.
+- `d_rocket_untranslated_closure_linq` — flags LINQ
+  operators used on raw `Iterable<T>` with a closure
+  (these evaluate in-memory only and can't be pushed
+  to SQL). The fix is to wrap the closure in
+  `Expr.lambda(...)` so the LINQ provider can
+  translate it. `dart fix` applies the change
+  automatically.
+
+The 1.x class names `LinqClosureRule` and
+`NPlusOneRule` (and the typedefs `LinqClosureLint` /
+`NPlusOneLint`) are still importable from
+`package:d_rocket_lints/d_rocket_lints.dart` for
+1.x source compatibility, but the analyzer uses the
+diagnostic codes above.
+
+To run a one-shot rewrite of an entire file with the
+closure-sugar fix, use the CLI:
+
+```bash
+dart run d_rocket:closure transform-file lib/services/order_query.dart
 ```
 
 ## 6. Common pitfalls
@@ -211,7 +229,7 @@ You're on a `d_rocket` version older than 1.0. Upgrade:
 
 ```yaml
 dependencies:
-  d_rocket: ^1.0.0
+  d_rocket: ^2.0.0
 ```
 
 ### "Too many positional arguments" / "Undefined class 'Expr'"
@@ -306,7 +324,7 @@ first stable version. Upgrading from a 0.x version requires:
 1. Bump the version constraint:
    ```yaml
    dependencies:
-     d_rocket: ^1.0.0
+     d_rocket: ^2.0.0
    ```
 2. Re-run the codegen with `--delete-conflicting-outputs`.
 3. Update test imports: `package:d_rocket/d_rocket.dart` (the
