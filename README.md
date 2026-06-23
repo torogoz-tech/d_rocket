@@ -72,15 +72,19 @@ class Book extends Record {
   final int authorId;
 }
 
-void main() {
+Future<void> main() async {
   // 1. Register the engine + the domain.
   dRocketSqlite();
   initializeD();
 
-  // 2. Open a connection (in-memory here;
-  // use `SqliteQueryProvider.open(path: 'app.db')` for disk).
-  final provider = SqliteQueryProvider.inMemory();
-  provider.execute('''
+  // 2. Open a connection. `Db.inMemory()` is
+  // a convenience for `Db.open(path: 'sqlite::memory:')`.
+  final db = await Db.inMemory();
+
+  // 3. Schema (the codegen would do this via
+  // auto-migrations; for the bare-bones example
+  // we issue raw DDL).
+  await db.provider.executeAsync('''
     CREATE TABLE books (
       id       INTEGER PRIMARY KEY,
       title    TEXT NOT NULL,
@@ -88,54 +92,62 @@ void main() {
     )
   ''');
 
-  // 3. INSERT — via a prepared statement.
-  final ins = provider.database.prepare(
-    'INSERT INTO books (id, title, authorId) VALUES (?, ?, ?)',
-  );
-  ins.execute([1, 'A Wizard of Earthsea', 1]);
-  ins.execute([2, 'The Left Hand of Darkness', 1]);
-  ins.close();
+  // 4. INSERT — stage with `.add()` then flush.
+  db.set<Book>().add(
+        Book(id: 1, title: 'A Wizard of Earthsea', authorId: 1),
+      );
+  db.set<Book>().add(
+        Book(id: 2, title: 'The Left Hand of Darkness', authorId: 1),
+      );
+  await db.saveChanges();
 
-  // 4. Build a typed queryable over the table.
-  final books = Queryable<Book>(
-    provider: provider,
-    table: 'books',
-    reader: (row) => Book(
-      id: row['id']! as int,
-      title: row['title']! as String,
-      authorId: row['authorId']! as int,
-    ),
-  );
-
-  // 5. SELECT — deferred-execution LINQ query.
-  final titles = books
+  // 5. SELECT — typed LINQ over the change-tracked set.
+  final titles = await db.set<Book>()
+      .asQueryable()
       .select_<String>((b) => b.title)
-      .toList_();
+      .toListAsync_();
   print(titles);
   // [A Wizard of Earthsea, The Left Hand of Darkness]
 
-  // 6. UPDATE — single row, parameterised.
-  provider.execute(
-    'UPDATE books SET title = ? WHERE id = ?',
-    ['The Farthest Shore', 1],
-  );
+  // 6. UPDATE — load, mutate, stage as `markModified`.
+  final List<Book> all = await db
+      .set<Book>()
+      .asQueryable()
+      .toListAsync_()
+      .then((v) => v.cast<Book>());
+  final first = all.firstWhere((b) => b.id == 1);
+  first.title = 'The Farthest Shore';
+  db.set<Book>().markModified(first);
+  await db.saveChanges();
 
-  // 7. DELETE — by primary key.
-  provider.execute(
-    'DELETE FROM books WHERE id = ?',
-    [2],
-  );
+  // 7. DELETE — stage with `.remove()` then flush.
+  db.set<Book>().remove(first);
+  await db.saveChanges();
 
-  // 8. Confirm the final state.
-  final remaining = books.toList_();
+  // 8. Final state.
+  final remaining = await db.set<Book>()
+      .asQueryable()
+      .toListAsync_()
+      .then((v) => v.cast<Book>());
   print(remaining.map((b) => b.title));
-  // [The Farthest Shore]
+  // [The Left Hand of Darkness]
 
-  provider.dispose();
+  await db.close();
 }
 ```
 
-The full surface (`where_`, `orderBy_`, `take_`, `join_`,
+**The high-level write surface on `DbSet<T>` is**:
+
+| Operation | Method | Flush |
+|---|---|---|
+| Insert | `db.set<T>().add(entity)` | `await db.saveChanges()` |
+| Update | `db.set<T>().markModified(entity)` | `await db.saveChanges()` |
+| Delete | `db.set<T>().remove(entity)` | `await db.saveChanges()` |
+| Direct insert | `await db.set<T>().insertOneAsync(entity)` | n/a |
+| Direct update | `await db.set<T>().updateOneAsync(entity, originalValues)` | n/a |
+| Direct delete | `await db.set<T>().deleteOneAsync(entity)` | n/a |
+
+The full LINQ surface (`where_`, `orderBy_`, `take_`, `join_`,
 `groupBy_`, `aggregate`, …) lives in
 `package:d_rocket/d_rocket.dart` and follows the
 [deferred-execution LINQ semantics](https://github.com/torogoz-tech/d_rocket/blob/main/doc/02-layer-3-linq.md).
