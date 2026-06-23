@@ -58,14 +58,16 @@ extend the framework.
                 ▼                   ▼                   ▼
       ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
       │ d_rocket_engine_ │ │ d_rocket_engine_ │ │ d_rocket_engine_ │
-      │ sqlite (2.0.0)   │ │ postgres (2.0.0) │ │ libsql_wasm      │
-      │                  │ │                  │ │ (2.1.0)         │
-      │ - SqliteEngine   │ │ - PgEngine       │ │ - LibSqlEngine   │
-      │ - SqliteProvider │ │ - PgPool         │ │ - WasmProvider   │
-      │ - SqliteDialect  │ │ - PgDialect      │ │ - WasmDialect    │
+      │ sqlite (2.0.0)   │ │ postgres (2.0.0) │ │ web (2.0.0)      │
       │                  │ │                  │ │                  │
-      │ package:sqlite3  │ │ package:postgres │ │ @libsql/client   │
-      │ (sqlcipher opt)  │ │ (libpq)          │ │ (browser)        │
+      │ - SqliteEngine   │ │ - PostgresEngine │ │ - WebEngine      │
+      │ - Db facade      │ │ - PgDb facade    │ │ - WebDb facade   │
+      │ - SQLiteProvider │ │ - PgProvider     │ │ - WebProvider    │
+      │ - SQLiteDialect  │ │ - PostgresDialect│ │ - WebDialect     │
+      │                  │ │ - listen/notify  │ │ (IndexedDB via   │
+      │                  │ │                  │ │  idb_shim)       │
+      │ package:sqlite3  │ │ package:postgres │ │ package:idb_shim │
+      │ (sqlcipher opt)  │ │ (wire protocol)  │ │ (browser)        │
       └──────────────────┘ └──────────────────┘ └──────────────────┘
 ```
 
@@ -73,18 +75,18 @@ The runtime is split into two tiers in 2.0.0:
 
 * **Core** (`d_rocket`) — engine-agnostic. Contains all
   six layers, the `DbEngine` contract, the `SqlDialect`
-  contract (3 methods), and the `EngineRegistry`. No DB
-  driver dependency.
+  contract, the `EngineRegistry`, and the
+  `AsyncQueryProvider` interface. No DB driver dependency.
 * **Engines** (one package per engine) — implements
   `DbEngine`. Each engine is a thin wrapper around a
   Dart DB driver (`package:sqlite3`, `package:postgres`,
-  `@libsql/client`).
+  `package:idb_shim`).
 
 The same `DbContext`, `DbSet<T>`, `@Table`, and LINQ
 code runs on every engine. Switching engines is a
 1-line change in `main.dart` (the
 `dRocketSqlite()` / `dRocketPostgres()` /
-`dRocketLibsqlWasm()` registration call).
+`dRocketWeb()` registration call).
 
 The codegen is a separate `build_runner` integration.
 The platform plugins are well-known Dart packages —
@@ -93,40 +95,44 @@ primitives.
 
 ### 2.0.0 — the engine contract
 
-The boundary between core and engines is a single
-interface: `DbEngine` (3 methods). The `SqlDialect`
-interface is also 3 methods. Everything else is
-engine-agnostic.
+The boundary between core and engines is a small set
+of interfaces. The `DbEngine` contract is what an
+engine package implements. The `AsyncQueryProvider`
+interface is what the engine returns to d_rocket
+core. The `SqlDialect` is the LINQ-to-SQL translator
+hook (the in-memory `Expr` tree gets walked by the
+dialect to produce a `SqlFragment`).
 
 ```dart
-abstract interface class DbEngine {
-  String get name;
-  Future<DbConnection> open(DatabaseConfig config);
-  SqlDialect get dialect;
+abstract class DbEngine {
+  String get name;            // e.g. "sqlite", "postgres", "web"
+  bool get isAvailable;       // platform probe (libsqlite3 loaded?)
+  Future<AsyncQueryProvider> open({
+    String? path,
+    String? password,
+    Object? encryptionConfig, // engine-specific shape
+  });
 }
 
-abstract interface class DbConnection {
-  Future<List<Map<String, Object?>>> select(
-    String sql, [List<Object?>? binds]);
-  Future<int> execute(String sql, [List<Object?>? binds]);
-  Future<void> beginTransaction();
-  Future<void> commit();
-  Future<void> rollback();
-  Future<void> close();
-}
-
-abstract interface class SqlDialect {
-  String contains(String column, String pattern);
-  String mapLiteral(List<(String, String)> pairs);
-  String parameter(int index);
+abstract class AsyncQueryProvider {
+  bool get isOpen;
+  Future<void> executeAsync(String sql, [List<Object?>? binds]);
+  Future<List<Object?>> selectAsync(String sql, [List<Object?>? binds]);
+  Future<int> lastInsertRowIdAsync();
+  Future<void> beginTransactionAsync();
+  Future<void> commitAsync();
+  Future<void> rollbackAsync();
+  Future<void> disposeAsync();
 }
 ```
 
-The default `SqlDialect` (`DefaultDialect`) is
-SQLite-flavoured. The Postgres engine uses
-`PostgresLikeDialect` (3 method overrides, ~20 lines).
-Adding a new engine (e.g. MySQL for 2.2.0) means
-implementing these 3 interfaces.
+The default `SqlDialect` is
+SQLite-flavoured (`DefaultDialect`). The Postgres
+engine ships `PostgresDialect` which overrides the
+`?`-placeholder rewrite (Postgres uses `$1, $2, ...`
+and the provider rewrites on emit). Adding a new
+engine (e.g. MySQL for 2.2.0) means implementing
+`DbEngine` + `AsyncQueryProvider` + `SqlDialect`.
 
 ## The six layers, internally
 
@@ -294,24 +300,43 @@ columns are updated.
 ## The codegen pipeline
 
 `d_rocket_builder` is a `build_runner` integration.
-It registers four `Builder`s:
+It registers seven `Builder`s (the `build.yaml` is the
+authoritative source):
 
 | Builder id | What it reads | What it emits |
 |---|---|---|
-| `d_rocket:serializer` | `@Serializable`, `@SerializableUnion` | per-class `fromJson` / `toJson`, central `register<X>Serializer` calls |
-| `d_rocket:rest_client` | `@RestClient` | per-interface implementation with interceptors, retry, and serialization |
-| `d_rocket:table` | `@Table`, `@PrimaryKey`, `@Column`, `@BelongsTo`, `@HasMany` | per-class `fromRow`, `setId`, `BazSchema` |
-| `d_rocket:closure` | (no annotation) | closure-sugar translation to `Expr.lambda` |
+| `d_rocket_builder:record` | `extends Record` | per-class `_$<Name>Init` + `register<X>Record` |
+| `d_rocket_builder:serializer` | `@Serializable`, `@SerializableUnion` | per-class `fromJson` / `toJson`, central `register<X>Serializer` calls |
+| `d_rocket_builder:rest_client` | `@RestClient` | per-interface implementation with interceptors, retry, serialization |
+| `d_rocket_builder:rocket_table` | `@Table`, `@PrimaryKey`, `@Column`, `@ForeignKey`, `@Index`, `@Embedded` | per-class `EntityMeta` (table name, columns, indexes, PK, FKs, embeds) |
+| `d_rocket_builder:rocket_migration` | `@Migration` | per-class `_$<Name> extends MigrationBase` |
+| `d_rocket_builder:realtime` | `@WebSocketClient`, `@SseClient` | per-interface typed `Stream<T>` client |
+| `d_rocket_builder:record_registry` | the union of all the above | a single `d_rocket_registry.g.dart` with the central `initializeD()` |
 
-The four builders run in parallel. Their outputs are
+The seven builders run in parallel. Their outputs are
 collected by the central `d_rocket_registry.g.dart`
 generator, which imports every `*.d_rocket_*.g.dart`
-and exposes a single `initializeD()` function.
+and exposes a single `initializeD()` function. The dev
+calls `initializeD()` once at app startup; no other
+wiring is needed.
+
+> **Note (historical):** in 1.x the builders were
+> namespaced `d_rocket:*` and the table builder was
+> `d_rocket:table`. Both are kept as 1.x typedefs for
+> source compatibility but the canonical 2.0.0 ids
+> are `d_rocket_builder:*` and `d_rocket_builder:rocket_table`.
 
 The output is deterministic — re-running the
 generator on unchanged source produces byte-identical
 `*.g.dart` files. This is important for CI: a diff
 in the generated output means something changed.
+
+The closure-sugar translation is **not** a builder
+— it's the CLI `d_rocket:closure` (exposed as the
+`closure` executable in `d_rocket/bin/closure.dart`).
+It walks the source and rewrites `Iterable.where((x) => ...)`
+into `Expr.lambda(...)` calls. Run it via
+`dart run d_rocket:closure transform-file path/to/file.dart`.
 
 ## Extension points
 
@@ -339,34 +364,42 @@ final MyType field;
 ```dart
 class MyInterceptor implements RestInterceptor {
   @override
-  Future<void> onRequest(RestRequest request) async { /* ... */ }
+  Future<RestRequest> onRequest(RestRequest request) async {
+    // mutate the request, or throw RestException to abort
+    return request;
+  }
   @override
-  void onResponse(RestRequest request, RestResponse response) { /* ... */ }
+  Future<RestResponse<dynamic>> onResponse(
+    RestResponse<dynamic> response,
+  ) async => response;
   @override
-  void onError(RestRequest request, Object error, StackTrace st) { /* ... */ }
+  Future<void> onError(
+    RestRequest request,
+    Object error,
+    StackTrace st,
+  ) async { /* log / rethrow */ }
 }
 
-dRest.use(MyInterceptor());
+dRest.useDefaults(interceptors: [MyInterceptor()]);
 ```
 
-### Custom `ConflictResolver`
+### Custom `ConflictPolicy`
 
 ```dart
-class MyResolver implements ConflictResolver {
+class MyPolicy extends ConflictPolicy {
+  const MyPolicy();
   @override
-  Future<SyncOp> resolve(SyncOp local, SyncOp server, ConflictContext ctx) async {
-    // ...
+  Map<String, Object?> resolve(
+    Map<String, Object?> local,
+    Map<String, Object?> server,
+  ) {
+    // return the field-level merge you want
+    return {...server, ...local};
   }
 }
-```
 
-### Custom `LinqProvider<T>`
-
-```dart
-class MyLinqProvider implements LinqProvider<T> {
-  @override
-  Future<List<T>> execute(Expr<T, dynamic> query, ...) async { /* ... */ }
-}
+// then on the SyncProvider:
+MyBackendSyncProvider(policy: const MyPolicy());
 ```
 
 ### Custom `AsyncQueryProvider`
@@ -374,24 +407,30 @@ class MyLinqProvider implements LinqProvider<T> {
 ```dart
 class MyDbProvider implements AsyncQueryProvider {
   @override
-  Future<List<Map<String, Object?>>> rawQuery(String sql, List<Object?> params) async { /* ... */ }
+  bool get isOpen => /* ... */;
   @override
-  Future<void> exec(String sql, List<Object?> params) async { /* ... */ }
-  // ...
+  Future<void> executeAsync(String sql, [List<Object?>? binds]) async { /* ... */ }
+  @override
+  Future<List<Object?>> selectAsync(String sql, [List<Object?>? binds]) async { /* ... */ }
+  @override
+  Future<int> lastInsertRowIdAsync() async => 0;
+  @override
+  Future<void> beginTransactionAsync() async { /* ... */ }
+  @override
+  Future<void> commitAsync() async { /* ... */ }
+  @override
+  Future<void> rollbackAsync() async { /* ... */ }
+  @override
+  Future<void> disposeAsync() async { /* ... */ }
 }
 ```
 
-A custom `AsyncQueryProvider` is the way to use a
-different engine (Postgres, MySQL, IndexedDB) with
-the ORM. The `Db` factory accepts a custom
-provider:
-
-```dart
-final db = await Db.open(
-  path: 'app.db',
-  queryProvider: MyDbProvider(),
-);
-```
+A custom `AsyncQueryProvider` is the way to wire a
+new engine. Wrap it in a `DbEngine` and pass it to
+`Db.open(engine: ...)`, or register it with
+`EngineRegistry.register(myEngine)` and use the
+`dRocketSqlite()` / `dRocketPostgres()` / `dRocketWeb()`
+helpers to register the shipped engines.
 
 ## Threading model
 
@@ -400,18 +439,14 @@ runtime, the codegen output, and the user's code all
 run on the same event loop.
 
 For multi-threaded work (e.g. a long-running sync),
-use `Isolate.spawn` to start a worker isolate. The
-`IsolateWorker<Db>` helper handles the
-plumbing. The worker isolate has its own `Db`
-instance and its own event loop; messages are passed
-via `SendPort` / `ReceivePort`.
-
-The framework's API is the same on the main isolate
-and on a worker isolate. The same `@Table`
-classes, the same `DbSet<T>` chains, the same
-`saveChanges()`. The only difference is that on a
-worker isolate, `open` is synchronous
-(`Db.openSync`).
+use `Isolate.spawn` directly with `package:d_rocket`
+on the worker isolate — there is no special
+`IsolateWorker<Db>` helper in 2.0.0. Each isolate
+has its own `Db` instance and its own event loop;
+messages are passed via `SendPort` / `ReceivePort`.
+The framework's API is the same on every isolate:
+the same `@Table` classes, the same `DbSet<T>`
+chains, the same `saveChanges()`.
 
 ## Build-time vs runtime
 
@@ -452,17 +487,19 @@ generated files are up-to-date with
 
 ## Future directions
 
-The framework is at 1.0.0. Future directions include:
+The framework is at 2.0.0. Future directions include:
 
-- **A web platform provider** for IndexedDB
-  (alternative to SQLite).
-- **A `d_rocket_provider_postgres` package** for
-  server-side apps.
-- **A query analyzer** that runs in the IDE and
-  surfaces N+1 patterns as warnings (in addition to
-  the lint rule).
-- **A `d_rocket_admin` package** for an
-  out-of-the-box admin UI for `@Table`s.
+- **`d_rocket_admin`** — a Flutter web admin UI
+  on top of the engine.
+- **Dart macros** for codegen (replaces the
+  `build_runner` integration; requires analyzer
+  `^13.0.0`).
+- **Form binding** — a `@RocketForm` annotation
+  for two-way binding of `@Table` entities to form
+  widgets.
+- **Cross-engine benchmarks** — quantify the
+  per-engine LINQ-to-SQL overhead vs EF Core /
+  Hibernate.
 
 These are not commitments; they are areas where
 contributions are welcome.
