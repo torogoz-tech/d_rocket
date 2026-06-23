@@ -485,7 +485,10 @@ For a key rotation strategy, see
 ## Background sync — `Isolate` worker
 
 For a long-running sync, run the push / pull loop in
-a Dart `Isolate` so the main UI stays responsive:
+a Dart `Isolate` so the main UI stays responsive. The
+2.0.0 API is async-only (no `Db.openSync`), so the
+worker isolate awaits `Db.inMemory()` (or `Db.open()`)
+on its own event loop:
 
 ```dart
 import 'dart:isolate';
@@ -494,28 +497,27 @@ void main() {
   Isolate.spawn(_syncEntryPoint, SendPort(...));
 }
 
-void _syncEntryPoint(SendPort mainPort) {
+Future<void> _syncEntryPoint(SendPort mainPort) async {
+  // Each isolate has its own engine registration
+  // (the registry is per-isolate, not global).
+  dRocketSqlite();
   // Open a db in this isolate.
-  final db = Db.openSync(path: 'app.db');
-  final sync = MyBackendSyncProvider(...);
+  final db = await Db.inMemory();
+  final sync = MyBackendSyncProvider(db);
   sync.attach(db);
 
   // Run the push loop forever.
-  sync.runForever();
+  await sync.runForever();
 }
 ```
 
-The framework's `IsolateWorker` helper handles the
-port plumbing and the lifecycle:
-
-```dart
-final worker = IsolateWorker<Db>(
-  spawn: (sendPort) => Db.openSync(path: 'app.db'),
-  onMessage: (db, message) { /* ... */ },
-);
-
-await worker.start();
-```
+The framework does not ship a dedicated
+`IsolateWorker<Db>` helper in 2.0.0 (the 1.x version
+was removed). Use `Isolate.spawn` directly with
+`SendPort` / `ReceivePort` for the port plumbing.
+The framework's API is the same on every isolate:
+the same `Db`, the same `DbSet<T>`, the same
+`saveChanges()`.
 
 For Flutter, use `compute(...)` for one-off tasks and
 the isolate worker for long-running pipelines.
