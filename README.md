@@ -17,19 +17,18 @@ a dozen different libraries.
 
 ## The six layers
 
-| # | Layer | What you get | Annotation | Docs |
-|---|---|---|---|---|
-| 1 | **Serialization** | `@Serializable` classes with type-safe `fromJson` / `toJson`, union types via `@SerializableUnion`, custom formatters, naming policies (`@JsonKey` + `JsonNaming`), and `unknownKeyPolicy` for forward-compat. | `@Serializable` | [doc/04](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
-| 2 | **REST** | `@RestClient` interfaces with `@HttpGet`/`@HttpPost`/`@HttpPut`/`@HttpPatch`/`@HttpDelete`/`@HttpHead`, parameter binding via `@Path`/`@Query`/`@Header`/`@Body`/`@Field`/`@Part`/`@RawBody`, **retry** with backoff, **rate limiting**, **circuit breaker**, **response cache**, **streaming** `Stream<T>` endpoints, **cancelable** requests via `CancelToken`, and a full **interceptor chain**. | `@RestClient` | [doc/05](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
-| 3 | **LINQ** | Deferred-execution `Queryable<T>` with **35+ operators** across filter, project, order, page, group, join, aggregate, set, quantifier, element, convert. Engine-agnostic AST (`Expr.lambda` for SQL push-down). **Both** sync (`*_`) and async (`*Async_`) terminals. | none — `IQueryable<T>` | [doc/06](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
-| 4 | **ORM** (engine-agnostic) | `DbContext` with change-tracked `DbSet<T>`, code-first + `@Migration` callbacks, **auto-migrator** with `pendingSchemaDiff()`, eager-loading `include_<TNav>()`, reactive `watch()`, `DbInterceptor` chain, `redactPragmaKey` for SQL logging. `saveChanges()` flushes inserts/updates/deletes in a single transaction. | `@Table` + `@PrimaryKey` + `@Column` + `@ForeignKey` + `@Index` + `@Embedded` | [doc/07](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
-| 5 | **Sync** (offline-first) | `SyncProvider` interface, `RestSyncProvider` HTTP+JSON impl, persistent identity (`clientId` + watermark) that survives process restarts, push + pull pipelines, **conflict resolution** (LWW, server-wins, client-wins, custom callback), triggers (periodic + signal + manual), retry with exponential backoff. | `class SyncProvider` (no annotation) | [doc/08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
-| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>`, reconnection with exponential backoff, **heartbeat / ping**, reuses the Layer 1 JSON serializer for payloads. | `@WebSocketClient` + `@SseClient` | [doc/09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
+| # | Layer | Features | Doc |
+|---|---|---|---|
+| 1 | **Serialization** | `@Serializable` → `fromJson` / `toJson`; union types via `@SerializableUnion`; custom formatters; `@JsonKey` + `JsonNaming`; `unknownKeyPolicy` for forward-compat. | [doc/04](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
+| 2 | **REST** | `@RestClient` + `@HttpGet`/`@Post`/`@Put`/`@Patch`/`@Delete`/`@Head`; `@Path`/`@Query`/`@Header`/`@Body`/`@Field`/`@Part`/`@RawBody`; **retry**, **rate limit**, **circuit breaker**, **response cache**, **streaming** `Stream<T>`, **cancelable** `CancelToken`, full **interceptor chain**. | [doc/05](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
+| 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [doc/06](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
+| 4 | **ORM** (engine-agnostic) | `DbContext` + change-tracked `DbSet<T>`; code-first + `@Migration` callbacks; **auto-migrator** with `pendingSchemaDiff()`; `include_<TNav>()` eager-loading; reactive `watch()`; `DbInterceptor` chain; `redactPragmaKey`. `saveChanges()` flushes inserts/updates/deletes in one transaction. | [doc/07](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
+| 5 | **Sync** (offline-first) | `SyncProvider` + `RestSyncProvider` HTTP+JSON; persistent identity (`clientId` + watermark) surviving restarts; push + pull pipelines; **conflict resolution** (LWW, server-wins, client-wins, custom); triggers (periodic + signal + manual); retry with backoff. | [doc/08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>`; reconnect with exponential backoff; **heartbeat / ping**; reuses Layer 1 JSON serializer. | [doc/09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
 
 A single `initializeD()` call (emitted by `d_rocket_builder` into
 `d_rocket_registry.g.dart`) wires every annotated class in your
-project. There is no per-file `registerAll()`, no abstract
-`AsyncQueryProvider` to wire by hand.
+project. There is no per-file `registerAll()`.
 
 ## Engines
 
