@@ -33,6 +33,7 @@ common consumer of a realtime stream in the
 - [`SseConnection` and `HttpSseClient`](#sseconnection-and-httpsseclient)
 - [`WebSocketReconnector`](#websocketreconnector)
 - [`WebSocketMessage` and `SseEvent`](#websocketmessage-and-sseevent)
+- [Web target — `IOWebSocketClient` browser stub](#web-target--iowebsocketclient-browser-stub)
 - [Use in a `SyncProvider.pull` (Layer 5)](#use-in-a-syncproviderpull)
 - [API reference](#api-reference)
 
@@ -263,6 +264,49 @@ class WebSocketReconnector {
 }
 ```
 
+### Constructor parameters
+
+| Parameter | Default | Purpose |
+|---|---|---|
+| `factory` | (required) | `WebSocketConnection Function()` — creates a new client on each (re)connect. |
+| `url` | (required) | The WebSocket endpoint. |
+| `headers` | `null` | Optional upgrade headers (e.g. `Authorization`). |
+| `initialBackoff` | `1s` | Base backoff; doubles on every retry (1s, 2s, 4s, 8s, 16s). |
+| `maxAttempts` | `5` | Maximum connect attempts before re-throwing the last error. |
+
+### Wiring into `IOWebSocketClient`
+
+`WebSocketReconnector` is the standard wrapper
+used by codegen-emitted `_$<ClassName>` clients
+when the user declares
+`reconnectBackoffSeconds` on `@WebSocketClient`:
+
+```dart
+// Manual wiring (when not using codegen):
+final reconnector = WebSocketReconnector(
+  factory: () => IOWebSocketClient(),
+  url: Uri.parse('wss://api.example.com/realtime'),
+  headers: {'Authorization': 'Bearer $token'},
+  initialBackoff: const Duration(seconds: 1),
+  maxAttempts: 5,
+);
+await reconnector.start();
+
+// Forward messages:
+await for (final msg in reconnector.messages) {
+  print('got: $msg');
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `client` | The underlying `WebSocketConnection`. `null` before `start` and during reconnects. |
+| `messages` | Broadcast `Stream<WebSocketMessage>` forwarded from the underlying client. Throws `StateError` if `start` has not been called. |
+| `start()` | Tries `maxAttempts` times with exponential backoff; re-throws on exhaustion. |
+| `stop()` | Closes the underlying client. |
+
+### Behaviour and limitations
+
 The backoff is exponential:
 `1s, 2s, 4s, 8s, 16s`. After `maxAttempts` the
 last error is re-thrown.
@@ -274,6 +318,21 @@ ends. This is intentional: a long-lived
 realtime stream's reconnect policy is a
 user-facing decision (per-screen, per-event-type,
 etc.), and the framework doesn't presume.
+
+```dart
+final sub = reconnector.client!.messages.listen(
+  (msg) => handle(msg),
+  onDone: () async {
+    await reconnector.stop();
+    await reconnector.start();   // re-arm on disconnect
+  },
+);
+```
+
+For exponential-backoff-after-disconnect
+(separate from the initial connect retries), the
+user wraps the `onDone` handler in their own
+delay loop.
 
 ## `WebSocketMessage` and `SseEvent`
 
@@ -318,6 +377,50 @@ Multiple `data:` lines in the wire format are
 joined with `\n` and exposed as `data`. The
 `event` field defaults to `'message'` if the
 server didn't specify one.
+
+## Web target — `IOWebSocketClient` browser stub
+
+`d_rocket` ships a conditional-import stub at
+`lib/src/realtime/web_websocket_client.dart`
+that exposes the same public class
+(`IOWebSocketClient`) but is selected on the web
+build instead of the `dart:io` implementation.
+On the web, `dart:io` is not available, so every
+operation throws `UnsupportedError`:
+
+```dart
+UnsupportedError: IOWebSocketClient is not available on the web.
+Use a `package:web_socket_channel`-backed `WebSocketConnection` adapter.
+```
+
+| Operation | Web behaviour |
+|---|---|
+| `connect(url, headers: ...)` | Throws `UnsupportedError`. |
+| `send(message)` | Throws `UnsupportedError`. |
+| `close({code, reason})` | Throws `UnsupportedError`. |
+| `messages` (getter) | Throws `UnsupportedError`. |
+| `errors` (getter) | Throws `UnsupportedError`. |
+| `closed` (getter) | Throws `UnsupportedError`. |
+| `isConnected` (getter) | Always returns `false`. |
+
+The public interface is intentionally identical
+to the `dart:io` `IOWebSocketClient` so the call
+site does not change. To enable real WebSocket
+support on the web, drop in
+`package:web_socket_channel` behind a
+`WebSocketConnection` adapter:
+
+```dart
+class ChannelWebSocketConnection implements WebSocketConnection {
+  // wraps `IOWebSocketChannel` from package:web_socket_channel
+}
+```
+
+Replace the stub via a custom `build.yaml` /
+conditional-import or by overriding the export
+in your fork. Until then, generated clients
+that target `@WebSocketClient` on the web will
+throw on connect.
 
 ## Use in a `SyncProvider.pull` (Layer 5)
 
@@ -371,6 +474,11 @@ Abstract transport / `dart:io` implementation. See
 [WebSocketConnection](#websocketconnection-and-iowebsocketclient)
 above.
 
+### `IOWebSocketClient` (web stub)
+
+Conditional-import browser stub that throws
+`UnsupportedError`. See [Web target](#web-target--iowebsocketclient-browser-stub).
+
 ### `SseConnection` / `HttpSseClient`
 
 Abstract transport / `package:http` implementation.
@@ -381,7 +489,9 @@ above.
 
 Auto-reconnecting wrapper for the initial
 connection. See [WebSocketReconnector](#websocketreconnector)
-above.
+above. Includes constructor parameters, `client`
+/ `messages` / `start` / `stop` members, and the
+mid-session-reconnect pattern.
 
 ### `WebSocketMessage` / `WebSocketMessageType`
 

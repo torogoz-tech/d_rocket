@@ -179,11 +179,14 @@ in the in-memory provider). The SQL provider emits
 |---|---|---|
 | `any_({where})` | `bool any_({Expr? where})` | `true` if at least one element exists, or if at least one element satisfies the optional `where` predicate. Short-circuits. |
 | `all_(predicate)` | `bool all_(Expr predicate)` | `true` if every element satisfies the predicate. Vacuously true for empty source. Short-circuits. |
+| `allAsync_(predicate)` | `Future<bool> allAsync_(Expr predicate)` | Async variant of `all_`. Requires an `AsyncQueryProvider` (throws `StateError` otherwise — see [Legacy sync / async split](#legacy-sync--async-split)). |
 | `contains_(value)` | `bool contains_(T value)` | `true` if `value` is an element of the source (using `==` / `hashCode`). |
 
 The `any_` two-form dispatch is via the `where:`
 named parameter, because Dart does not allow method
-overloading.
+overloading. `allAsync_` is the preferred idiom in
+2.0.0 — `all_` is kept for parity but goes through
+the legacy sync path.
 
 ### Aggregate
 
@@ -211,6 +214,15 @@ overloading.
 The `first_` and `single_` (and `*OrDefault` variants)
 use a named `where:` parameter to disambiguate the
 no-arg and predicate forms.
+
+> **Note:** `last_` and `lastOrDefault_` do not
+> exist in 2.0.0. The element operators are
+> forward-only; if the order matters, append an
+> `orderByDescending_(...)` (or `reverse_()` after
+> `orderBy_`) before `first_`. Similarly,
+> `singleAsync_` does not exist; use the sync
+> `single_` against an `IQueryable` materialised
+> from the async source via `toListAsync_()`.
 
 ### Convert
 
@@ -490,6 +502,291 @@ responsible for any I/O. The in-memory provider
 doesn't need async; the SQLite provider does its
 async work in `toList()` / `first_()` / etc. by
 flushing the query and materialising the result.
+
+---
+
+## SQL translator subsystem
+
+The SQL translation lives in `lib/src/linq/sql/`
+and is **engine-agnostic**. The translator walks
+an `Expr` tree and emits a SQL fragment; the
+dialect controls the engine-specific bits
+(placeholder format, substring search, JSON-object
+construction). All three engines that ship today —
+SQLite, Postgres, libsql_wasm — share the same
+`SqlTranslator` and differ only in the `SqlDialect`
+they pass in.
+
+### `SqlDialect`
+
+The engine-specific surface of the SQL layer. A
+single class with three overridable methods; the
+default implementation is SQLite-flavoured:
+
+```dart
+class SqlDialect {
+  const SqlDialect();
+  String placeholder() => '?';
+  String stringContainsFunction() => 'INSTR';
+  String jsonObjectFunction() => 'json_object';
+}
+
+class DefaultDialect extends SqlDialect {
+  const DefaultDialect();
+}
+```
+
+| Method | Default | SQLite | Postgres | MySQL |
+|---|---|---|---|---|
+| `placeholder()` | `'?'` | `?` | rewritten to `$1, $2, …` by the provider | `?` |
+| `stringContainsFunction()` | `'INSTR'` | `INSTR` | `STRPOS` | `LOCATE` |
+| `jsonObjectFunction()` | `'json_object'` | `json_object` (3.38+) | `jsonb_build_object` | `JSON_OBJECT` |
+
+Engines that diverge pass a `const` subclass of
+`SqlDialect` that overrides the methods they
+need. The `DefaultDialect` is a `const` alias for
+`SqlDialect` — they behave identically. The 2.0.0
+dialect abstraction captures only the differences
+that the SQLite and Postgres engines actually need
+today; future engines (MySQL, MSSQL) may add more
+methods, each with a default implementation that
+maps to the standard SQL behaviour.
+
+### `SqlFragment`
+
+The output of the translator: a piece of SQL plus
+the bind parameters that go with it.
+
+```dart
+class SqlFragment {
+  final String sql;
+  final List<Object?> binds;
+  const SqlFragment(this.sql, [List<Object?>? binds]);
+  SqlFragment combine(SqlFragment other);
+  SqlFragment parens();
+  SqlFragment withPrefix(String prefix);
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `sql` | The SQL text. May contain `?` placeholders that are bound by `binds` in order. |
+| `binds` | The values to bind to the `?` placeholders, in order. |
+| `combine(other)` | Side-by-side composition: `(this.sql) (other.sql)` with the bind lists concatenated. Used to assemble `WHERE a AND b` from two fragments. |
+| `parens()` | Wraps the fragment in parentheses without re-binding. |
+| `withPrefix(prefix)` | Prefixes the SQL (e.g. `'WHERE '`); appends a single space if the prefix doesn't already end in one. |
+
+The `ExprVisitor<SqlFragment>` implementation
+(`SqlTranslator`) returns a `SqlFragment` from each
+visit method; the caller combines the fragments
+to form the final `SELECT … FROM … WHERE …` text.
+
+### `SqlTranslator`
+
+Walks an `Expr` tree and produces a
+`SqlFragment`. Stateless — the visitor can be
+reused across translations.
+
+```dart
+class SqlTranslator implements ExprVisitor<SqlFragment> {
+  SqlTranslator({this.tableAlias = 'u', this.dialect = const DefaultDialect()});
+
+  String tableAlias;
+  SqlDialect dialect;
+
+  SqlFragment translate(Expr e);
+  SqlFragment translateLambda(Expr lambda);
+}
+```
+
+| Member | Purpose |
+|---|---|
+| `tableAlias` | The SQL alias for the table whose columns the lambda's body refers to. Default `'u'`. Must match the lambda's parameter name. |
+| `dialect` | The `SqlDialect` that controls placeholder / function names. Default `DefaultDialect()` (SQLite-flavoured). |
+| `translate(e)` | Convenience for `e.accept(this)`. |
+| `translateLambda(lambda)` | Translates a top-level `LambdaExpr` (the body of a `where_` clause) and returns a fragment suitable for use after a SQL `WHERE` keyword. Validates that the argument is a `LambdaExpr` with one parameter whose name matches `tableAlias`. |
+
+The translator implements every `visit*` method of
+`ExprVisitor<SqlFragment>`. A summary of what each
+node maps to:
+
+| Expr node | SQL output |
+|---|---|
+| `ConstExpr(value)` | `?` with `value` as the bind (or literal `NULL` for `null`) |
+| `ParamExpr('u')` | the table alias `u` |
+| `BinaryExpr(op, l, r)` | `(l <mapped-op> r)` with concatenated binds |
+| `UnaryExpr(op, x)` | `NOT (x)` for `!`, `-(x)` for unary `-` |
+| `MemberAccessExpr(ParamExpr('u'), name)` | the column name (no quoting — see comment in source) |
+| `MemberAccessExpr(NavRef, name)` | `<alias>.<name>` and registers the JOIN |
+| `MethodCallExpr` | `startsWith`/`endsWith` → `substr`; `contains` → dialect's `INSTR`/`STRPOS`; `length` → `LENGTH`; `toUpperCase`/`toLowerCase`/`trim` → `UPPER`/`LOWER`/`TRIM`; `isEmpty`/`isNotEmpty` → `(col = '')` / `(col <> '')` |
+| `NullExpr` | `NULL` |
+| `ListExpr([a, b, c])` | `(<a>, <b>, <c>)` (the SQL IN-list form) |
+| `MapLiteralExpr` | `dialect.jsonObjectFunction()(key, value, …)` |
+| `TernaryExpr` | `CASE WHEN <cond> THEN <then> ELSE <else> END` |
+| `CoalesceExpr` | `COALESCE(<l>, <r>)` |
+| `NullSafeAccessExpr` | `CASE WHEN <target> IS NULL THEN NULL ELSE <target>.<member> END` |
+| `AggregateExpr` | `<FN>([DISTINCT ] <selector>)`; `COUNT(*)` when the selector is `NullExpr` |
+| `GroupByExpr` | `GROUP BY <key>[, <element>]` (the caller splices it into the outer SELECT) |
+| `HavingExpr` | `HAVING <predicate>` |
+| `JoinExpr` | `[<type>] JOIN <inner> ON <outerKey> = <innerKey>` (the caller splices it) |
+| `NavRef` | `<alias>.<pkColumn>` and registers an `INNER JOIN` on the navigation |
+
+Binary operator mapping (`==` → `=`, `!=` → `<>`,
+`&&` → `AND`, `||` → `OR`, etc.) is in the static
+`_mapBinaryOp` table inside the translator. The
+`Placeholder` rule is unified: the translator
+always emits `?`; the provider rewrites to the
+engine-specific form (Postgres does the rewrite;
+SQLite leaves them as-is).
+
+Example:
+
+```dart
+final translator = SqlTranslator(tableAlias: 'u');
+final frag = translator.translateLambda(
+  Expr.lambda(
+    [Expr.param('u')],
+    Expr.binary('&&',
+      Expr.binary('>=', Expr.member(Expr.param('u'), 'age'), Expr.const_(18)),
+      Expr.call(Expr.member(Expr.param('u'), 'name'), 'startsWith', [Expr.const_('A')]),
+    ),
+  ),
+);
+// frag.sql   == "(age >= ?) AND (substr(name, 1, ?) = ?)"
+// frag.binds == [18, 1, 'A']
+```
+
+### `LegacySyncQueryProvider`
+
+The marker interface that an engine implements to
+expose the 1.x-style **synchronous** LINQ API.
+
+```dart
+abstract class LegacySyncQueryProvider {
+  List<Map<String, Object?>> selectWithBinds(String sql, List<Object?> binds);
+}
+```
+
+`selectWithBinds` runs a `SELECT` and returns the
+rows synchronously — no `Future` wrapping. The
+underlying binding is what makes this possible:
+
+- `d_rocket_engine_sqlite`: `SqliteQueryProvider
+  implements LegacySyncQueryProvider` (the
+  `package:sqlite3` binding is sync).
+- `d_rocket_engine_postgres`: `PostgresQueryProvider`
+  does **not** implement it (the `package:postgres`
+  binding is async-only).
+- `d_rocket_engine_libsql_wasm` (2.1): the WASM
+  binding is async-only, so it will **not**
+  implement it either.
+
+The `Queryable` checks at runtime: when its
+provider is a `LegacySyncQueryProvider`, the sync
+methods (`toList_`, `count_`, `first_`, `sum_`,
+`min_`, `max_`) work; otherwise they throw a clear
+"this engine is async-only; use the `*Async_`
+methods" error.
+
+### Legacy sync / async split
+
+The d_rocket 2.0.0 LINQ surface is split into
+three tiers, in order of preference:
+
+1. **Async terminals** (`toListAsync_`,
+   `countAsync_`, `firstAsync_`, `anyAsync_`,
+   `allAsync_`, etc.) — engine-agnostic. These are
+   the 2.0.0 idiom.
+2. **Sync terminals** (`toList_`, `count_`,
+   `first_`, etc.) — only available when the
+   provider is a `LegacySyncQueryProvider`. Engines
+   that have a synchronous binding expose them;
+   async-only engines throw.
+3. **Sync iteration** (the `IQueryable<T>.iterator`
+   path used by `for ... in`) — also goes through
+   the legacy sync provider when the source is a
+   `Queryable<T>`. The in-memory provider
+   (`EnumerableQuery`) is always sync.
+
+The split is intentionally explicit. The same
+code that calls `first_` on a `Queryable` backed
+by SQLite works unchanged, and a Postgres-backed
+call site fails with a clear runtime error rather
+than silently dropping data.
+
+The legacy sync API is scheduled for removal in
+3.0.0. New code should use the async variants.
+The sync methods are kept in 2.0.0 for back-compat
+with 1.x code that hasn't migrated yet.
+
+---
+
+## Logging helpers
+
+### `redactPragmaKey`
+
+Top-level function. Replaces the literal value of
+a `PRAGMA key = '...'` or `PRAGMA rekey = '...'`
+statement with `'***'`, so the password never
+appears in logs, crash reports, or any other
+observer:
+
+```dart
+String redactPragmaKey(String sql);
+```
+
+```dart
+redactPragmaKey("PRAGMA key = 'hunter2'");
+// → "PRAGMA key = '***'"
+
+redactPragmaKey("PRAGMA rekey = 'O''Brien'");
+// → "PRAGMA rekey = '***'"
+
+redactPragmaKey("SELECT * FROM users");
+// → "SELECT * FROM users"   (unmodified)
+```
+
+The function is **case-insensitive** and tolerant
+of whitespace variations; it only matches the
+single-quoted form (which is what d_rocket itself
+emits when applying the key).
+
+The function does **not** try to detect keys that
+are passed via a `?` placeholder — `PRAGMA` does
+not accept bound parameters in SQLite, so a
+`PRAGMA key = ?` form is a no-op in the engine
+and has no key value to redact.
+
+`PRAGMA key` / `PRAGMA rekey` are SQLCipher
+statements (the form that ships in
+`d_rocket_engine_sqlite`). The function is
+engine-agnostic and lives in d_rocket core so that
+the `LoggingInterceptor` in d_rocket's REST layer
+can use it without depending on a specific engine
+package.
+
+`LoggingInterceptor` defaults its `redactBody`
+parameter to `redactPragmaKey`:
+
+```dart
+dRest.use(LoggingInterceptor());
+// equivalent to:
+dRest.use(LoggingInterceptor(redactBody: redactPragmaKey));
+```
+
+Pass a custom `redactBody` to extend or replace
+the default redaction (e.g. add a regex for
+`Authorization: Bearer …` headers, or strip
+custom keys entirely):
+
+```dart
+dRest.use(LoggingInterceptor(
+  redactBody: (sql) => redactPragmaKey(sql).replaceAll(
+    RegExp(r"Bearer\s+[A-Za-z0-9._\-]+"),
+    'Bearer ***',
+  ),
+));
+```
 
 ## API reference
 

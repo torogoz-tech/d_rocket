@@ -285,6 +285,151 @@ canonical form.
 
 ---
 
+## Code generators (`d_rocket_builder`)
+
+In addition to the two CLI scaffolders above,
+`d_rocket` ships six `build_runner` builders in
+the companion `d_rocket_builder` package. They
+are wired by `build.yaml` (which `d_rocket_builder`
+publishes); consumers do not need to write any
+configuration of their own — `dart run build_runner
+build` picks them up automatically.
+
+| Builder | Output suffix | Detects | Emits |
+|---|---|---|---|
+| `d_rocket_builder:record` | `.g.dart` | every `extends Record` class | `_<ClassName>Init` + `register<ClassName>Record()` |
+| `d_rocket_builder:serializer` | `.d_rocket_serializer.g.dart` | every `@Serializable` class | `XFromJson` / `XToJson` + `register<X>Serializer()` |
+| `d_rocket_builder:rest_client` | `.d_rocket_rest_client.g.dart` | every `@RestClient` abstract class | `_$<ClassName>` impl + `register<ClassName>RestClient()` |
+| `d_rocket_builder:rocket_table` | `.d_rocket_orm.g.dart` | every `@Table` class | `static EntityMeta entityMeta` + `register<ClassName>EntityMeta()` |
+| `d_rocket_builder:realtime` | `.d_rocket_realtime.g.dart` | every `@WebSocketClient` and `@SseClient` abstract class | `_$<ClassName>` extending `IOWebSocketClient` / `HttpSseClient` |
+| `d_rocket_builder:rocket_migration` | `.d_rocket_migration.g.dart` | every `@Migration` top-level function | `_$<FunctionName>` `MigrationBase` subclass |
+| `d_rocket_builder:record_registry` | `d_rocket_registry.g.dart` (per-package, not per-file) | all of the above across `lib/**.dart` | one `initializeD()` function that calls every `register<X>...()` |
+
+The per-file builders use **distinct** `PartBuilder`
+suffixes so a single Dart file can freely mix
+`extends Record` + `@Serializable` + `@RestClient`
++ `@Table` + `@Migration` annotations without
+build_runner output collisions (this is the
+HANDOFF §6 fix).
+
+### `d_rocket_builder:rocket_migration`
+
+The migration codegen. Walks every `@Migration`
+top-level function (and every `@Table` class in
+the same library) and emits a
+`MigrationBase` subclass for each function:
+
+```dart
+@Migration(id: '001', name: 'Initial schema')
+MigrationBase initialSchema() => _$_InitialSchema();
+```
+
+The generated `_$_InitialSchema` extends
+`MigrationBase` and runs:
+
+* `up()` — `entityMeta.createTableDdl()` + every
+  `entityMeta.createIndexStatements()` for every
+  `@Table` in the same library, then
+  `PRAGMA foreign_keys = ON`.
+* `down()` — `DROP TABLE IF EXISTS` for every
+  `@Table`, in reverse order.
+
+The user's function then just
+`=> _$_InitialSchema();` — the codegen emits the
+implementation. The migration is ready to be
+added to the context's `migrations` list.
+
+| Aspect | Value |
+|---|---|
+| Suffix | `.d_rocket_migration.g.dart` |
+| Detects | top-level functions annotated with `@Migration` (annotation marker name `MigrationBase` in the analyzer lookup) |
+| Per-class output | `class _$_<fnName> extends MigrationBase { ... }` |
+| Cross-references | every `@Table` in the same library, in declaration order |
+| Side effects | none beyond the generated `MigrationBase` subclass |
+
+### `d_rocket_builder:record`
+
+The default-suffix `record` builder. Walks every
+class that `extends Record` (from
+`package:d_rocket/d_rocket.dart`) — no annotation
+required — and emits, per class:
+
+* A `_<ClassName>Init` class whose constructor
+  registers the field accessors with d_rocket's
+  internal registry.
+* A `final _$_<ClassName>Init` lazy top-level
+  initializer.
+* A public `void register<ClassName>Record()`
+  function that forces evaluation of the
+  initializer — called by the central
+  `d_rocket_registry.g.dart` `initializeD()`.
+
+```dart
+class Author extends Record {
+  final String name;
+  final int age;
+}
+```
+
+Becomes (per file):
+
+```dart
+class _$AuthorInit {
+  _$AuthorInit() {
+    final fields = <String, Object? Function(Author)>{
+      fields['name'] = (a) => a.name;
+      fields['age']  = (a) => a.age;
+    };
+    Record.register<Author>(fields);
+  }
+}
+
+final _authorInit = _$AuthorInit();
+
+void registerAuthorRecord() { _authorInit; }
+```
+
+| Aspect | Value |
+|---|---|
+| Suffix | `.g.dart` (the `source_gen` default — the only builder that uses it) |
+| Detects | classes that `extends Record` (base class from `package:d_rocket`) |
+| Per-class output | `_<ClassName>Init` + `_$<lcFirst>Init` + `register<ClassName>Record()` |
+| Cross-references | none beyond the `Record.register<T>()` registry call |
+| Side effects | none beyond the registry entry |
+
+### `d_rocket_builder:record_registry`
+
+A `LibraryBuilder` (not a `PartBuilder`).
+Scans the consumer's `lib/**.dart` once,
+collects every `extends Record` class AND every
+`@Serializable` class AND every `@RestClient`
+class AND every `@Table` class, AND every
+`@WebSocketClient` / `@SseClient` abstract class,
+and emits a single `lib/d_rocket_registry.g.dart`
+with a public `initializeD()` function that calls
+every `register<X>Record()`, every
+`register<X>Serializer()`, every
+`register<X>RestClient()`, every
+`register<X>EntityMeta()`, and every
+`register<X>Client` in one shot.
+
+```dart
+void initializeD() {
+  registerAuthorRecord();
+  registerBookRecord();
+  registerOrderSerializer();
+  registerOrdersApiRestClient();
+  registerOrderEntityMeta();
+  registerChatClient();
+  // ...
+}
+```
+
+The user calls `initializeD()` once in `main()`
+and every d_rocket-managed class is wired up.
+
+---
+
 ## Environment variables
 
 Both CLIs read a few environment variables:

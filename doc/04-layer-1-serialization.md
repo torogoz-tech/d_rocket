@@ -454,6 +454,165 @@ The `Serializer` registry holds the dispatcher
 function for the abstract type. The codegen emits
 it.
 
+---
+
+## Low-level building blocks
+
+The serializer's public surface is small: a
+singleton registry and three public type aliases
+(`JsonFactory`, `JsonEncoder`, `CodecEncoder`).
+Everything else — the value codecs, the snapshot,
+the union dispatcher — lives behind those types.
+This section documents the building blocks and
+the low-level state they expose.
+
+### `JsonFactory<T>`
+
+The deserialiser half of a registered type. A
+`JsonFactory` is a function that takes a
+`Map<String, dynamic>` and returns an instance of
+`T`:
+
+```dart
+typedef JsonFactory<T> = T Function(Map<String, dynamic> json);
+```
+
+The codegen emits a `JsonFactory` for every
+`@Serializable` class and a `JsonFactory` for each
+case of every `@SerializableUnion`. The factory is
+called by `Serializer._decodeMap` when the runtime
+type `T` matches a registered type, or when the
+discriminator value of a registered union matches.
+
+You normally never construct a `JsonFactory` by
+hand — the codegen writes them — but the type alias
+is the contract used by `Serializer.register`:
+
+```dart
+Serializer.register<MyType>(
+  fromJson: (Map<String, dynamic> json) => MyType.fromJson(json),
+  toJson: (MyType value) => value.toJson(),
+);
+```
+
+### `JsonEncoder<T>`
+
+The serialiser half of a registered type. The
+mirror image of `JsonFactory`:
+
+```dart
+typedef JsonEncoder<T> = Map<String, dynamic> Function(T value);
+```
+
+The codegen emits one `JsonEncoder` per
+`@Serializable` class. It is called by
+`Serializer._encodeValue` after the value-codec
+chain (`null`, primitives, `DateTime`, `Uri`,
+`BigInt`, `Duration`, `Enum`, `List`, `Set`, `Map`)
+has decided the value is not a built-in.
+
+> **Note:** `JsonReader` and `JsonWriter` do not
+> exist in 2.0.0. The framework uses the
+> `JsonFactory` / `JsonEncoder` pair (which both
+> consume `Map<String, dynamic>`) rather than
+> stream-style reader / writer types.
+
+### `CodecEncoder`
+
+The recursion callback passed to every value
+codec. Internal — most users will not import it
+directly:
+
+```dart
+typedef CodecEncoder = Object? Function(Object? value);
+```
+
+When the `_ListCodec` or `_SetCodec` encodes a
+collection, it does not recurse into a sub-codec
+table directly; it calls back through `CodecEncoder`
+so the same dispatch chain (`null`, primitives,
+`DateTime`, …) applies at every depth. This is what
+makes a `List<DateTime>` round-trip as a JSON array
+of ISO-8601 strings without any extra wiring.
+
+`CodecEncoder` is the extensibility hook: if you
+register a new `Serializer` entry for a type that
+contains nested `List` / `Set` / `Map` fields, the
+registered encoder will be called through this
+dispatch — there is no special "recursive
+encoding" branch.
+
+### `SerializerSnapshot`
+
+The read-only, immutable view of the registry.
+Returned by `Serializer.snapshot()` for debugging
+and tests:
+
+```dart
+class SerializerSnapshot {
+  final Map<Type, JsonFactory<dynamic>> factories;
+  final Map<Type, JsonEncoder<dynamic>> encoders;
+  final Map<Type, String> unionTypeFields;
+  final Map<Type, Map<String, JsonFactory<dynamic>>> unions;
+  Iterable<Type> get registeredTypes => factories.keys;
+}
+```
+
+The four fields are non-modifiable
+(`Map.unmodifiable`) views of the registry at the
+time `snapshot()` was called; subsequent
+`register` / `registerUnion` / `reset` calls do
+not affect the snapshot.
+
+Typical use cases:
+
+- **Debug** — print the set of registered types
+  to see whether `initializeD()` was called.
+- **Test assertions** — compare a snapshot before
+  and after a registration step to verify the
+  expected types were wired.
+- **Audit / diff** — compute the set difference
+  between two snapshots to surface accidental
+  registrations (e.g. a test that forgot to call
+  `Serializer.reset()` between cases).
+
+```dart
+final snap = Serializer.snapshot();
+print('Registered: ${snap.registeredTypes.length}');
+print('Unions:     ${snap.unions.keys.toList()}');
+
+Serializer.reset();
+// `snap` still references the previous state.
+assert(snap.factories.containsKey(Customer));
+```
+
+> **Note:** `SerializerSnapshotEntry` and
+> `SerializerSnapshotField` do not exist in 2.0.0.
+> The snapshot exposes the registry as four
+> `Map`s; there is no per-class or per-field entry
+> type.
+
+---
+
+## What is intentionally absent
+
+The serializer in 2.0.0 is JSON-only. The
+following items sometimes appear in C# / Java
+serialisation frameworks but are **not** part of
+`d_rocket`:
+
+| Concept | Status |
+|---|---|
+| `FormatType` enum (`json` / `msgpack` / `cbor` / `bson` / `xml` / `urlForm` / `multipart` / `raw`) | **Does not exist.** The `Format` class (see [Custom encoders](#custom-encoders--format)) describes per-field formatters, not wire-format selection. |
+| `JsonReader` / `JsonWriter` (streaming reader / writer types) | **Does not exist.** See [`JsonEncoder`](#jsonencodert) above. |
+| Wire-format negotiation (e.g. `Accept: application/msgpack`) | **Does not exist.** The `Serializer.toJson` path always emits JSON text via `dart:convert`. |
+| `SerializerSnapshotEntry` / `SerializerSnapshotField` | **Do not exist.** See [`SerializerSnapshot`](#serializersnapshot) above. |
+| `msgpack` / `cbor` / `bson` / `xml` codecs | **Do not exist.** The built-in codecs cover `null`, `int`, `double`, `num`, `bool`, `String`, `DateTime`, `Uri`, `BigInt`, `Duration`, `Enum`, `List`, `Set`, and `Map<String, dynamic>` only. |
+
+For non-JSON wire formats the recommended pattern
+is to bring your own (de)serialiser on top of the
+REST layer and skip `Serializer` entirely.
+
 ## API reference
 
 ### `@Serializable(...)`
@@ -541,3 +700,15 @@ Static singleton. Methods:
 | `Serializer.reset()` | Clear the registry. (For tests.) |
 | `Serializer.snapshot()` | Immutable snapshot of the current registry state. (For debugging / tests.) |
 | `Serializer.validateMapKeys(map)` | Validate that the keys of a `Map` are safe JSON keys. |
+
+### Low-level building blocks
+
+| Type | Purpose |
+|---|---|
+| `JsonFactory<T>` (`typedef`) | `T Function(Map<String, dynamic> json)`. Deserialiser half of a registered type. |
+| `JsonEncoder<T>` (`typedef`) | `Map<String, dynamic> Function(T value)`. Serialiser half of a registered type. |
+| `CodecEncoder` (`typedef`) | `Object? Function(Object? value)`. Recursion callback for the value-codec chain. |
+| `SerializerSnapshot` | Read-only view of the registry: `factories`, `encoders`, `unionTypeFields`, `unions`, plus `registeredTypes`. |
+
+See [Low-level building blocks](#low-level-building-blocks) for the full
+description of each.
