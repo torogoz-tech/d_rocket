@@ -43998,10 +43998,10 @@ else{q=m.gfI()
 B.b.O(r,q.di(q,new A.a2s(this,a),t.l7))}return A.tF(p,A.mq(r,B.b8,B.as,B.bE),B.z,p,new A.dQ(o,p,new A.dn(s,s,s,s),n,p,p,B.b6),p,p,p,B.G2,p,p,1/0)},
 gaci(){switch(this.gyO()){case"rest":return A.b(["url","method","headers"],t.s)
 case"database":return A.b(["sql","rowCount"],t.s)
-case"migration":return A.b(["id","name"],t.s)
-case"sync":return A.b(["since"],t.s)
+case"migration":return A.b(["id","name","steps"],t.s)
+case"sync":return A.b(["since","uploaded","downloaded"],t.s)
 case"cache":return A.b(["key","hit","etag"],t.s)
-case"realtime":return A.b(["channel","messageType"],t.s)
+case"realtime":return A.b(["channel","messageType","payloadSize"],t.s)
 default:var s=this.gvk().gbM()
 return s.dA(s,!1)}},
 Q2(a){switch(a){case"url":return"URL"
