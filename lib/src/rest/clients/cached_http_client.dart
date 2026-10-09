@@ -20,6 +20,10 @@
 
 library;
 
+import '../../diagnostics/diagnostic_category.dart';
+import '../../diagnostics/diagnostic_event.dart';
+import '../../diagnostics/drocket_diagnostics.dart';
+
 /// A cache entry: body + ETag + last-fetched
 /// time.
 class CacheEntry {
@@ -92,13 +96,16 @@ class HttpCache {
     final CacheEntry? entry = _cache[key];
     if (entry == null) {
       _misses++;
+      _recordCacheEvent('miss');
       return null;
     }
     if (DateTime.now().difference(entry.fetchedAt) > maxAge) {
       _misses++;
+      _recordCacheEvent('expired');
       return null;
     }
     _hits++;
+    _recordCacheEvent('hit');
     return entry;
   }
 
@@ -107,6 +114,7 @@ class HttpCache {
   /// [maxEntries].
   void put(String key, CacheEntry entry) {
     _cache[key] = entry;
+    _recordCacheEvent('store');
     if (_cache.length > maxEntries) {
       final String oldestKey = _cache.entries
           .reduce((MapEntry<String, CacheEntry> a,
@@ -121,5 +129,17 @@ class HttpCache {
   /// revalidation succeeded).
   void recordRevalidation() {
     _revalidations++;
+    _recordCacheEvent('revalidation');
+  }
+
+  void _recordCacheEvent(String operation) {
+    DrocketDiagnostics.instance.record(
+      DiagnosticEvent(
+        category: DiagnosticCategory.cache,
+        operation: operation,
+        startedAt: DateTime.now(),
+        success: true,
+      ),
+    );
   }
 }
