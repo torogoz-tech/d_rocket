@@ -14,7 +14,7 @@
 | Previous release | 1.2.2 (auto-migrations, 1.x maintenance) |
 | Test suite | ~1,184 pass across 6 packages (Postgres tests skip-gated) |
 | Analyzer warnings | 0 |
-| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web` (lockstep since 2.0.0) |
+| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` (and 5 siblings) |
 
@@ -123,9 +123,10 @@ to the next monthly release.
   test) is currently at SQLite: 100% / Postgres: 70% / Web:
   40%; the goal is 100% on all three.
 - **A `connectivity_plus` integration for the
-  `ConnectivityProvider`.** A dev_dependencies-only helper
-  package that wires `package:connectivity_plus` to the
-  `ConnectivityProvider` interface.
+  `ConnectivityProvider`.** The `d_rocket_engine_mobile`
+  package wires `package:connectivity_plus` to the
+  `ConnectivityProvider` interface and exposes replayable,
+  deduplicated transport changes.
 
 ### Tier 2 — observability + tooling (next 2-3 monthly releases)
 

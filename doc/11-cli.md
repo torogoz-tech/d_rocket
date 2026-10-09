@@ -226,7 +226,7 @@ it; no stale state.
   hardcodes `SqliteQueryProvider.file(...)`).
   Postgres/web CLI support is a 2.1 item.
 
-#### `status` / `run` / `rollback` (2.0.0)
+#### `status` / `run` / `rollback` (2.1.0)
 
 The three subcommands that need a real SQLite engine
 were split out of `d_rocket:migration` into a separate
@@ -251,6 +251,28 @@ $ dart run d_rocket_engine_sqlite:migration run --db app.db
 $ dart run d_rocket_engine_sqlite:migration run --db app.db --target 5
 $ dart run d_rocket_engine_sqlite:migration rollback --db app.db
 ```
+
+The runtime commands can load application migrations by receiving a
+project-relative Dart file that declares `migrations`:
+
+```dart
+// lib/db/migrations.dart
+final List<MigrationBase> migrations = <MigrationBase>[
+  M001CreateTodos(),
+];
+```
+
+```bash
+dart run d_rocket_engine_sqlite:migration run \
+  --db app.db --migrations lib/db/migrations.dart
+dart run d_rocket_engine_sqlite:migration rollback \
+  --db app.db --migrations lib/db/migrations.dart
+```
+
+The CLI creates a temporary worker under `.d_rocket/`, loads the user's
+migration list, runs each migration inside a transaction, and returns a
+non-zero exit code when the worker cannot apply the requested operation.
+`status` remains metadata-only and does not require the migration source file.
 
 The scaffolder (`d_rocket:migration`) preserves
 backward-compatible behavior for `add` / `list` /

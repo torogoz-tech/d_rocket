@@ -11,8 +11,8 @@
 | Previous release | 1.2.2 |
 | Test suite | ~1,184 pass across 6 packages (Postgres tests skip-gated) |
 | Analyzer warnings | 0 |
-| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web` (lockstep since 2.0.0) |
-| Lockstep versioning | yes — every release publishes all 6 packages at the same version on the same tag |
+| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
+| Lockstep versioning | yes — every release publishes all 7 packages at the same version on the same tag |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` (and 5 siblings) |
 

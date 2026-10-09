@@ -83,7 +83,22 @@ exec.renameTable('orders', 'sales_orders');
 
 // Drop a table if it exists.
 exec.dropTableIfExists('legacy_users');
+exec.renameColumn('orders', 'total', 'gross_total');
+exec.createIndex('idx_orders_total', 'orders', '"gross_total"');
+
+// SQLite has no ALTER COLUMN. Use an explicit table rebuild
+// when a type or constraint change is intentional:
+exec.rebuildTable(
+  'orders',
+  'CREATE TABLE "orders" ("id" INTEGER PRIMARY KEY, "total" REAL NOT NULL)',
+  columns: ['id'],
+);
 ```
+
+`rebuildTable` copies only the columns listed in `columns`. It is an explicit
+manual migration and therefore makes any data transformation or omitted
+columns visible in code review. The migration runner executes the statements
+inside its transaction; a failure rolls the operation back.
 
 `MigrationBase` parameters:
 

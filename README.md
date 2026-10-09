@@ -82,22 +82,22 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.0.0
+  d_rocket: ^2.1.0
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.0.0
+  d_rocket: ^2.1.0
 dev_dependencies:
-  d_rocket_builder: ^2.0.0
+  d_rocket_builder: ^2.1.0
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.0.0
-  d_rocket_engine_sqlite: ^2.0.0   # or postgres / web
+  d_rocket: ^2.1.0
+  d_rocket_engine_sqlite: ^2.1.0   # SQLite in 2.1.0
 dev_dependencies:
-  d_rocket_builder: ^2.0.0
-  d_rocket_lints: ^2.0.0            # N+1 + closure-linq lints
+  d_rocket_builder: ^2.1.0
+  d_rocket_lints: ^2.1.0            # N+1 + closure-linq lints
   build_runner: ^2.4.13
 ```
 

@@ -37,6 +37,7 @@ export 'applied_migration.dart';
 export 'migration.dart';
 export 'migration_annotation.dart';
 export 'migration_executor.dart';
+export 'migration_executor_extensions.dart';
 export 'migration_runner.dart';
 export 'migration_selector.dart';
 export 'migration_strategy.dart';

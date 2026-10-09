@@ -46,7 +46,11 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
+import '../realtime/websocket_connection.dart';
+import '../realtime/websocket_message.dart';
+import '../realtime/websocket_message_type.dart';
 import 'sync_change.dart';
 import 'sync_envelope.dart';
 import 'sync_provider.dart';
@@ -110,8 +114,14 @@ class WebSocketSyncProvider implements SyncProvider {
     required this.pushHandler,
     Future<String?> Function()? auth,
     Future<Object> Function(Uri)? channel,
+    WebSocketConnection Function()? connectionFactory,
+    Duration reconnectBackoff = const Duration(seconds: 1),
+    int maxReconnectAttempts = 5,
   })  : _auth = auth,
-        _channelFactory = channel;
+        _channelFactory = channel,
+        _connectionFactory = connectionFactory,
+        _reconnectBackoff = reconnectBackoff,
+        _maxReconnectAttempts = maxReconnectAttempts;
 
   /// The WebSocket URL.
   final Uri url;
@@ -121,14 +131,23 @@ class WebSocketSyncProvider implements SyncProvider {
 
   final Future<String?> Function()? _auth;
   final Future<Object> Function(Uri)? _channelFactory;
+  final WebSocketConnection Function()? _connectionFactory;
+  final Duration _reconnectBackoff;
+  final int _maxReconnectAttempts;
 
   /// The current connection state.
   final StreamController<bool> _connected =
       StreamController<bool>.broadcast(sync: true);
   bool _isConnected = false;
 
-  Object? _channel;
-  StreamSubscription<dynamic>? _channelSub;
+  WebSocketConnection? _connection;
+  StreamSubscription<WebSocketMessage>? _messageSub;
+  Timer? _reconnectTimer;
+  Completer<SyncEnvelope>? _pendingSync;
+  Completer<int>? _pendingWatermark;
+  int _requestSequence = 0;
+  int _reconnectAttempts = 0;
+  bool _manualClose = false;
 
   /// `true` if the WebSocket is currently
   /// connected.
@@ -158,84 +177,195 @@ class WebSocketSyncProvider implements SyncProvider {
   /// are no-ops.
   Future<void> connect() async {
     if (_isConnected) return;
-    // In a real impl, we'd use
-    // `WebSocketChannel.connect` from
-    // `package:web_socket_channel`. For
-    // 2.0.0 we expose the channel factory so
-    // tests can inject a fake one.
-    final Uri wsUrl = url;
+    _manualClose = false;
+    final WebSocketConnection connection;
+    if (_connectionFactory != null) {
+      connection = _connectionFactory();
+    } else if (_channelFactory != null) {
+      final Object value = await _channelFactory(url);
+      if (value is! WebSocketConnection) {
+        throw ArgumentError.value(
+          value,
+          'channel',
+          'The channel factory must return a WebSocketConnection.',
+        );
+      }
+      connection = value;
+    } else {
+      return;
+    }
+
+    final Map<String, String> headers = <String, String>{};
     if (_auth != null) {
       final String? token = await _auth();
       if (token != null) {
-        // Add token to the URL or as a
-        // protocol header, depending on
-        // server convention.
+        headers['Authorization'] = 'Bearer $token';
       }
     }
-    if (_channelFactory != null) {
-      _channel = await _channelFactory(wsUrl);
-    } else {
-      // No factory — connect() is a no-op.
-      // Users who want real WebSocket support
-      // must provide a channel factory (or
-      // wait for the `d_rocket_realtime`
-      // integration in 2.1.0).
-      return;
-    }
+
+    await connection.connect(url, headers: headers.isEmpty ? null : headers);
+    _connection = connection;
     _isConnected = true;
+    _reconnectAttempts = 0;
     _connected.add(true);
-    // (In a real impl, we'd listen to
-    // _channel!.stream and parse each
-    // message as a SyncChange.)
-    _channelSub = (_channel as Stream<dynamic>).listen(
-      (_) {/* placeholder */},
-      onError: (Object _, StackTrace __) {
-        _isConnected = false;
-        _connected.add(false);
-      },
-      onDone: () {
-        _isConnected = false;
-        _connected.add(false);
-      },
+    _messageSub = connection.messages.listen(
+      _handleMessage,
+      onError: _handleDisconnect,
+      onDone: _handleDisconnect,
     );
   }
 
   /// Closes the WebSocket connection.
   Future<void> close() async {
-    if (!_isConnected) return;
-    await _channelSub?.cancel();
-    _isConnected = false;
-    _connected.add(false);
-    if (!_connected.isClosed) {
-      await _connected.close();
-    }
+    _manualClose = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _messageSub?.cancel();
+    _messageSub = null;
+    await _connection?.close();
+    _connection = null;
+    _setDisconnected();
+    _pendingSync?.completeError(StateError('WebSocket connection closed.'));
+    _pendingWatermark
+        ?.completeError(StateError('WebSocket connection closed.'));
+    _pendingSync = null;
+    _pendingWatermark = null;
   }
 
   @override
   Future<SyncEnvelope> syncAsync(SyncEnvelope envelope) async {
-    // The WebSocket transport's pull side is
-    // implemented as a regular round-trip.
-    // In a real impl, the server would
-    // accept a JSON envelope over the
-    // existing WebSocket (e.g. as the first
-    // message after `connect`).
-    // For 2.0.0, the round-trip uses an
-    // injected transport (the same one as
-    // RestSyncProvider). Callers wire this
-    // up explicitly.
-    throw UnsupportedError(
-      'WebSocketSyncProvider.syncAsync requires an injected transport. '
-      'Use it together with RestSyncProvider, or wait for 2.1.0 '
-      'where the realtime layer is integrated.',
+    await _ensureConnected();
+    final WebSocketConnection? connection = _connection;
+    if (connection == null) {
+      throw StateError('WebSocketSyncProvider is not connected.');
+    }
+    if (_pendingSync != null) {
+      throw StateError('A WebSocket sync request is already in progress.');
+    }
+    final Completer<SyncEnvelope> pending = Completer<SyncEnvelope>();
+    _pendingSync = pending;
+    await connection.send(
+      WebSocketMessage.text(
+        jsonEncode(<String, Object?>{
+          'type': 'sync.request',
+          'requestId': _nextRequestId(),
+          'envelope': envelope.toJson(),
+        }),
+      ),
     );
+    try {
+      return await pending.future;
+    } finally {
+      if (identical(_pendingSync, pending)) _pendingSync = null;
+    }
   }
 
   @override
   Future<int> currentWatermarkAsync() async {
-    // No persistent watermark; the server
-    // tracks it. Return 0 (the caller will
-    // use the server's value in the next
-    // pull).
-    return 0;
+    if (!_isConnected &&
+        _connectionFactory == null &&
+        _channelFactory == null) {
+      return 0;
+    }
+    await _ensureConnected();
+    final WebSocketConnection? connection = _connection;
+    if (connection == null) {
+      throw StateError('WebSocketSyncProvider is not connected.');
+    }
+    if (_pendingWatermark != null) {
+      throw StateError(
+        'A WebSocket watermark request is already in progress.',
+      );
+    }
+    final Completer<int> pending = Completer<int>();
+    _pendingWatermark = pending;
+    await connection.send(
+      WebSocketMessage.text(
+        jsonEncode(<String, Object?>{
+          'type': 'sync.watermark.request',
+          'requestId': _nextRequestId(),
+        }),
+      ),
+    );
+    try {
+      return await pending.future;
+    } finally {
+      if (identical(_pendingWatermark, pending)) _pendingWatermark = null;
+    }
+  }
+
+  Future<void> _ensureConnected() async {
+    if (!_isConnected) await connect();
+    if (!_isConnected) {
+      throw StateError(
+        'WebSocketSyncProvider has no connection factory. '
+        'Provide connectionFactory or channel.',
+      );
+    }
+  }
+
+  String _nextRequestId() => 'd_rocket_${++_requestSequence}';
+
+  void _handleMessage(WebSocketMessage message) {
+    if (message.type != WebSocketMessageType.text || message.text == null) {
+      return;
+    }
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(message.text!);
+    } on FormatException {
+      return;
+    }
+    if (decoded is! Map) return;
+    final Map<String, Object?> json = decoded.cast<String, Object?>();
+    switch (json['type']) {
+      case 'sync.response':
+        final dynamic raw = json['envelope'];
+        if (raw is Map && _pendingSync != null) {
+          _pendingSync!.complete(
+            SyncEnvelope.fromJson(raw.cast<String, Object?>()),
+          );
+        }
+      case 'sync.watermark.response':
+        final dynamic raw = json['watermark'];
+        if (raw is num && _pendingWatermark != null) {
+          _pendingWatermark!.complete(raw.toInt());
+        }
+      case 'sync.change':
+        final dynamic raw = json['change'];
+        if (raw is Map) {
+          unawaited(pushHandler(PushedSyncChange(
+            change: SyncChange.fromJson(raw.cast<String, Object?>()),
+            receivedAt: DateTime.now().toUtc(),
+            originServerId: json['originServerId'] as String?,
+          )));
+        }
+    }
+  }
+
+  void _handleDisconnect([Object? error, StackTrace? stackTrace]) {
+    if (_manualClose) return;
+    _setDisconnected();
+    if (_reconnectAttempts >= _maxReconnectAttempts ||
+        (_connectionFactory == null && _channelFactory == null)) {
+      return;
+    }
+    _reconnectAttempts++;
+    final Duration delay = _reconnectBackoff * (1 << (_reconnectAttempts - 1));
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () async {
+      try {
+        await connect();
+      } catch (_) {
+        _handleDisconnect();
+      }
+    });
+  }
+
+  void _setDisconnected() {
+    if (_isConnected) {
+      _isConnected = false;
+      _connected.add(false);
+    }
   }
 }

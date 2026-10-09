@@ -12,10 +12,9 @@ for every event name the user declared.
 
 The realtime layer reuses the serializer registry
 from Layer 1 for inbound / outbound payloads. The
-`WebSocketReconnector` wrapper handles the initial
-connect with exponential backoff; mid-session
-reconnects are not automatic (the user's `onDone`
-handler re-arms the wrapper).
+`WebSocketReconnector` wrapper handles initial and
+mid-session reconnects with exponential backoff until
+`maxAttempts` is reached or the owner calls `stop()`.
 
 This is the **realtime layer**. It is the most
 common consumer of a realtime stream in the
@@ -245,8 +244,8 @@ inject a `MockClient` (via
 
 Auto-reconnecting wrapper. Wraps any
 `WebSocketConnection` factory and retries the
-initial `start()` call with exponential backoff
-when it fails.
+initial connection and later disconnects with
+exponential backoff.
 
 ```dart
 class WebSocketReconnector {
@@ -301,7 +300,7 @@ await for (final msg in reconnector.messages) {
 | Member | Purpose |
 |---|---|
 | `client` | The underlying `WebSocketConnection`. `null` before `start` and during reconnects. |
-| `messages` | Broadcast `Stream<WebSocketMessage>` forwarded from the underlying client. Throws `StateError` if `start` has not been called. |
+| `messages` | Broadcast `Stream<WebSocketMessage>` forwarded from the underlying client and preserved across reconnects. |
 | `start()` | Tries `maxAttempts` times with exponential backoff; re-throws on exhaustion. |
 | `stop()` | Closes the underlying client. |
 

@@ -523,7 +523,7 @@ final ws = WebSocketSyncProvider(
   url: Uri.parse('wss://api.example.com/sync'),
   pushHandler: (change) async => ctx.applyRemote(change),
   auth: () async => myAuth.token,    // called on reconnect
-  channel: myChannelFactory,         // optional; default is a no-op
+  connectionFactory: () => IOWebSocketClient(),
 );
 await ws.connect();
 ```
@@ -533,19 +533,22 @@ await ws.connect();
 | `url` | The `wss://` endpoint. |
 | `pushHandler` | Called for every server-pushed `PushedSyncChange`. |
 | `auth` | Optional async function that returns the current auth header value. Called on each (re)connect. |
-| `channel` | Optional WebSocket channel factory (defaults to a no-op). Tests inject a fake here. |
+| `connectionFactory` | Creates a fresh `WebSocketConnection` for every connection attempt. Tests can inject a fake here. |
+| `channel` | Legacy factory name. It must return a `WebSocketConnection`; new code should use `connectionFactory`. |
 
 `PushedSyncChange` wraps a `SyncChange` with a
 `receivedAt` timestamp and an optional
 `originServerId` (for sharded multi-server
 setups).
 
-> **2.0.0 limitation.** `syncAsync` throws
-> `UnsupportedError` because the round-trip
-> requires an injected transport (see the
-> example in the file). Use it together with
-> `RestSyncProvider` for the polling side; the
-> full realtime integration ships in 2.1.0.
+The 2.1.0 transport uses these JSON messages:
+
+* `sync.request` / `sync.response` for a round-trip.
+* `sync.watermark.request` / `sync.watermark.response` for the server watermark.
+* `sync.change` for a server-pushed change.
+
+The provider reconnects with exponential backoff, refreshes the auth token on
+each attempt, and stops reconnecting after the configured attempt limit.
 
 ### `MultiTransportSyncProvider`
 
@@ -853,7 +856,7 @@ transport.
 |---|---|
 | `NoopConnectivityProvider` | Default; always returns `ConnectivityState.wifi`. Tests + desktop. |
 | `GatedConnectivityProvider` | Wraps an inner provider and applies a predicate (e.g. "sync only on wifi"). |
-| `ConnectivityPlusProvider` | Backed by `package:connectivity_plus` (in `d_rocket_engine_mobile`, 2.1.0). |
+| `ConnectivityPlusProvider` | Backed by `package:connectivity_plus` in `d_rocket_engine_mobile` 2.1.0. It reports available transports, not Internet reachability; retry policy still handles failed requests. |
 
 The `NetworkType` enum has 6 values: `none`,
 `wifi`, `cellular`, `vpn`, `ethernet`,

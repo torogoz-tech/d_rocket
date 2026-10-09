@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `doc/diagnostics-devtools.md` and the `d_rocket_devtools_extension` package.
 * Sync application diagnostics with uploaded/downloaded/applied counts and
   conflict counts.
+* `d_rocket_engine_mobile` with a `connectivity_plus` adapter for the core
+  `ConnectivityProvider` contract.
+* Functional WebSocket sync round-trips, server-pushed changes, watermark
+  requests, refreshed auth headers and bounded reconnects.
+* `SseReconnector` with server retry hints and `Last-Event-ID` resume support.
+* Generic `WebSocketReconnector` now reconnects after mid-session disconnects.
+
+### Fixed
+
+* ORM code generation preserves declared nullability and does not emit
+  `String??` or `null as DateTime`.
+* Generated DateTime values round-trip between JSON and SQLite as ISO-8601
+  text; nullable numeric fields are guarded before conversion.
 
 ### Security
 
