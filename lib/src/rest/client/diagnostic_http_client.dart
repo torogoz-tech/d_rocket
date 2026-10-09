@@ -36,6 +36,7 @@ class DiagnosticHttpClient implements HttpClient {
     RestResponse<dynamic>? response,
     Object? error,
   }) {
+    final diagnostics = DrocketDiagnostics.instance;
     DrocketDiagnostics.instance.record(
       DiagnosticEvent(
         category: DiagnosticCategory.rest,
@@ -46,12 +47,42 @@ class DiagnosticHttpClient implements HttpClient {
         statusCode: response?.statusCode,
         error: error?.toString(),
         metadata: <String, Object?>{
-          'url': request.fullUrl,
-          if (DrocketDiagnostics.instance.includeSensitiveData &&
-              request.headers.isNotEmpty)
-            'headers': request.headers,
+          'request': _requestPayload(request, diagnostics),
+          'response': _responsePayload(response, diagnostics),
         },
       ),
     );
+  }
+
+  Map<String, Object?> _requestPayload(
+    RestRequest request,
+    DrocketDiagnostics diagnostics,
+  ) {
+    final String body = request.bodyAsString;
+    return <String, Object?>{
+      'method': request.method,
+      'url': request.fullUrl,
+      'headers': diagnostics.includeSensitiveData
+          ? request.headers
+          : request.headers.keys.toList(growable: false),
+      'body': diagnostics.includeSensitiveData ? body : '<hidden>',
+      'bodyLength': body.length,
+    };
+  }
+
+  Map<String, Object?> _responsePayload(
+    RestResponse<dynamic>? response,
+    DrocketDiagnostics diagnostics,
+  ) {
+    if (response == null) return const <String, Object?>{};
+    return <String, Object?>{
+      'statusCode': response.statusCode,
+      if (response.reasonPhrase != null) 'reasonPhrase': response.reasonPhrase,
+      'headers': diagnostics.includeSensitiveData
+          ? response.headers
+          : response.headers.keys.toList(growable: false),
+      'body': diagnostics.includeSensitiveData ? response.rawBody : '<hidden>',
+      'bodyLength': response.rawBody.length,
+    };
   }
 }
