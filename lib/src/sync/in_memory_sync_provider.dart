@@ -26,6 +26,10 @@ class InMemorySyncProvider implements SyncProvider {
   /// each client has seen).
   final Map<String, int> _clientWatermarks = <String, int>{};
 
+  /// Accepted idempotency keys per client. This models the server-side
+  /// durable deduplication table used by a production sync endpoint.
+  final Map<String, Set<String>> _acceptedChangeIds = <String, Set<String>>{};
+
   /// Server-side watermark — increments on every
   /// push.
   int _watermark = 0;
@@ -37,11 +41,16 @@ class InMemorySyncProvider implements SyncProvider {
   @override
   Future<SyncEnvelope> syncAsync(SyncEnvelope envelope) async {
     pushLog.add(envelope);
+    final Set<String> accepted = _acceptedChangeIds.putIfAbsent(
+      envelope.clientId,
+      () => <String>{},
+    );
     // Re-stamp each change's version with the
     // SERVER-side watermark (so all clients see
     // a consistent ordering, regardless of what
     // the client sent).
     for (final SyncChange c in envelope.changes) {
+      if (!accepted.add(c.idempotencyKey)) continue;
       _watermark++;
       _history.add(SyncChange(
         tableName: c.tableName,
@@ -49,6 +58,7 @@ class InMemorySyncProvider implements SyncProvider {
         type: c.type,
         payload: c.payload,
         version: _watermark,
+        changeId: c.changeId,
       ));
     }
     // Return the changes for THIS client since
@@ -81,6 +91,7 @@ class InMemorySyncProvider implements SyncProvider {
   void reset() {
     _history.clear();
     _clientWatermarks.clear();
+    _acceptedChangeIds.clear();
     _watermark = 0;
     pushLog.clear();
   }
@@ -97,6 +108,7 @@ class InMemorySyncProvider implements SyncProvider {
       type: change.type,
       payload: change.payload,
       version: _watermark,
+      changeId: change.changeId,
     ));
   }
 }

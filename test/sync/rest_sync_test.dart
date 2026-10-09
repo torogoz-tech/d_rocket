@@ -203,5 +203,29 @@ void main() {
       expect(back.changes, hasLength(1));
       expect(back.changes.first.tableName, 'books');
     });
+
+    test('changeId is optional on the wire and stable for retries', () {
+      const SyncChange change = SyncChange(
+        tableName: 'books',
+        pk: '1',
+        type: SyncChangeType.upsert,
+        payload: <String, Object?>{'title': 'Rex'},
+        version: 7,
+        changeId: 'client-1:change-7',
+      );
+      final SyncChange roundTrip = SyncChange.fromJson(change.toJson());
+      expect(roundTrip.changeId, 'client-1:change-7');
+      expect(roundTrip.idempotencyKey, 'client-1:change-7');
+
+      const SyncChange legacy = SyncChange(
+        tableName: 'books',
+        pk: '1',
+        type: SyncChangeType.upsert,
+        payload: <String, Object?>{'title': 'Rex'},
+        version: 7,
+      );
+      expect(legacy.idempotencyKey, 'books:1:upsert:7');
+      expect(SyncChange.fromJson(legacy.toJson()).changeId, isNull);
+    });
   });
 }

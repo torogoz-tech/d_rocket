@@ -123,9 +123,8 @@ class _Flags {
 
 ///: minimal flag parser. Recognises
 /// `—db <path>`, `—target <int>`, and
-/// `—entities <dart_file>`. Unknown flags
-/// are silently ignored (we keep it simple for the
-/// MVP — a future PR can swap in `package:args`).
+/// `—entities <dart_file>`. Unknown flags are
+/// ignored for backwards compatibility.
 _Flags _parseFlags(List<String> args) {
   String? db;
   int? target;
@@ -232,10 +231,10 @@ Options (via env vars):
   D_ROCKET_MIGRATIONS_DIR   Where to look for / place files
                             (default: lib/db/migrations)
 
-Note: `run` / `status` / `rollback` are MVP — they
-connect to a raw SQLite file but do NOT auto-import
-your migration classes. Use Db.open(strategy:)
-programmatically for full functionality.
+Note: `run` / `status` / `rollback` are provided by
+`d_rocket_engine_sqlite:migration`, because the core
+package is engine-agnostic. Use `--migrations <dart_file>`
+with that command to load and execute application migrations.
 
 The `check` command generates a temp worker under
 `.d_rocket/` that imports your --entities file, runs

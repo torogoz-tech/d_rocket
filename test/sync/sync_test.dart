@@ -26,6 +26,37 @@ void main() {
       );
       expect(out.changes, isEmpty);
     });
+
+    test('retries with the same idempotency key are applied once', () async {
+      final InMemorySyncProvider provider = InMemorySyncProvider();
+      const SyncChange change = SyncChange(
+        tableName: 'books',
+        pk: '1',
+        type: SyncChangeType.upsert,
+        payload: <String, Object?>{'id': 1, 'title': 'Once'},
+        version: 1,
+        changeId: 'client-1:1',
+      );
+
+      final SyncEnvelope first = await provider.syncAsync(
+        const SyncEnvelope(
+          clientId: 'client-1',
+          since: 0,
+          changes: <SyncChange>[change],
+        ),
+      );
+      final SyncEnvelope retry = await provider.syncAsync(
+        const SyncEnvelope(
+          clientId: 'client-1',
+          since: 0,
+          changes: <SyncChange>[change],
+        ),
+      );
+
+      expect(first.since, 1);
+      expect(retry.since, 1);
+      expect(await provider.currentWatermarkAsync(), 1);
+    });
   });
 
   group('Fase 5.9 — ctx.syncAsync(): pull + apply', () {

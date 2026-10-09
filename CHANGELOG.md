@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requests, refreshed auth headers and bounded reconnects.
 * `SseReconnector` with server retry hints and `Last-Event-ID` resume support.
 * Generic `WebSocketReconnector` now reconnects after mid-session disconnects.
+* Optional `SyncChange.changeId` keys and reference-provider deduplication for
+  safe retries after network timeouts.
 
 ### Fixed
 
@@ -36,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `String??` or `null as DateTime`.
 * Generated DateTime values round-trip between JSON and SQLite as ISO-8601
   text; nullable numeric fields are guarded before conversion.
+* Code generation now rejects exact `Decimal`/`BigDecimal` value objects
+  without an explicit conversion contract instead of guessing a lossy storage
+  representation.
 
 ### Security
 

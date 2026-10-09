@@ -134,7 +134,7 @@ $ dart run d_rocket:migration verify 005
 This is useful in CI to confirm no migration has been
 silently edited.
 
-### `check` (2.0.0)
+### `check` (2.1.0)
 
 Compute the pending schema diff between your codegen-
 supplied entity metas and the actual schema in a
@@ -217,14 +217,14 @@ The temp worker is gitignored by convention
 (`.d_rocket/`). Re-running `check` overwrites
 it; no stale state.
 
-#### Supported engines (2.0.0)
+#### Supported engines (2.1.0)
 
 - ✅ **SQLite** (`d_rocket_engine_sqlite`).
 - ⏸️ Postgres + web engines: supported
   programmatically via `db.pendingSchemaDiff()`,
-  but the CLI is SQLite-only in 2.0.0 (the worker
+  but the CLI is SQLite-only in 2.1.0 (the worker
   hardcodes `SqliteQueryProvider.file(...)`).
-  Postgres/web CLI support is a 2.1 item.
+  Postgres/web CLI support remains outside the 2.1.0 scope.
 
 #### `status` / `run` / `rollback` (2.1.0)
 

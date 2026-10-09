@@ -559,6 +559,16 @@ The codegen handles the following Dart types in
 | An enum | `TEXT` | The `name`. |
 | An `@Embedded` class | flattened | Multiple columns on the parent table. |
 
+#### Exact decimal values
+
+`double` and `num` are the supported decimal-equivalent column types. They do
+not guarantee arbitrary precision. A value object named `Decimal` or
+`BigDecimal` is rejected by code generation unless the application converts
+it explicitly. For exact persistence, use a `String` or scaled `int` column
+and convert at the domain boundary; for JSON, use the serializer's explicit
+`@JsonKey(converter: ...)` contract. d_rocket never silently chooses a
+precision-losing representation for an exact decimal object.
+
 ## API reference
 
 ### `@Table(...)` / `@Table.tph(...)` / `@Table.tpc(...)`

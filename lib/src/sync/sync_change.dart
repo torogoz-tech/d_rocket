@@ -18,6 +18,7 @@ class SyncChange {
     required this.type,
     required this.payload,
     required this.version,
+    this.changeId,
   });
 
   /// The local table name.
@@ -37,6 +38,18 @@ class SyncChange {
   /// (used for last-write-wins).
   final int version;
 
+  /// Optional stable idempotency key assigned by the client.
+  ///
+  /// A retry must reuse the same key. Servers can use it to discard a
+  /// previously accepted change without applying it twice. Older wire
+  /// implementations may omit the field; [idempotencyKey] still provides a
+  /// deterministic fallback for the reference provider.
+  final String? changeId;
+
+  /// Stable key used to recognize a retried change.
+  String get idempotencyKey =>
+      changeId ?? '$tableName:$pk:${type.name}:$version';
+
   /// JSON serialisation (for `RestSyncProvider`).
   /// The wire format is a flat map with one string
   /// for the type (so it's stable across renames).
@@ -46,6 +59,7 @@ class SyncChange {
         'type': type.name,
         'payload': payload,
         'version': version,
+        if (changeId != null) 'changeId': changeId,
       };
 
   /// Inverse of [toJson].
@@ -57,6 +71,7 @@ class SyncChange {
           .firstWhere((SyncChangeType t) => t.name == json['type']),
       payload: json['payload'] as Map<String, Object?>?,
       version: json['version']! as int,
+      changeId: json['changeId'] as String?,
     );
   }
 }

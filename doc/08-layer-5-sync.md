@@ -196,6 +196,7 @@ class SyncChange {
     required this.type,
     required this.payload,
     required this.version,
+    this.changeId,
   });
 
   final String tableName;                       // local table name
@@ -203,6 +204,7 @@ class SyncChange {
   final SyncChangeType type;                    // upsert or delete
   final Map<String, Object?>? payload;          // row data, or null for delete
   final int version;                            // monotonic (e.g. ms timestamp)
+  final String? changeId;                       // stable retry key (optional)
 }
 ```
 
@@ -210,6 +212,19 @@ class SyncChange {
 (typically a millisecond timestamp) used for
 last-write-wins conflict resolution. The server
 assigns the version; the client just trusts it.
+
+#### Retries and idempotency
+
+When a client retries a request after a timeout, it must resend the same
+`changeId`. The server should persist accepted ids per client and ignore a
+second change with the same key. This prevents a network retry from applying
+an insert or update twice. Envelopes produced by older clients may omit
+`changeId`; the reference in-memory provider derives a deterministic fallback
+from table, primary key, operation and version for backwards compatibility.
+
+The client watermark is advanced only after the provider returns a successful
+envelope. A failed request must remain eligible for retry, and a server must
+return a watermark that includes all accepted changes in the response.
 
 ### `SyncChangeType`
 
