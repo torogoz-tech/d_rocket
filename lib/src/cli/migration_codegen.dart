@@ -6,25 +6,19 @@
 //
 // Design notes:
 //
-// 1. We emit `safe` diffs into `up()` by default.
-//    `unsafe` diffs are listed in a comment block
-//    at the top of the file (so the dev can hand-
-//    roll a follow-up migration for them). Pass
-//    `includeUnsafe: true` to also emit the unsafe
-//    SQL verbatim (use `--include-unsafe` on the
-//    CLI).
+// 1. We emit every diff with executable SQL into
+//    `up()`, including unsafe ALTER/DROP operations.
+//    Unsafe operations are surrounded by explicit
+//    review warnings. Diffs without executable SQL
+//    remain as manual TODO blocks.
 //
 // 2. We emit the inverse SQL into `down()` for
-//    every `safe` diff. The inverse is the
+//    every diff where a clean inverse is known. The inverse is the
 //    natural complement (CREATE TABLE → DROP TABLE,
 //    CREATE INDEX → DROP INDEX, ADD COLUMN → DROP
-//    COLUMN). Diffs whose inverse is data-loss
-//    (e.g. DROP COLUMN has no data-preserving
-//    inverse) are wrapped in a defensive
-//    `BEGIN; ... ROLLBACK;` block to make the
-//    rollback explicit; the dev can edit the
-//    generated file to remove the guard if they
-//    really want a destructive rollback.
+//    COLUMN). Operations without enough metadata
+//    for a clean inverse are called out for manual
+//    rollback work.
 //
 // 3. We do NOT touch the existing
 //    `bin/migration.dart` `add` command's default
@@ -90,11 +84,10 @@ class CliSchemaDiff {
 /// file looks like. The CLI exposes these as
 /// flags (e.g. `--include-unsafe`).
 class CodegenOptions {
-  /// When true, the unsafe diffs' SQL is
-  /// included in `up()` (in addition to a
-  /// comment header). Default false: only safe
-  /// diffs go in `up()`; unsafe diffs appear
-  /// in a comment block.
+  /// Retained for CLI/API compatibility. Executable
+  /// unsafe SQL is now emitted by default so the
+  /// generated migration covers the complete diff.
+  /// The generated source still marks it for review.
   final bool includeUnsafe;
 
   /// When true, `down()` is emitted as
@@ -157,11 +150,16 @@ String? inverseSqlFor(CliSchemaDiff diff) {
       if (diff.columnName == null) return null;
       return 'ALTER TABLE ${diff.tableName} '
           'DROP COLUMN ${diff.columnName}';
+    case 'renameColumn':
+      if (diff.columnName == null || diff.newColumnName == null) {
+        return null;
+      }
+      return 'ALTER TABLE ${diff.tableName} RENAME COLUMN '
+          '${diff.newColumnName} TO ${diff.columnName}';
     case 'dropColumn':
     case 'dropTable':
     case 'dropIndex':
     case 'modifyColumn':
-    case 'renameColumn':
       // These are the unsafe-diff forward
       // operations; the inverse is to
       // restore the data, which has no
@@ -170,6 +168,15 @@ String? inverseSqlFor(CliSchemaDiff diff) {
     default:
       return null;
   }
+}
+
+/// Whether [diff] contains SQL that can be passed to
+/// `MigrationExecutor.exec`. Some SQLite schema changes
+/// intentionally carry a comment explaining that a table
+/// rebuild is required instead of executable SQL.
+bool hasExecutableSql(CliSchemaDiff diff) {
+  final sql = diff.sql.trimLeft();
+  return sql.isNotEmpty && !sql.startsWith('--');
 }
 
 /// Render a SQL string as a Dart raw-string
@@ -211,6 +218,9 @@ String buildMigrationFileContent({
   final partitioned = partitionDiffsBySeverity(diffs);
   final safe = partitioned.safe;
   final unsafe = partitioned.unsafe;
+  final executableUnsafe = unsafe.where(hasExecutableSql).toList();
+  final manualUnsafe = unsafe.where((d) => !hasExecutableSql(d)).toList();
+  final forward = <CliSchemaDiff>[...safe, ...executableUnsafe];
 
   final StringBuffer upBody = StringBuffer();
   final StringBuffer downBody = StringBuffer();
@@ -225,37 +235,48 @@ String buildMigrationFileContent({
   commentBlock.writeln('/// SQLite file at `add` time.');
   commentBlock.writeln('///');
   commentBlock.writeln('/// Forward operations: ${safe.length} safe, '
-      '${unsafe.length} unsafe.');
+      '${executableUnsafe.length} unsafe executable, '
+      '${manualUnsafe.length} manual.');
   if (unsafe.isNotEmpty) {
     commentBlock.writeln('///');
-    commentBlock.writeln('/// UNSAFE diffs (NOT auto-applied):');
+    commentBlock.writeln('/// UNSAFE diffs (REVIEW REQUIRED):');
     for (final u in unsafe) {
-      final String target = u.columnName == null
-          ? u.tableName
-          : '$u.tableName.${u.columnName}';
+      final String target =
+          u.columnName == null ? u.tableName : '$u.tableName.${u.columnName}';
       commentBlock.writeln('///   - ${u.type} $target '
           '(${u.reason})');
     }
     commentBlock.writeln('///');
-    commentBlock.writeln('/// Write a follow-up migration to handle');
-    commentBlock.writeln('/// the unsafe diffs explicitly.');
+    commentBlock.writeln('/// Executable unsafe SQL is included below,');
+    commentBlock.writeln('/// but must be reviewed before applying it.');
   }
   commentBlock.writeln();
 
   // Build `up()` body.
-  if (safe.isEmpty && (unsafe.isEmpty || !options.includeUnsafe)) {
-    upBody.writeln('    // No safe diffs detected at scaffold time.');
+  if (forward.isEmpty && manualUnsafe.isEmpty) {
+    upBody.writeln('    // No executable diffs detected at scaffold time.');
     upBody.writeln('    // (Re-run `migration add` after the diff');
     upBody.writeln('    // changes, or hand-roll the DDL here.)');
   } else {
-    final List<CliSchemaDiff> forward =
-        options.includeUnsafe ? [...safe, ...unsafe] : safe;
     for (final d in forward) {
+      if (d.severity == 'unsafe') {
+        upBody.writeln('    // WARNING: review this unsafe operation');
+        upBody.writeln('    // carefully before applying it to data.');
+      }
       upBody.writeln('    // ${d.severity.toUpperCase()}: '
           '${d.type} on ${d.tableName}'
           '${d.columnName == null ? "" : ".${d.columnName}"}');
       upBody.writeln('    //   reason: ${d.reason}');
       upBody.writeln('    exec(${dartRawString(d.sql)});');
+      upBody.writeln();
+    }
+    for (final d in manualUnsafe) {
+      upBody.writeln('    // MANUAL REQUIRED: ${d.type} on '
+          '${d.tableName}${d.columnName == null ? "" : ".${d.columnName}"}');
+      upBody.writeln('    // reason: ${d.reason}');
+      upBody.writeln('    // SQLite requires a table rebuild or custom');
+      upBody.writeln('    // DDL for this change. Add the SQL here.');
+      upBody.writeln('    // source: ${d.sql.replaceAll("\n", " | ")}');
       upBody.writeln();
     }
   }
@@ -265,42 +286,29 @@ String buildMigrationFileContent({
     downBody.writeln('    throw UnsupportedError(');
     downBody.writeln("      'M$id is irreversible (codegen opted out).',");
     downBody.writeln('    );');
-  } else if (safe.isEmpty) {
-    downBody.writeln('    // No forward safe diffs to invert.');
+  } else if (forward.isEmpty && manualUnsafe.isEmpty) {
+    downBody.writeln('    // No forward diffs to invert.');
     downBody.writeln('    // (Hand-roll if you need a rollback path.)');
   } else {
-    for (final d in safe) {
+    for (final d in forward) {
       final String? inverse = inverseSqlFor(d);
       if (inverse == null) {
         downBody.writeln('    // No clean inverse for '
             '${d.type}; hand-roll if needed.');
         continue;
       }
-      // Data-loss diffs (dropTable, dropColumn,
-      // dropIndex) are wrapped in a
-      // BEGIN/ROLLBACK guard so the dev has to
-      // actively remove the rollback to allow
-      // destruction. This is intentional: the
-      // dev should think twice before
-      // destructively rolling back.
-      final bool isDestructive = d.type == 'createTable' ||
-          d.type == 'addColumn';
-      if (isDestructive) {
-        downBody.writeln('    // Inverse of ${d.type} '
-            '${d.tableName}'
-            '${d.columnName == null ? "" : ".${d.columnName}"} '
-            '(destructive — guarded).');
-        downBody.writeln('    // Remove the BEGIN/ROLLBACK guard');
-        downBody.writeln('    // if you really want a destructive');
-        downBody.writeln('    // rollback.');
-        downBody.writeln('    exec("BEGIN;");');
-        downBody.writeln('    exec(${dartRawString(inverse)});');
-        downBody.writeln('    exec("ROLLBACK;");');
-      } else {
-        downBody.writeln('    // Inverse of ${d.type}.');
-        downBody.writeln('    exec(${dartRawString(inverse)});');
+      downBody.writeln('    // Inverse of ${d.type}.');
+      if (d.severity == 'unsafe' ||
+          d.type == 'createTable' ||
+          d.type == 'addColumn') {
+        downBody.writeln('    // WARNING: this rollback may destroy data.');
       }
+      downBody.writeln('    exec(${dartRawString(inverse)});');
       downBody.writeln();
+    }
+    for (final d in manualUnsafe) {
+      downBody.writeln('    // MANUAL REQUIRED: no clean inverse for '
+          '${d.type} on ${d.tableName}.');
     }
   }
 
@@ -354,4 +362,3 @@ String cliNameToFileName(String cliName) {
       .toLowerCase()
       .replaceAll(RegExp(r'[ _\-]+'), '_');
 }
-

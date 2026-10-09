@@ -196,8 +196,8 @@ Commands:
                         add add_note_to_patients \\
                           --db app.db \\
                           --entities lib/db/entities.dart
-                      --include-unsafe    also emit unsafe diffs
-                                          in up() (default: skip)
+                      --include-unsafe    acknowledge unsafe SQL
+                                          explicitly (compatibility flag)
                       --irreversible      skip the auto-inverse in
                                           down() (default: emit it)
   list                List all migrations in the migrations dir
@@ -403,14 +403,20 @@ Future<int> _addMigrationCodegen({
   final partitioned = partitionDiffsBySeverity(diffs);
   stdout.writeln('✅ Created ${file.path}');
   stdout.writeln('   id: $id, name: $name, class: $className');
-  stdout.writeln('   ${partitioned.safe.length} safe diff(s) in up(), '
-      '${partitioned.unsafe.length} unsafe diff(s) listed in header.');
+  final executableUnsafe = partitioned.unsafe.where(hasExecutableSql).length;
+  final manualUnsafe = partitioned.unsafe.length - executableUnsafe;
+  stdout.writeln('   ${partitioned.safe.length} safe diff(s) and '
+      '$executableUnsafe unsafe executable diff(s) in up(); '
+      '$manualUnsafe manual diff(s) require attention.');
   if (partitioned.unsafe.isNotEmpty) {
     stdout.writeln('');
-    stdout.writeln('⚠️  Unsafe diffs are NOT auto-applied. '
-        'Write a follow-up migration to handle them,');
-    stdout.writeln('   or re-run with --include-unsafe to emit the '
-        'unsafe SQL verbatim in up().');
+    stdout.writeln('⚠️  REVIEW REQUIRED: unsafe SQL is present in up().');
+    stdout.writeln('   Check destructive operations, data loss, and the '
+        'generated down() before applying.');
+    if (manualUnsafe > 0) {
+      stdout.writeln('❗ $manualUnsafe operation(s) have no executable SQL '
+          'and are marked MANUAL REQUIRED in the file.');
+    }
   }
   return 0;
 }
@@ -609,4 +615,3 @@ Future<int> _runCheck(_Flags flags) async {
   );
   return 0;
 }
-

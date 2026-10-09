@@ -131,8 +131,7 @@ void main() {
           columnName: 'ix_users_name',
           sql: 'x',
           reason: 'r');
-      expect(inverseSqlFor(d),
-          equals('DROP INDEX ix_users_name'));
+      expect(inverseSqlFor(d), equals('DROP INDEX ix_users_name'));
     });
 
     test('createIndex without a name → null', () {
@@ -153,11 +152,10 @@ void main() {
           columnName: 'note',
           sql: 'x',
           reason: 'r');
-      expect(inverseSqlFor(d),
-          equals('ALTER TABLE patients DROP COLUMN note'));
+      expect(inverseSqlFor(d), equals('ALTER TABLE patients DROP COLUMN note'));
     });
 
-    test('unsafe ops → null (no clean inverse)', () {
+    test('unsafe ops without metadata → null (no clean inverse)', () {
       const dropTable = CliSchemaDiff(
           severity: 'unsafe',
           type: 'dropTable',
@@ -189,14 +187,14 @@ void main() {
       expect(inverseSqlFor(dropTable), isNull);
       expect(inverseSqlFor(dropCol), isNull);
       expect(inverseSqlFor(modify), isNull);
-      expect(inverseSqlFor(rename), isNull);
+      expect(inverseSqlFor(rename),
+          equals('ALTER TABLE a RENAME COLUMN new TO old'));
     });
   });
 
   group('Phase 8.11 — dartRawString', () {
     test('wraps the input in r\'\'\'...\'\'\'', () {
-      expect(dartRawString('CREATE TABLE x'),
-          equals("r'''CREATE TABLE x'''"));
+      expect(dartRawString('CREATE TABLE x'), equals("r'''CREATE TABLE x'''"));
     });
 
     test('escapes embedded triple-quotes', () {
@@ -204,8 +202,7 @@ void main() {
       // `r'''a\'\'\'b'''` (each `'''`
       // inside the raw string is escaped
       // to `\'\'\'`).
-      expect(dartRawString("a'''b"),
-          equals(r"r'''a\'\'\'b'''"));
+      expect(dartRawString("a'''b"), equals(r"r'''a\'\'\'b'''"));
     });
   });
 
@@ -229,7 +226,7 @@ void main() {
         name: 'x',
         diffs: const <CliSchemaDiff>[],
       );
-      expect(src, contains('No safe diffs detected at scaffold time'));
+      expect(src, contains('No executable diffs detected at scaffold time'));
     });
 
     test('emits safe diffs in up() and inverse in down()', () {
@@ -256,18 +253,14 @@ void main() {
       );
       // `up()` body
       expect(src, contains('CREATE TABLE users (id INT)'));
-      expect(src,
-          contains('ALTER TABLE patients ADD COLUMN note TEXT'));
-      // `down()` body (destructive — wrapped in
-      // BEGIN/ROLLBACK guard)
+      expect(src, contains('ALTER TABLE patients ADD COLUMN note TEXT'));
+      // `down()` body includes executable inverses.
       expect(src, contains('DROP TABLE users'));
-      expect(src,
-          contains('ALTER TABLE patients DROP COLUMN note'));
-      expect(src, contains('exec("BEGIN;")'));
-      expect(src, contains('exec("ROLLBACK;")'));
+      expect(src, contains('ALTER TABLE patients DROP COLUMN note'));
+      expect(src, contains('WARNING: this rollback may destroy data'));
     });
 
-    test('excludes unsafe diffs from up() by default', () {
+    test('emits executable unsafe diffs by default with a review warning', () {
       final diffs = <CliSchemaDiff>[
         const CliSchemaDiff(
             severity: 'safe',
@@ -289,10 +282,9 @@ void main() {
         diffs: diffs,
       );
       expect(src, contains('CREATE TABLE a (id INT)'));
-      expect(src, isNot(contains('DROP TABLE b')));
-      // ...but the unsafe diff is listed in
-      // the comment header.
-      expect(src, contains('UNSAFE diffs (NOT auto-applied)'));
+      expect(src, contains('DROP TABLE b'));
+      expect(src, contains('WARNING: review this unsafe operation'));
+      expect(src, contains('UNSAFE diffs (REVIEW REQUIRED)'));
       expect(src, contains('dropTable b'));
     });
 
@@ -313,6 +305,25 @@ void main() {
         options: const CodegenOptions(includeUnsafe: true),
       );
       expect(src, contains('DROP TABLE b'));
+    });
+
+    test('leaves non-executable unsafe diffs as manual blocks', () {
+      const diff = CliSchemaDiff(
+        severity: 'unsafe',
+        type: 'modifyColumn',
+        tableName: 'events',
+        columnName: 'amount',
+        sql: '-- (no direct ALTER COLUMN in SQLite; manual migration required)',
+        reason: 'type changed',
+      );
+      final src = buildMigrationFileContent(
+        className: 'M001',
+        id: '001',
+        name: 'x',
+        diffs: const [diff],
+      );
+      expect(src, contains('MANUAL REQUIRED: modifyColumn'));
+      expect(src, isNot(contains('exec(r\'\'\'--')));
     });
 
     test('irreversible option skips the auto-inverse in down()', () {
@@ -363,7 +374,7 @@ void main() {
         name: 'x',
         diffs: diffs,
       );
-      expect(src, contains('Forward operations: 2 safe, 1 unsafe'));
+      expect(src, contains('Forward operations: 2 safe, 1 unsafe executable'));
     });
   });
 
@@ -392,8 +403,8 @@ void main() {
     test('file name is snake_case', () {
       expect(cliNameToFileName('add-note-to-patients'),
           equals('add_note_to_patients'));
-      expect(cliNameToFileName('AddNoteToPatients'),
-          equals('addnotetopatients'));
+      expect(
+          cliNameToFileName('AddNoteToPatients'), equals('addnotetopatients'));
       expect(cliNameToFileName('init'), equals('init'));
     });
   });

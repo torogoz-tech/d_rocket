@@ -79,10 +79,11 @@ final DRest dRest = DRest.instance;
 /// por defecto, etc.).
 Future<T> invokeRequest<T>(
   RestRequest request,
-  Decoder<dynamic> decoder,
-) async {
-  final HttpClient client = dRest.client;
-  final RestResponse<dynamic> raw = await client.execute(
+  Decoder<dynamic> decoder, {
+  HttpClient? client,
+}) async {
+  final HttpClient effectiveClient = client ?? dRest.client;
+  final RestResponse<dynamic> raw = await effectiveClient.execute(
     request,
     decoder: decoder,
   );

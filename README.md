@@ -127,6 +127,10 @@ dart run build_runner build --delete-conflicting-outputs
 dart run d_rocket:migration add add_note_to_patients \
   --db app.db --entities lib/db/entities.dart
 
+# Acknowledge destructive operations explicitly when reviewed (optional)
+dart run d_rocket:migration add drop_legacy_events \
+  --db app.db --entities lib/db/entities.dart --include-unsafe
+
 # Auto-rewrite LINQ closures to Expr.lambda
 dart run d_rocket:closure transform-file lib/services/order_query.dart
 

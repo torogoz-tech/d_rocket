@@ -421,14 +421,11 @@ other one-time work that isn't a schema change.
 
 ## CLI scaffolder
 
-`dart run bin/migration.dart add <name>` scaffolds
-a new migration. As of 1.2.1 the CLI is **minimal**
-— it emits a skeleton with the right `id` and
-`class` names and pre-filled `// TODO`
-bodies, but the generated SQL is not auto-populated
-from the entity diff. A 1.3.0 candidate (CLI
-scaffolder with EF Core parity) is documented in
-[ROADMAP.md](ROADMAP.md#13-candidates).
+`dart run d_rocket:migration add <name>` scaffolds a
+new migration. Without database flags it preserves
+the compatibility stub behaviour. With `--db` and
+`--entities`, it computes the pending SQLite schema
+diff and pre-fills the migration body.
 
 ```bash
 $ dart run bin/migration.dart add create_inventory_table
@@ -446,7 +443,56 @@ $ D_ROCKET_MIGRATIONS_DIR=lib/database/migrations \
     dart run d_rocket:migration add create_inventory_table
 ```
 
-The generated file is a skeleton:
+### Codegen mode
+
+Pass the current SQLite database and the Dart file that
+exports `entityMetas`:
+
+```bash
+dart run d_rocket:migration add add_note_to_patients \
+  --db app.db \
+  --entities lib/db/entities.dart
+```
+
+The command runs the same schema-diff worker used by
+`migration check` and emits:
+
+- safe operations and executable unsafe operations in `up()`;
+- inverse SQL in `down()` when a clean inverse exists;
+- manual-only operations in clearly marked `MANUAL REQUIRED` blocks;
+- deterministic output that can be inspected before it
+  enters the migration history.
+
+The command prints a direct warning whenever unsafe operations are found.
+Review the generated SQL, especially destructive `ALTER TABLE`, `DROP`, and
+rollback statements, before applying the migration:
+
+```bash
+dart run d_rocket:migration add rename_legacy_column \
+  --db app.db \
+  --entities lib/db/entities.dart \
+  --include-unsafe # optional compatibility/acknowledgment flag
+```
+
+Use `--irreversible` when the migration must not receive an
+automatically generated `down()` body. This is useful for
+data migrations or operations whose inverse cannot preserve
+data:
+
+```bash
+dart run d_rocket:migration add backfill_event_amount \
+  --db app.db \
+  --entities lib/db/entities.dart \
+  --irreversible
+```
+
+The generated file is still source code, not an opaque
+runtime plan. Review and edit it when the schema change
+requires data transformation, backfill logic, or a deliberate
+destructive operation.
+
+Without `--db` and `--entities`, the generated file remains a
+manual skeleton:
 
 ```dart
 class M005CreateInventoryTable extends Migration {
