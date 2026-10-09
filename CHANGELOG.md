@@ -5,7 +5,7 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] — planned
+## [2.1.0] — Unreleased
 
 ### Added
 
@@ -24,13 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Sync application diagnostics with uploaded/downloaded/applied counts and
   conflict counts.
 * `d_rocket_engine_mobile` with a `connectivity_plus` adapter for the core
-  `ConnectivityProvider` contract.
+  `ConnectivityProvider` contract. OS-specific background scheduling remains
+  the responsibility of the host Flutter application.
 * Functional WebSocket sync round-trips, server-pushed changes, watermark
   requests, refreshed auth headers and bounded reconnects.
 * `SseReconnector` with server retry hints and `Last-Event-ID` resume support.
-* Generic `WebSocketReconnector` now reconnects after mid-session disconnects.
-* Configurable WebSocket application-level heartbeats are cancelled cleanly
-  during disconnect and shutdown.
+* Generic `WebSocketReconnector` now reconnects after mid-session disconnects
+  and supports configurable application-level heartbeats that are cancelled
+  cleanly during disconnect and shutdown.
 * Optional `SyncChange.changeId` keys and reference-provider deduplication for
   safe retries after network timeouts.
 
@@ -64,10 +65,9 @@ guide.
 package is the Postgres implementation of the
 `DbEngine` contract. It is the **second
 engine** in the d_rocket 2.0 multi-engine
-architecture (the third, `libsql_wasm`, is a
-2.1 feature). The Postgres engine is
-raw-SQL-only in 2.0.0 — the `Queryable<T>`
-SQL LINQ is a 2.1 feature. For 2.0.0 the user
+architecture. The Postgres engine is
+raw-SQL-only in 2.0.0 — SQL LINQ remains
+SQLite-only in 2.1.0. For 2.0.0 the user
 opens a `PgDb` and uses `db.provider.selectAsync`
 / `executeAsync` directly.
 
@@ -105,19 +105,11 @@ opens a `PgDb` and uses `db.provider.selectAsync`
   REST layer. It is engine-agnostic even though
   `PRAGMA key` is a SQLCipher statement.
 
-* **The `d_rocket:migration` CLI now ships with
-  d_rocket_engine_sqlite as a regular dep.**
-  This is a known limitation of the 2.0
-  cutover: the CLI's `run` / `status` /
-  `rollback` subcommands need a real engine
-  to apply migrations. The `add` / `list` /
-  `doctor` subcommands are engine-agnostic and
-  work without the engine. A future 2.1
-  release will split the CLI into two
-  executables (`d_rocket:migration` and
-  `d_rocket_engine_sqlite:migration`) to drop
-  the dep for users who never apply migrations
-  via the CLI.
+* **Migration CLI architecture.** The 2.0 runtime commands were moved to
+  `d_rocket_engine_sqlite:migration` so core remains engine-agnostic. The
+  2.1 CLI loads application migration classes through `--migrations` and
+  executes them transactionally; `add`, `list`, `doctor` and `check` remain
+  available from the core CLI.
 
 * **Phase 1 (this release): AsyncQueryProvider
   refactor + DbEngine contract + EngineRegistry.**
