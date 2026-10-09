@@ -47,6 +47,8 @@ jobs:
             '  d_rocket_lints:' \
             '    path: .ci/deps/d_rocket_lints' > pubspec_overrides.yaml
       - run: flutter pub get
+      - name: Generate source files
+        run: dart run build_runner build --delete-conflicting-outputs
       - run: dart analyze
       - run: dart test --reporter=expanded
 
@@ -89,4 +91,6 @@ jobs:
             '  d_rocket_lints:' \
             '    path: .ci/deps/d_rocket_lints' > pubspec_overrides.yaml
       - run: flutter pub get
+      - name: Generate source files
+        run: dart run build_runner build --delete-conflicting-outputs
       - run: dart pub publish --dry-run
