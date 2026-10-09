@@ -90,6 +90,12 @@ const WebSocketClient({
 | `receiveEventNames` | `[]` | The typed-events the user wants to receive. The codegen generates `Stream<TExtendsEvent> on<TEvent>(name)` for each. |
 | `reconnectBackoffSeconds` | `1` | Initial backoff for the `WebSocketReconnector` wrapper. The actual delay doubles on every attempt (1s, 2s, 4s, 8s, 16s) up to `maxAttempts` (default 5). |
 
+The low-level `WebSocketReconnector` also accepts an optional
+`heartbeatInterval`. When set, it sends an application-level ping frame (or
+the supplied `heartbeatMessage`) while connected. The timer is cancelled on
+disconnect and `stop()`. This is separate from a WebSocket protocol ping so
+servers that use JSON application messages can observe and acknowledge it.
+
 ## `@SseClient` parameters
 
 ```dart

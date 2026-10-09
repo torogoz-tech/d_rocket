@@ -8,6 +8,7 @@ class FakeReconnectingWebSocket implements WebSocketConnection {
   final StreamController<WebSocketMessage> controller =
       StreamController<WebSocketMessage>.broadcast();
   bool connected = false;
+  final List<WebSocketMessage> sent = <WebSocketMessage>[];
 
   @override
   Stream<WebSocketMessage> get messages => controller.stream;
@@ -21,7 +22,9 @@ class FakeReconnectingWebSocket implements WebSocketConnection {
   }
 
   @override
-  Future<void> send(WebSocketMessage message) async {}
+  Future<void> send(WebSocketMessage message) async {
+    sent.add(message);
+  }
 
   Future<void> disconnect() async {
     connected = false;

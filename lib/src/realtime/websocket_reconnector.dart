@@ -17,8 +17,12 @@ class WebSocketReconnector {
     this.headers,
     Duration initialBackoff = const Duration(seconds: 1),
     int maxAttempts = 5,
+    this.heartbeatInterval,
+    WebSocketMessage? heartbeatMessage,
   })  : _initialBackoff = initialBackoff,
-        _maxAttempts = maxAttempts;
+        _maxAttempts = maxAttempts,
+        heartbeatMessage =
+            heartbeatMessage ?? WebSocketMessage.text('{"type":"ping"}');
 
   /// Factory that creates a new client on each
   /// (re)connect.
@@ -30,6 +34,13 @@ class WebSocketReconnector {
   /// Optional headers (e.g. for auth).
   final Map<String, String>? headers;
 
+  /// Optional application-level heartbeat interval. When configured, the
+  /// wrapper sends [heartbeatMessage] while the connection is open.
+  final Duration? heartbeatInterval;
+
+  /// Message sent by the heartbeat timer.
+  final WebSocketMessage heartbeatMessage;
+
   final Duration _initialBackoff;
   final int _maxAttempts;
 
@@ -38,6 +49,7 @@ class WebSocketReconnector {
   final StreamController<WebSocketMessage> _incoming =
       StreamController<WebSocketMessage>.broadcast();
   Timer? _retryTimer;
+  Timer? _heartbeatTimer;
   int _attempt = 0;
   bool _stopped = true;
 
@@ -64,6 +76,7 @@ class WebSocketReconnector {
           onError: _handleDisconnect,
           onDone: _handleDisconnect,
         );
+        _startHeartbeat();
         return;
       } catch (e) {
         attempt++;
@@ -81,6 +94,8 @@ class WebSocketReconnector {
     _stopped = true;
     _retryTimer?.cancel();
     _retryTimer = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     await _subscription?.cancel();
     _subscription = null;
     await _client?.close();
@@ -90,6 +105,8 @@ class WebSocketReconnector {
   void _handleDisconnect([Object? error, StackTrace? stackTrace]) {
     if (_stopped || _retryTimer != null) return;
     _client = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     if (_attempt >= _maxAttempts) return;
     _attempt++;
     final Duration delay = _initialBackoff * (1 << (_attempt - 1));
@@ -99,6 +116,21 @@ class WebSocketReconnector {
         await start();
       } catch (_) {
         _handleDisconnect();
+      }
+    });
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    final Duration? interval = heartbeatInterval;
+    if (interval == null || interval <= Duration.zero) return;
+    _heartbeatTimer = Timer.periodic(interval, (_) async {
+      final WebSocketConnection? client = _client;
+      if (_stopped || client == null || !client.isConnected) return;
+      try {
+        await client.send(heartbeatMessage);
+      } catch (error, stackTrace) {
+        _handleDisconnect(error, stackTrace);
       }
     });
   }

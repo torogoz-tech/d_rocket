@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requests, refreshed auth headers and bounded reconnects.
 * `SseReconnector` with server retry hints and `Last-Event-ID` resume support.
 * Generic `WebSocketReconnector` now reconnects after mid-session disconnects.
+* Configurable WebSocket application-level heartbeats are cancelled cleanly
+  during disconnect and shutdown.
 * Optional `SyncChange.changeId` keys and reference-provider deduplication for
   safe retries after network timeouts.
 
