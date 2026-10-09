@@ -12,10 +12,12 @@ class DrocketDiagnostics {
   final StreamController<DiagnosticEvent> _controller =
       StreamController<DiagnosticEvent>.broadcast();
   final List<DiagnosticEvent> _events = <DiagnosticEvent>[];
+  int _sequence = 0;
 
   bool enabled = false;
   bool publishToVmService = true;
   bool includeSensitiveData = false;
+  int maxPayloadLength = 32768;
   int maxEvents = 500;
 
   Stream<DiagnosticEvent> get events => _controller.stream;
@@ -26,6 +28,7 @@ class DrocketDiagnostics {
     bool? enabled,
     bool? publishToVmService,
     bool? includeSensitiveData,
+    int? maxPayloadLength,
     int? maxEvents,
   }) {
     if (enabled != null) this.enabled = enabled;
@@ -34,6 +37,16 @@ class DrocketDiagnostics {
     }
     if (includeSensitiveData != null) {
       this.includeSensitiveData = includeSensitiveData;
+    }
+    if (maxPayloadLength != null) {
+      if (maxPayloadLength < 1) {
+        throw ArgumentError.value(
+          maxPayloadLength,
+          'maxPayloadLength',
+          'must be positive',
+        );
+      }
+      this.maxPayloadLength = maxPayloadLength;
     }
     if (maxEvents != null) {
       if (maxEvents < 1) {
@@ -46,11 +59,17 @@ class DrocketDiagnostics {
 
   void record(DiagnosticEvent event) {
     if (!enabled) return;
-    _events.add(event);
+    final now = DateTime.now();
+    final normalized = event.copyWith(
+      id: event.id ?? '${event.startedAt.microsecondsSinceEpoch}-${_sequence++}',
+      finishedAt: event.finishedAt ??
+          (event.duration == null ? now : event.startedAt.add(event.duration!)),
+    );
+    _events.add(normalized);
     _trim();
-    _controller.add(event);
+    _controller.add(normalized);
     if (publishToVmService) {
-      developer.postEvent('d_rocket.diagnostic', event.toJson());
+      developer.postEvent('d_rocket.diagnostic', normalized.toJson());
     }
   }
 

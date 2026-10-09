@@ -1,5 +1,7 @@
 import 'package:d_rocket/d_rocket.dart';
 
+import 'diagnostic_payload.dart';
+
 /// HTTP wrapper that publishes one structured event per request.
 class DiagnosticHttpClient implements HttpClient {
   const DiagnosticHttpClient(this.inner);
@@ -61,14 +63,16 @@ class DiagnosticHttpClient implements HttpClient {
     DrocketDiagnostics diagnostics,
   ) {
     final String body = request.bodyAsString;
+    final payload = _boundedPayload(body, diagnostics.maxPayloadLength);
     return <String, Object?>{
       'method': request.method,
       'url': request.fullUrl,
       'headers': diagnostics.includeSensitiveData
-          ? request.headers
+          ? _redactHeaders(request.headers)
           : request.headers.keys.toList(growable: false),
-      'body': diagnostics.includeSensitiveData ? body : '<hidden>',
+      'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': body.length,
+      if (payload.truncated) 'bodyTruncated': true,
     };
   }
 
@@ -77,14 +81,19 @@ class DiagnosticHttpClient implements HttpClient {
     DrocketDiagnostics diagnostics,
   ) {
     if (response == null) return const <String, Object?>{};
+    final payload = _boundedPayload(
+      response.rawBody,
+      diagnostics.maxPayloadLength,
+    );
     return <String, Object?>{
       'statusCode': response.statusCode,
       if (response.reasonPhrase != null) 'reasonPhrase': response.reasonPhrase,
       'headers': diagnostics.includeSensitiveData
-          ? response.headers
+          ? _redactHeaders(response.headers)
           : response.headers.keys.toList(growable: false),
-      'body': diagnostics.includeSensitiveData ? response.rawBody : '<hidden>',
+      'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': response.rawBody.length,
+      if (payload.truncated) 'bodyTruncated': true,
     };
   }
 
@@ -93,11 +102,45 @@ class DiagnosticHttpClient implements HttpClient {
     DrocketDiagnostics diagnostics,
   ) {
     if (error is! RestHttpException) return const <String, Object?>{};
+    final payload = _boundedPayload(
+      error.rawBody,
+      diagnostics.maxPayloadLength,
+    );
     return <String, Object?>{
       'statusCode': error.statusCode,
       if (error.reasonPhrase != null) 'reasonPhrase': error.reasonPhrase,
-      'body': diagnostics.includeSensitiveData ? error.rawBody : '<hidden>',
+      'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': error.rawBody.length,
+      if (payload.truncated) 'bodyTruncated': true,
     };
   }
+
+  DiagnosticPayload _boundedPayload(String value, int maxLength) {
+    if (value.length <= maxLength) {
+      return DiagnosticPayload(value: value, truncated: false);
+    }
+    return DiagnosticPayload(
+      value: value.substring(0, maxLength),
+      truncated: true,
+    );
+  }
+
+  Map<String, String> _redactHeaders(Map<String, String> headers) {
+    return headers.map(
+      (key, value) => MapEntry(
+        key,
+        _sensitiveHeaderNames.contains(key.toLowerCase())
+            ? '<redacted>'
+            : value,
+      ),
+    );
+  }
+
+  static const Set<String> _sensitiveHeaderNames = <String>{
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'proxy-authorization',
+    'x-api-key',
+  };
 }

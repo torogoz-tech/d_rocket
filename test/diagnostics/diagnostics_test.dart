@@ -29,6 +29,9 @@ void main() {
     expect(await next, isA<DiagnosticEvent>());
     expect(diagnostics.snapshot, hasLength(1));
     expect(diagnostics.snapshot.single.toJson()['category'], 'rest');
+    expect(diagnostics.snapshot.single.id, isNotNull);
+    expect(diagnostics.snapshot.single.finishedAt, isNotNull);
+    expect(diagnostics.snapshot.single.toJson()['finishedAt'], isNotNull);
   });
 
   test('discards old events when the ring buffer reaches its limit', () {

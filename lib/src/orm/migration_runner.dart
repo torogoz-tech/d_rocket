@@ -138,6 +138,8 @@ void _recordMigrationEvent(
       metadata: <String, Object?>{
         'id': migration.id,
         'name': migration.name,
+        'version': migration.version,
+        'direction': operation == 'rollback' ? 'down' : 'up',
       },
     ),
   );
