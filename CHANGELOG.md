@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separate CLI process.
 * Structured Flutter DevTools integration. See
   `doc/diagnostics-devtools.md` and the `d_rocket_devtools_extension` package.
+* Sync application diagnostics with uploaded/downloaded/applied counts and
+  conflict counts.
 
 ### Security
 

@@ -1086,6 +1086,7 @@ abstract class DbContext {
         'clientId: \'...\' explicitly.',
       );
     }
+    final DateTime syncStarted = DateTime.now();
     // (push, fix-1.1.1): read the local
     // queue from the persistent store. We do
     // not trust the in-memory cache for this
@@ -1253,15 +1254,16 @@ abstract class DbContext {
     // and we don't ask the server to re-send
     // them; this is the contract).
     final List<SyncChange> applied = <SyncChange>[];
+    int conflictCount = 0;
     int i = 0;
     for (final SyncChange change in remote.changes) {
-      final bool keep = filters.isEmpty ||
-          filters.every((f) => f.matches(change));
+      final bool keep =
+          filters.isEmpty || filters.every((f) => f.matches(change));
       if (!keep) {
         i++;
         continue;
       }
-      await _applyRemoteChange(change);
+      if (await _applyRemoteChange(change)) conflictCount++;
       applied.add(change);
       i++;
       _emitProgress(
@@ -1270,8 +1272,8 @@ abstract class DbContext {
           phase: SyncPhase.applying,
           processed: applied.length,
           total: remote.changes
-              .where((c) =>
-                  filters.isEmpty || filters.every((f) => f.matches(c)))
+              .where(
+                  (c) => filters.isEmpty || filters.every((f) => f.matches(c)))
               .length,
           message: 'applied $applied.length/$i',
         ),
@@ -1303,6 +1305,23 @@ abstract class DbContext {
         processed: applied.length,
         total: applied.length,
         message: 'sync complete: ${applied.length} change(s) applied',
+      ),
+    );
+    DrocketDiagnostics.instance.record(
+      DiagnosticEvent(
+        category: DiagnosticCategory.sync,
+        operation: 'sync.apply',
+        startedAt: syncStarted,
+        duration: DateTime.now().difference(syncStarted),
+        success: true,
+        metadata: <String, Object?>{
+          'since': lastWatermark,
+          'watermark': _clientWatermark,
+          'uploaded': localChanges.length,
+          'downloaded': remote.changes.length,
+          'applied': applied.length,
+          'conflicts': conflictCount,
+        },
       ),
     );
     return applied;
@@ -1450,9 +1469,9 @@ abstract class DbContext {
   /// `version` (we use the same column to track
   /// the local `updated_at` / `_d_rocket_version`
   /// as the version), skip the remote change.
-  Future<void> _applyRemoteChange(SyncChange change) async {
+  Future<bool> _applyRemoteChange(SyncChange change) async {
     final AsyncQueryProvider? provider = asyncProvider;
-    if (provider == null) return;
+    if (provider == null) return false;
     if (change.type == SyncChangeType.delete) {
       // DELETE: remove the row by primary key.
       final String tableName = change.tableName;
@@ -1464,6 +1483,7 @@ abstract class DbContext {
         where: 'id = ?',
         whereBinds: <Object?>[change.pk],
       );
+      return false;
     } else {
       // UPSERT: insert or merge the row.
       final String tableName = change.tableName;
@@ -1512,6 +1532,7 @@ abstract class DbContext {
           <Object?>[...finalPayload.values, change.pk],
         );
       }
+      return existing.isNotEmpty;
     }
   }
 
