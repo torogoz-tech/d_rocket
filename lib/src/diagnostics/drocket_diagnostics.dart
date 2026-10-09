@@ -24,6 +24,17 @@ class DrocketDiagnostics {
   List<DiagnosticEvent> get snapshot =>
       List<DiagnosticEvent>.unmodifiable(_events);
 
+  /// Executes an async LINQ operation inside a diagnostic context so a
+  /// storage provider can distinguish generated LINQ SQL from direct SQL.
+  Future<T> runLinq<T>(Future<T> Function() operation) {
+    return runZoned(
+      operation,
+      zoneValues: <Object, Object?>{_linqZoneKey: true},
+    );
+  }
+
+  bool get isLinqContext => Zone.current[_linqZoneKey] == true;
+
   void configure({
     bool? enabled,
     bool? publishToVmService,
@@ -61,7 +72,8 @@ class DrocketDiagnostics {
     if (!enabled) return;
     final now = DateTime.now();
     final normalized = event.copyWith(
-      id: event.id ?? '${event.startedAt.microsecondsSinceEpoch}-${_sequence++}',
+      id: event.id ??
+          '${event.startedAt.microsecondsSinceEpoch}-${_sequence++}',
       finishedAt: event.finishedAt ??
           (event.duration == null ? now : event.startedAt.add(event.duration!)),
     );
@@ -83,4 +95,6 @@ class DrocketDiagnostics {
     final int overflow = _events.length - maxEvents;
     if (overflow > 0) _events.removeRange(0, overflow);
   }
+
+  static const Symbol _linqZoneKey = #drocketLinqContext;
 }

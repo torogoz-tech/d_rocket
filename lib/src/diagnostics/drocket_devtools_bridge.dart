@@ -23,6 +23,13 @@ class DrocketDevToolsBridge {
           'events': DrocketDiagnostics.instance.snapshot
               .map((event) => event.toJson())
               .toList(growable: false),
+          'buffer': <String, Object?>{
+            'count': DrocketDiagnostics.instance.snapshot.length,
+            'capacity': DrocketDiagnostics.instance.maxEvents,
+          },
+          'enabled': DrocketDiagnostics.instance.enabled,
+          'includeSensitiveData':
+              DrocketDiagnostics.instance.includeSensitiveData,
         });
         return developer.ServiceExtensionResponse.result(payload);
       },

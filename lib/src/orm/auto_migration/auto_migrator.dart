@@ -32,6 +32,9 @@ import 'dart:async';
 
 import '../async_query_provider.dart';
 import '../entity_meta.dart';
+import '../../diagnostics/diagnostic_category.dart';
+import '../../diagnostics/diagnostic_event.dart';
+import '../../diagnostics/drocket_diagnostics.dart';
 import 'schema_diff.dart';
 import 'schema_snapshot.dart';
 import 'schema_state.dart';
@@ -70,8 +73,7 @@ class AutoMigrationResult {
   });
 
   @override
-  String toString() =>
-      'AutoMigrationResult(applied: ${applied.length}, '
+  String toString() => 'AutoMigrationResult(applied: ${applied.length}, '
       'unsafe: ${unsafe.length})';
 }
 
@@ -100,6 +102,7 @@ class AutoMigrator {
   final AsyncQueryProvider _provider;
   final SchemaState _state;
   final List<EntityMeta> _entityMetas;
+  int? _previousSnapshotVersion;
 
   ///: applies the auto-migration. Returns
   /// the result (with the safe diffs that were
@@ -114,17 +117,29 @@ class AutoMigrator {
   /// shape). On any exception, the transaction
   /// rolls back and the database is unchanged.
   Future<AutoMigrationResult> run() async {
+    final DateTime started = DateTime.now();
+    try {
+      final result = await _run();
+      _recordDiagnostic(started, result: result);
+      return result;
+    } catch (error) {
+      _recordDiagnostic(started, error: error);
+      rethrow;
+    }
+  }
+
+  Future<AutoMigrationResult> _run() async {
     // 1. Compute the new snapshot from the
     //    codegen-emitted entity list. The
     //    snapshot is deterministic; the same
     //    entity list always produces the same
     //    JSON.
-    final SchemaSnapshot newSnapshot =
-        computeSnapshot(_entityMetas);
+    final SchemaSnapshot newSnapshot = computeSnapshot(_entityMetas);
 
     // 2. Read the old snapshot. null on fresh
     //    install.
     final SchemaSnapshot? oldSnapshot = await _state.read();
+    _previousSnapshotVersion = oldSnapshot?.version;
 
     // 3. Compute the diff. This also performs
     //    the version-sanity check (refuses to
@@ -242,6 +257,37 @@ class AutoMigrator {
     );
   }
 
+  void _recordDiagnostic(
+    DateTime started, {
+    AutoMigrationResult? result,
+    Object? error,
+  }) {
+    final diagnostics = DrocketDiagnostics.instance;
+    final unsafe = result?.unsafe ?? const <SchemaDiff>[];
+    diagnostics.record(
+      DiagnosticEvent(
+        category: DiagnosticCategory.migration,
+        operation: 'auto.apply',
+        startedAt: started,
+        duration: DateTime.now().difference(started),
+        success: error == null,
+        error: error?.toString(),
+        metadata: <String, Object?>{
+          'applied': result?.applied.length ?? 0,
+          'unsafe': unsafe.length,
+          'destructive': unsafe.isNotEmpty,
+          if (result != null) 'snapshotVersion': result.snapshot.version,
+          if (_previousSnapshotVersion != null)
+            'snapshotVersionBefore': _previousSnapshotVersion,
+          if (unsafe.isNotEmpty)
+            'unsafeOperations': <String>[
+              for (final diff in unsafe) diff.toString()
+            ],
+        },
+      ),
+    );
+  }
+
   ///: returns the diff between the
   /// current schema and the last applied
   /// snapshot, WITHOUT applying anything. Used
@@ -249,8 +295,7 @@ class AutoMigrator {
   /// caller inspect what would change before
   /// opening with `autoMigrate: true`.
   Future<List<SchemaDiff>> computePendingDiff() async {
-    final SchemaSnapshot newSnapshot =
-        computeSnapshot(_entityMetas);
+    final SchemaSnapshot newSnapshot = computeSnapshot(_entityMetas);
     final SchemaSnapshot? oldSnapshot = await _state.read();
     if (oldSnapshot == null) {
       return _freshInstallDiffs(newSnapshot);
@@ -271,8 +316,7 @@ class AutoMigrator {
         type: SchemaOperationType.createTable,
         tableName: t.name,
         sql: _createTableSqlForFreshInstall(t),
-        reason:
-            'Fresh install: entity ${t.name} does '
+        reason: 'Fresh install: entity ${t.name} does '
             'not exist yet. CREATE TABLE IF NOT '
             'EXISTS is idempotent.',
       ));
@@ -285,8 +329,7 @@ class AutoMigrator {
           sql: 'CREATE ${i.isUnique ? "UNIQUE " : ""}INDEX '
               'IF NOT EXISTS ${i.name} '
               'ON ${t.name} (${i.columns.join(", ")})',
-          reason:
-              'Fresh install: index ${i.name} does '
+          reason: 'Fresh install: index ${i.name} does '
               'not exist yet.',
         ));
       }

@@ -513,7 +513,7 @@ class Queryable<T> extends IQueryable<T> {
           (Map<String, Object?> row) => _reader(row) as T2;
       return Queryable<T2>._(
         _provider,
-                _dialect,
+        _dialect,
         _table,
         placeholderReader,
         meta: _meta,
@@ -531,7 +531,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('select_', selector as Expr);
     return Queryable<T2>._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       (row) => row['result'] as T2,
       meta: _meta,
@@ -573,7 +573,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('orderBy_', keySelector as Expr);
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -616,7 +616,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('orderByDescending_', keySelector as Expr);
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -672,7 +672,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('thenBy_', keySelector as Expr);
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -727,7 +727,7 @@ class Queryable<T> extends IQueryable<T> {
     final lambda = _requireLambda('thenByDescending_', keySelector as Expr);
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -748,7 +748,7 @@ class Queryable<T> extends IQueryable<T> {
   Queryable<T> distinct_() {
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -797,7 +797,7 @@ class Queryable<T> extends IQueryable<T> {
     // now we just store the flag.
     return Queryable._(
       _provider,
-              _dialect,
+      _dialect,
       _table,
       _reader,
       meta: _meta,
@@ -891,10 +891,11 @@ class Queryable<T> extends IQueryable<T> {
       defaultValue: defaultValue,
     );
   }
+
   /// Appends a `LIMIT n` clause.
   Queryable<T> take_(int n) => Queryable._(
         _provider,
-                _dialect,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -917,7 +918,7 @@ class Queryable<T> extends IQueryable<T> {
   /// Appends an `OFFSET n` clause.
   Queryable<T> skip_(int n) => Queryable._(
         _provider,
-                _dialect,
+        _dialect,
         _table,
         _reader,
         meta: _meta,
@@ -1354,8 +1355,9 @@ class Queryable<T> extends IQueryable<T> {
   /// (memFilters + memOrderBy).
   Future<List<T>> _materializeAsync() async {
     final frag = _buildSelect();
-    final List<Object?> rows =
-        await _asyncProvider!.selectAsync(frag.sql, frag.binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider!.selectAsync(frag.sql, frag.binds),
+    );
     List<T> result = rows.map((Object? row) {
       // Each row is `Map<String, Object?>` (sqlite3 Row
       // satisfies this via covariance). The legacy
@@ -1421,8 +1423,9 @@ class Queryable<T> extends IQueryable<T> {
       return toListAsync_();
     }
     final frag = _buildSelectWithJoins(joins);
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(frag.sql, frag.binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(frag.sql, frag.binds),
+    );
     if (rows.isEmpty) return <T>[];
     return _materializeJoins(rows.cast<Map<String, Object?>>(), joins);
   }
@@ -1440,8 +1443,9 @@ class Queryable<T> extends IQueryable<T> {
       sqlExpr: 'COUNT(*)',
       coalesceZero: false,
     );
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(frag.sql, frag.binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(frag.sql, frag.binds),
+    );
     if (rows.isEmpty) return 0;
     final Object? first = rows.first;
     if (first is Map) {
@@ -1471,8 +1475,9 @@ class Queryable<T> extends IQueryable<T> {
     }
     final SqlFragment frag = _buildSelect();
     final String limited = '${frag.sql} LIMIT 1';
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(limited, frag.binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(limited, frag.binds),
+    );
     if (rows.isEmpty) {
       throw StateError(
         'Queryable<T>.firstAsync_(): no rows matched the '
@@ -1496,8 +1501,9 @@ class Queryable<T> extends IQueryable<T> {
     }
     final SqlFragment frag = _buildSelect();
     final String limited = '${frag.sql} LIMIT 1';
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(limited, frag.binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(limited, frag.binds),
+    );
     if (rows.isEmpty) return null;
     return _reader(rows.first as dynamic);
   }
@@ -1522,8 +1528,9 @@ class Queryable<T> extends IQueryable<T> {
       binds.addAll(whereFrag.binds);
     }
     parts.add(') AS n');
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(parts.join(' '), binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(parts.join(' '), binds),
+    );
     if (rows.isEmpty) return false;
     final Object? first = rows.first;
     if (first is Map) {
@@ -1554,8 +1561,9 @@ class Queryable<T> extends IQueryable<T> {
     parts.add('WHERE ${whereFrag.sql}');
     binds.addAll(whereFrag.binds);
     parts.add(') AS n');
-    final List<Object?> rows =
-        await _asyncProvider.selectAsync(parts.join(' '), binds);
+    final List<Object?> rows = await DrocketDiagnostics.instance.runLinq(
+      () => _asyncProvider.selectAsync(parts.join(' '), binds),
+    );
     if (rows.isEmpty) return false;
     final Object? first = rows.first;
     if (first is Map) {
@@ -2072,9 +2080,8 @@ class Queryable<T> extends IQueryable<T> {
       // `reverse_()`, flip the ASC/DESC on
       // each key. This is cheaper than
       // materializing + reversing in memory.
-      final bool effectiveDescending = _reverse
-          ? !clause.descending
-          : clause.descending;
+      final bool effectiveDescending =
+          _reverse ? !clause.descending : clause.descending;
       if (i == 0) {
         // First ORDER BY clause — emit the keyword.
         parts.add(

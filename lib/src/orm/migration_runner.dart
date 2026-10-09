@@ -126,7 +126,12 @@ void _recordMigrationEvent(
   DateTime started, {
   String operation = 'apply',
   Object? error,
+  List<String> statements = const <String>[],
+  int? versionFrom,
+  int? versionTo,
 }) {
+  final List<String> destructiveStatements =
+      statements.where(_isDestructiveMigrationSql).toList(growable: false);
   DrocketDiagnostics.instance.record(
     DiagnosticEvent(
       category: DiagnosticCategory.migration,
@@ -139,10 +144,45 @@ void _recordMigrationEvent(
         'id': migration.id,
         'name': migration.name,
         'version': migration.version,
+        if (versionFrom != null) 'versionFrom': versionFrom,
+        if (versionTo != null) 'versionTo': versionTo,
         'direction': operation == 'rollback' ? 'down' : 'up',
+        'steps': statements.length,
+        'destructive': destructiveStatements.isNotEmpty,
+        'destructiveSteps': destructiveStatements.length,
+        if (DrocketDiagnostics.instance.includeSensitiveData)
+          'sqlStatements': statements,
       },
     ),
   );
+}
+
+MigrationExecutor _trackingExecutor(
+  MigrationExecutor delegate,
+  List<String> statements,
+) {
+  return (String sql, [List<Object?>? binds]) {
+    statements.add(sql);
+    delegate(sql, binds);
+  };
+}
+
+bool _isDestructiveMigrationSql(String sql) {
+  final normalized = sql.trimLeft().toUpperCase();
+  return normalized.startsWith('DROP ') ||
+      normalized.startsWith('ALTER ') ||
+      normalized.startsWith('DELETE ') ||
+      normalized.startsWith('UPDATE ');
+}
+
+AsyncMigrationExecutor _trackingAsyncExecutor(
+  AsyncMigrationExecutor delegate,
+  List<String> statements,
+) {
+  return (String sql, [List<Object?>? binds]) async {
+    statements.add(sql);
+    await delegate(sql, binds);
+  };
 }
 
 /// Factory that returns a fresh [MigrationTransaction]
@@ -335,12 +375,23 @@ class MigrationRunner {
 
     final List<MigrationBase> sorted = <MigrationBase>[...migrations]
       ..sort((MigrationBase a, MigrationBase b) => a.id.compareTo(b.id));
+    int? previousVersion;
+    for (final migration in sorted) {
+      if (alreadyApplied.contains(migration.id)) {
+        previousVersion = previousVersion == null
+            ? migration.version
+            : (migration.version > previousVersion
+                ? migration.version
+                : previousVersion);
+      }
+    }
 
     for (final MigrationBase m in sorted) {
       if (alreadyApplied.contains(m.id)) {
         continue;
       }
       final DateTime started = DateTime.now();
+      final statements = <String>[];
       try {
         if (createTransaction != null) {
           // Transactional path. On exception, the
@@ -348,7 +399,7 @@ class MigrationRunner {
           // not recorded.
           final MigrationTransaction tx = createTransaction!();
           try {
-            m.up(tx.executor);
+            m.up(_trackingExecutor(tx.executor, statements));
             _recordApplied(tx.executor, m);
             tx.commit();
           } catch (_) {
@@ -358,16 +409,30 @@ class MigrationRunner {
         } else {
           // Non-transactional path (backward-compat with
           // behaviour).
-          m.up(exec);
+          m.up(_trackingExecutor(exec, statements));
           _recordApplied(exec, m);
         }
       } catch (error) {
-        _recordMigrationEvent(m, started, error: error);
+        _recordMigrationEvent(
+          m,
+          started,
+          error: error,
+          statements: statements,
+          versionFrom: previousVersion,
+          versionTo: m.version,
+        );
         rethrow;
       }
-      _recordMigrationEvent(m, started);
+      _recordMigrationEvent(
+        m,
+        started,
+        statements: statements,
+        versionFrom: previousVersion,
+        versionTo: m.version,
+      );
       alreadyApplied.add(m.id);
       applied.add(m);
+      previousVersion = m.version;
     }
     return applied;
   }
@@ -392,11 +457,12 @@ class MigrationRunner {
     final List<MigrationBase> rolledBack = <MigrationBase>[];
     for (final MigrationBase m in sorted.reversed) {
       final DateTime started = DateTime.now();
+      final statements = <String>[];
       try {
         if (createTransaction != null) {
           final MigrationTransaction tx = createTransaction!();
           try {
-            m.down(tx.executor);
+            m.down(_trackingExecutor(tx.executor, statements));
             _removeApplied(tx.executor, m);
             tx.commit();
           } catch (_) {
@@ -404,16 +470,29 @@ class MigrationRunner {
             rethrow;
           }
         } else {
-          m.down(exec);
+          m.down(_trackingExecutor(exec, statements));
           _removeApplied(exec, m);
         }
       } on UnsupportedError {
         continue; // irreversible migration: skip
       } catch (error) {
-        _recordMigrationEvent(m, started, operation: 'rollback', error: error);
+        _recordMigrationEvent(
+          m,
+          started,
+          operation: 'rollback',
+          error: error,
+          statements: statements,
+          versionFrom: m.version,
+        );
         rethrow;
       }
-      _recordMigrationEvent(m, started, operation: 'rollback');
+      _recordMigrationEvent(
+        m,
+        started,
+        operation: 'rollback',
+        statements: statements,
+        versionFrom: m.version,
+      );
       rolledBack.add(m);
     }
     return rolledBack;
@@ -551,17 +630,28 @@ class MigrationRunner {
 
     final List<MigrationBase> sorted = <MigrationBase>[...migrations]
       ..sort((MigrationBase a, MigrationBase b) => a.id.compareTo(b.id));
+    int? previousVersion;
+    for (final migration in sorted) {
+      if (alreadyApplied.contains(migration.id)) {
+        previousVersion = previousVersion == null
+            ? migration.version
+            : (migration.version > previousVersion
+                ? migration.version
+                : previousVersion);
+      }
+    }
 
     for (final MigrationBase m in sorted) {
       if (alreadyApplied.contains(m.id)) {
         continue;
       }
       final DateTime started = DateTime.now();
+      final statements = <String>[];
       try {
         if (createAsyncTransaction != null) {
           final AsyncMigrationTransaction tx = await createAsyncTransaction!();
           try {
-            await m.upAsync(tx.executor);
+            await m.upAsync(_trackingAsyncExecutor(tx.executor, statements));
             await _recordAppliedAsync(tx.executor, m);
             await tx.commit();
           } catch (_) {
@@ -569,16 +659,30 @@ class MigrationRunner {
             rethrow;
           }
         } else {
-          await m.upAsync(exec);
+          await m.upAsync(_trackingAsyncExecutor(exec, statements));
           await _recordAppliedAsync(exec, m);
         }
       } catch (error) {
-        _recordMigrationEvent(m, started, error: error);
+        _recordMigrationEvent(
+          m,
+          started,
+          error: error,
+          statements: statements,
+          versionFrom: previousVersion,
+          versionTo: m.version,
+        );
         rethrow;
       }
-      _recordMigrationEvent(m, started);
+      _recordMigrationEvent(
+        m,
+        started,
+        statements: statements,
+        versionFrom: previousVersion,
+        versionTo: m.version,
+      );
       alreadyApplied.add(m.id);
       applied.add(m);
+      previousVersion = m.version;
     }
     return applied;
   }
@@ -598,11 +702,12 @@ class MigrationRunner {
     final List<MigrationBase> rolledBack = <MigrationBase>[];
     for (final MigrationBase m in sorted.reversed) {
       final DateTime started = DateTime.now();
+      final statements = <String>[];
       try {
         if (createAsyncTransaction != null) {
           final AsyncMigrationTransaction tx = await createAsyncTransaction!();
           try {
-            await m.downAsync(tx.executor);
+            await m.downAsync(_trackingAsyncExecutor(tx.executor, statements));
             await _removeAppliedAsync(tx.executor, m);
             await tx.commit();
           } catch (_) {
@@ -610,16 +715,29 @@ class MigrationRunner {
             rethrow;
           }
         } else {
-          await m.downAsync(exec);
+          await m.downAsync(_trackingAsyncExecutor(exec, statements));
           await _removeAppliedAsync(exec, m);
         }
       } on UnsupportedError {
         continue; // irreversible migration: skip
       } catch (error) {
-        _recordMigrationEvent(m, started, operation: 'rollback', error: error);
+        _recordMigrationEvent(
+          m,
+          started,
+          operation: 'rollback',
+          error: error,
+          statements: statements,
+          versionFrom: m.version,
+        );
         rethrow;
       }
-      _recordMigrationEvent(m, started, operation: 'rollback');
+      _recordMigrationEvent(
+        m,
+        started,
+        operation: 'rollback',
+        statements: statements,
+        versionFrom: m.version,
+      );
       rolledBack.add(m);
     }
     return rolledBack;

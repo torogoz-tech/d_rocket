@@ -46,7 +46,8 @@ class DiagnosticHttpClient implements HttpClient {
         startedAt: started,
         duration: DateTime.now().difference(started),
         success: error == null && response?.isSuccess == true,
-        statusCode: response?.statusCode,
+        statusCode: response?.statusCode ??
+            (error is RestHttpException ? error.statusCode : null),
         error: error?.toString(),
         metadata: <String, Object?>{
           'request': _requestPayload(request, diagnostics),

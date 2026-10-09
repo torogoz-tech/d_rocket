@@ -5,6 +5,28 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — planned
+
+### Added
+
+* Runtime diagnostics with bounded buffering, timestamps, completion metadata,
+  correlation IDs and VM Service events.
+* Structured REST request/response diagnostics with payload limits and default
+  redaction of authorization headers, cookies and API keys.
+* SQLite and LINQ diagnostics with SQL classification, safe bind metadata,
+  row counts, null values and database errors.
+* Manual and auto-migration diagnostics, including step counts, versions,
+  unsafe-operation warnings and rollback failures.
+* `d_rocket:migration check --diagnostics-file` for NDJSON output from the
+  separate CLI process.
+* Structured Flutter DevTools integration. See
+  `doc/diagnostics-devtools.md` and the `d_rocket_devtools_extension` package.
+
+### Security
+
+Sensitive REST bodies and headers remain hidden or redacted unless explicitly
+enabled for local development. SQL bind values are also hidden by default.
+
 ## [2.0.0] — 2026-06-22
 
 **BREAKING — engine split.** The SQLite engine

@@ -39,6 +39,7 @@ import 'dart:io';
 
 import 'package:d_rocket/src/cli/migration_check.dart';
 import 'package:d_rocket/src/cli/migration_codegen.dart';
+import 'package:d_rocket/src/cli/diagnostic_event_file.dart';
 
 const String _kBanner = '''
 ┌─────────────────────────────────────────────┐
@@ -88,7 +89,8 @@ Future<int> main(List<String> args) async {
       stderr.writeln('  Then run:');
       stderr.writeln('');
       stderr.writeln('    dart run d_rocket_engine_sqlite:migration '
-          '$command ${rest.join(' ')}'.trim());
+              '$command ${rest.join(' ')}'
+          .trim());
       return 2;
     case 'help':
     case '--help':
@@ -108,12 +110,14 @@ class _Flags {
   final String? entitiesFile;
   final bool includeUnsafe;
   final bool irreversible;
+  final String? diagnosticsFile;
   const _Flags({
     this.dbPath,
     this.target,
     this.entitiesFile,
     this.includeUnsafe = false,
     this.irreversible = false,
+    this.diagnosticsFile,
   });
 }
 
@@ -128,6 +132,7 @@ _Flags _parseFlags(List<String> args) {
   String? entities;
   bool includeUnsafe = false;
   bool irreversible = false;
+  String? diagnosticsFile;
   for (int i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--db':
@@ -169,6 +174,14 @@ _Flags _parseFlags(List<String> args) {
       case '--irreversible':
         irreversible = true;
         break;
+      case '--diagnostics-file':
+        if (i + 1 >= args.length) {
+          stderr.writeln('Error: --diagnostics-file requires a path argument');
+          exit(2);
+        }
+        diagnosticsFile = args[i + 1];
+        i++;
+        break;
     }
   }
   return _Flags(
@@ -177,6 +190,7 @@ _Flags _parseFlags(List<String> args) {
     entitiesFile: entities,
     includeUnsafe: includeUnsafe,
     irreversible: irreversible,
+    diagnosticsFile: diagnosticsFile,
   );
 }
 
@@ -206,6 +220,7 @@ Commands:
                       operations. Exit 1 if any unsafe diffs
                       (CI-friendly; wire it into your pipeline).
                       Requires --db <path> AND --entities <file>.
+                      Optional: --diagnostics-file <path> (NDJSON).
 
 Fase 10 — DB executor (require --db <path>):
   status --db <path>  Print the current schema version
@@ -357,8 +372,9 @@ Future<int> _addMigrationCodegen({
     stderr.writeln('Error: $err');
     return 2;
   }
-  final Directory dRocketDir =
-      Directory('.d_rocket')..createSync(recursive: true);
+
+  final Directory dRocketDir = Directory('.d_rocket')
+    ..createSync(recursive: true);
   final File workerFile = File('${dRocketDir.path}/check_worker.dart');
   workerFile.writeAsStringSync(buildCheckWorkerSource(entities));
   final String absDbPath = File(dbPath).absolute.path;
@@ -522,12 +538,39 @@ Future<int> _runCheck(_Flags flags) async {
     return 2;
   }
 
+  final DateTime started = DateTime.now();
+  final DiagnosticEventFile? diagnostics = flags.diagnosticsFile == null
+      ? null
+      : DiagnosticEventFile(flags.diagnosticsFile!);
+  void recordDiagnostic({
+    required bool success,
+    Object? error,
+    int? exitCode,
+    int? safeCount,
+    int? unsafeCount,
+  }) {
+    diagnostics?.record(
+      operation: 'cli.check',
+      startedAt: started,
+      duration: DateTime.now().difference(started),
+      success: success,
+      error: error,
+      metadata: <String, Object?>{
+        'db': dbPath,
+        'entities': entities,
+        if (exitCode != null) 'exitCode': exitCode,
+        if (safeCount != null) 'safeCount': safeCount,
+        if (unsafeCount != null) 'unsafeCount': unsafeCount,
+      },
+    );
+  }
+
   // Write the temp worker under `.d_rocket/`.
   // We use a `.d_rocket/` directory (gitignored
   // by convention) to avoid polluting the user's
   // project root.
-  final Directory dRocketDir =
-      Directory('.d_rocket')..createSync(recursive: true);
+  final Directory dRocketDir = Directory('.d_rocket')
+    ..createSync(recursive: true);
   final File workerFile = File('${dRocketDir.path}/check_worker.dart');
   workerFile.writeAsStringSync(buildCheckWorkerSource(entities));
 
@@ -549,6 +592,11 @@ Future<int> _runCheck(_Flags flags) async {
   if (result.exitCode != 0) {
     stderr.writeln('❌ check_worker failed (exit ${result.exitCode}):');
     stderr.writeln(result.stderr);
+    recordDiagnostic(
+      success: false,
+      error: result.stderr,
+      exitCode: result.exitCode,
+    );
     return result.exitCode;
   }
 
@@ -561,6 +609,7 @@ Future<int> _runCheck(_Flags flags) async {
     stderr.writeln('❌ check_worker emitted an unparseable '
         'JSON payload: $e');
     stderr.writeln('stdout was:\n${result.stdout}');
+    recordDiagnostic(success: false, error: e, exitCode: 3);
     return 3;
   }
 
@@ -569,13 +618,17 @@ Future<int> _runCheck(_Flags flags) async {
       .map((dynamic e) => (e as Map).cast<String, Object?>())
       .toList(growable: false);
 
-  final int safeCount =
-      diffs.where((d) => d['severity'] == 'safe').length;
-  final int unsafeCount =
-      diffs.where((d) => d['severity'] == 'unsafe').length;
+  final int safeCount = diffs.where((d) => d['severity'] == 'safe').length;
+  final int unsafeCount = diffs.where((d) => d['severity'] == 'unsafe').length;
 
   if (diffs.isEmpty) {
     stdout.writeln('✅ Schema is in sync (no diffs).');
+    recordDiagnostic(
+      success: true,
+      exitCode: 0,
+      safeCount: 0,
+      unsafeCount: 0,
+    );
     return 0;
   }
 
@@ -607,11 +660,23 @@ Future<int> _runCheck(_Flags flags) async {
       'performs the unsafe operation explicitly (auto-migrator '
       'does NOT auto-apply unsafe diffs).',
     );
+    recordDiagnostic(
+      success: false,
+      exitCode: 1,
+      safeCount: safeCount,
+      unsafeCount: unsafeCount,
+    );
     return 1;
   }
   stdout.writeln(
     '✓ $safeCount safe diff(s); auto-migrator will apply them on next '
     '`await db.runAutoMigrations()`.',
+  );
+  recordDiagnostic(
+    success: true,
+    exitCode: 0,
+    safeCount: safeCount,
+    unsafeCount: unsafeCount,
   );
   return 0;
 }
