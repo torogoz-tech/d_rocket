@@ -7,9 +7,9 @@
 
 | Metric | Value |
 |---|---|
-| Latest release | **2.0.0** (engine-agnostic multi-engine) |
+| Current line | **2.1.0** (local release candidate; not pushed) |
 | Previous release | 1.2.2 |
-| Test suite | ~1,184 pass across 6 packages (Postgres tests skip-gated) |
+| Test suite | All available package suites pass locally; external Postgres/browser tests remain skip-gated |
 | Analyzer warnings | 0 |
 | Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
 | Lockstep versioning | yes — every release publishes all 7 packages at the same version on the same tag |
@@ -26,6 +26,20 @@
 6. **Realtime** — `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>` with reconnect + backoff + heartbeat.
 
 ## Releases at a glance
+
+### 2.1.0 — production-readiness consolidation
+
+- Codegen preserves nullability and rejects implicit exact-decimal storage.
+- SQLite LINQ, migrations and the migration CLI have regression and smoke
+  coverage.
+- Sync has explicit retry/idempotency documentation and stable change keys.
+- WebSocket/SSE reconnect behavior and the Flutter DevTools diagnostics flow
+  are documented and covered by tests.
+- `d_rocket_engine_mobile` provides the `connectivity_plus` adapter for
+  Flutter applications.
+
+This version is prepared in local commits only; no push or publication has
+been performed.
 
 ### 2.0.0 — engine-agnostic multi-engine (current)
 

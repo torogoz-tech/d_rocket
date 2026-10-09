@@ -70,6 +70,7 @@ The DB engine is a separate package. The same `DbContext` /
 | [`d_rocket_engine_sqlite`](https://pub.dev/packages/d_rocket_engine_sqlite) | `package:sqlite3` (file or `sqlite::memory:`; SQLCipher supported) | sync + async |
 | [`d_rocket_engine_postgres`](https://pub.dev/packages/d_rocket_engine_postgres) | `package:postgres` (wire protocol; pure Dart, no FFI) | async only |
 | [`d_rocket_engine_web`](https://pub.dev/packages/d_rocket_engine_web) | IndexedDB via `idb_shim` (browser) | async only |
+| [`d_rocket_engine_mobile`](https://pub.dev/packages/d_rocket_engine_mobile) | Flutter mobile connectivity via `connectivity_plus` | connectivity adapter |
 
 > The engine-agnostic LINQ is provided by `d_rocket` core. Each
 > engine supplies a `QueryProvider` and a `SqlDialect` so the
@@ -147,6 +148,10 @@ and in the
 directory (one `.md` per layer, plus installation, migrations,
 cookbook, FAQ, and architecture). The package targets
 **Dart 3.6+** and **Flutter 3.10+**.
+
+The complete 2.1.0 production flow, including SQLite, sync, connectivity,
+migrations and DevTools, is documented in
+[`doc/2.1-production-example.md`](doc/2.1-production-example.md).
 
 ## License
 

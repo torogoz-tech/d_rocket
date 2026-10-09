@@ -10,9 +10,9 @@
 
 | | |
 |---|---|
-| Latest release | **2.0.0** (engine-agnostic multi-engine) |
+| Current line | **2.1.0** (local release candidate; not pushed) |
 | Previous release | 1.2.2 (auto-migrations, 1.x maintenance) |
-| Test suite | ~1,184 pass across 6 packages (Postgres tests skip-gated) |
+| Test suite | All available package suites pass locally; external Postgres/browser tests remain skip-gated |
 | Analyzer warnings | 0 |
 | Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
 | Source | `github.com/torogoz-tech/d_rocket` |
@@ -26,6 +26,14 @@ is the single source of truth for the data layer.
 ---
 
 ## Shipped versions
+
+### 2.1.0 — production-readiness consolidation
+
+The working 2.1.0 line consolidates nullable/date/numeric codegen, SQLite LINQ
+and migrations, real migration CLI execution, sync idempotency keys,
+WebSocket/SSE reconnection, mobile connectivity integration and DevTools
+diagnostics. It is committed locally and awaits final release coordination;
+no push has been performed.
 
 ### 1.0.0 — The unified rename (June 2026)
 
@@ -122,11 +130,9 @@ to the next monthly release.
   and Web for every test. The discrepancy matrix (engine ×
   test) is currently at SQLite: 100% / Postgres: 70% / Web:
   40%; the goal is 100% on all three.
-- **A `connectivity_plus` integration for the
-  `ConnectivityProvider`.** The `d_rocket_engine_mobile`
-  package wires `package:connectivity_plus` to the
-  `ConnectivityProvider` interface and exposes replayable,
-  deduplicated transport changes.
+- **Background execution policies.** OS-specific background scheduling is
+  intentionally left to the host Flutter application; the mobile adapter
+  reports connectivity and does not assume an Android/iOS scheduler.
 
 ### Tier 2 — observability + tooling (next 2-3 monthly releases)
 
