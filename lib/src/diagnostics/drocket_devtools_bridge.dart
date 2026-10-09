@@ -9,10 +9,13 @@ class DrocketDevToolsBridge {
 
   static bool _registered = false;
 
-  static void register() {
+  static void register({bool includeSensitiveData = false}) {
     if (_registered) return;
     _registered = true;
-    DrocketDiagnostics.instance.configure(enabled: true);
+    DrocketDiagnostics.instance.configure(
+      enabled: true,
+      includeSensitiveData: includeSensitiveData,
+    );
     developer.registerExtension(
       'ext.d_rocket.diagnostics.snapshot',
       (String method, Map<String, String> parameters) async {

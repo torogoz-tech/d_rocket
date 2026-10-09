@@ -6,6 +6,16 @@ Enable diagnostics only in development:
 DrocketDevToolsBridge.register();
 ```
 
+By default, request and response bodies are hidden while their method, URL,
+status, headers names, and body sizes remain available. During local
+development, payload capture can be enabled explicitly:
+
+```dart
+DrocketDevToolsBridge.register(includeSensitiveData: true);
+```
+
+Use payload capture only with non-sensitive development data.
+
 This enables the bounded in-memory event buffer and registers the VM Service
 endpoints consumed by the bundled `d_rocket` DevTools extension. The extension
 is available when DevTools is connected to an application that depends on

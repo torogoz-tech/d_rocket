@@ -48,7 +48,9 @@ class DiagnosticHttpClient implements HttpClient {
         error: error?.toString(),
         metadata: <String, Object?>{
           'request': _requestPayload(request, diagnostics),
-          'response': _responsePayload(response, diagnostics),
+          'response': response != null
+              ? _responsePayload(response, diagnostics)
+              : _errorResponsePayload(error, diagnostics),
         },
       ),
     );
@@ -83,6 +85,19 @@ class DiagnosticHttpClient implements HttpClient {
           : response.headers.keys.toList(growable: false),
       'body': diagnostics.includeSensitiveData ? response.rawBody : '<hidden>',
       'bodyLength': response.rawBody.length,
+    };
+  }
+
+  Map<String, Object?> _errorResponsePayload(
+    Object? error,
+    DrocketDiagnostics diagnostics,
+  ) {
+    if (error is! RestHttpException) return const <String, Object?>{};
+    return <String, Object?>{
+      'statusCode': error.statusCode,
+      if (error.reasonPhrase != null) 'reasonPhrase': error.reasonPhrase,
+      'body': diagnostics.includeSensitiveData ? error.rawBody : '<hidden>',
+      'bodyLength': error.rawBody.length,
     };
   }
 }
