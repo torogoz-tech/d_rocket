@@ -3,6 +3,7 @@
 library;
 
 import 'package:d_rocket/d_rocket.dart';
+
 ///
 /// The default configuration is conservative (method,
 /// URL, status — no headers, no bodies) so it is safe
@@ -89,9 +90,11 @@ class LoggingInterceptor implements RestInterceptor {
   /// it is written. Default: [redactPragmaKey].
   /// `null` disables redaction.
   final String Function(String)? redactBody;
+  final Map<RestRequest, DateTime> _started = <RestRequest, DateTime>{};
 
   @override
   Future<RestRequest> onRequest(RestRequest request) async {
+    _started[request] = DateTime.now();
     final StringBuffer sb = StringBuffer()
       ..write('→ ')
       ..write(request.method)
@@ -115,6 +118,18 @@ class LoggingInterceptor implements RestInterceptor {
   Future<RestResponse<dynamic>> onResponse(
     RestResponse<dynamic> response,
   ) async {
+    final DateTime? started = _started.remove(response.request);
+    DrocketDiagnostics.instance.record(
+      DiagnosticEvent(
+        category: DiagnosticCategory.rest,
+        operation: response.request.method,
+        startedAt: started ?? DateTime.now(),
+        duration: started == null ? null : DateTime.now().difference(started),
+        success: response.isSuccess,
+        statusCode: response.statusCode,
+        metadata: <String, Object?>{'url': response.request.fullUrl},
+      ),
+    );
     final StringBuffer sb = StringBuffer()
       ..write('← ')
       ..write(response.statusCode)
@@ -138,6 +153,31 @@ class LoggingInterceptor implements RestInterceptor {
 
   @override
   Future<RestException> onError(RestException error) async {
+    if (error is RestHttpException) {
+      final DateTime? started = _started.remove(error.request);
+      DrocketDiagnostics.instance.record(
+        DiagnosticEvent(
+          category: DiagnosticCategory.rest,
+          operation: error.request.method,
+          startedAt: started ?? DateTime.now(),
+          duration: started == null ? null : DateTime.now().difference(started),
+          success: false,
+          statusCode: error.statusCode,
+          error: error.message,
+          metadata: <String, Object?>{'url': error.request.fullUrl},
+        ),
+      );
+    } else {
+      DrocketDiagnostics.instance.record(
+        DiagnosticEvent(
+          category: DiagnosticCategory.rest,
+          operation: 'error',
+          startedAt: DateTime.now(),
+          success: false,
+          error: error.message,
+        ),
+      );
+    }
     final StringBuffer sb = StringBuffer()
       ..write('× ')
       ..write(error.runtimeType)

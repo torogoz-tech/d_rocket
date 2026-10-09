@@ -30,6 +30,9 @@
 library;
 
 import 'applied_migration.dart';
+import '../diagnostics/diagnostic_category.dart';
+import '../diagnostics/diagnostic_event.dart';
+import '../diagnostics/drocket_diagnostics.dart';
 import 'migration.dart';
 import 'migration_executor.dart';
 import 'migration_selector.dart';
@@ -116,6 +119,28 @@ class MigrationTransaction {
 
   /// Rolls back the transaction. Idempotent.
   final void Function() rollback;
+}
+
+void _recordMigrationEvent(
+  MigrationBase migration,
+  DateTime started, {
+  String operation = 'apply',
+  Object? error,
+}) {
+  DrocketDiagnostics.instance.record(
+    DiagnosticEvent(
+      category: DiagnosticCategory.migration,
+      operation: operation,
+      startedAt: started,
+      duration: DateTime.now().difference(started),
+      success: error == null,
+      error: error?.toString(),
+      metadata: <String, Object?>{
+        'id': migration.id,
+        'name': migration.name,
+      },
+    ),
+  );
 }
 
 /// Factory that returns a fresh [MigrationTransaction]
@@ -313,25 +338,32 @@ class MigrationRunner {
       if (alreadyApplied.contains(m.id)) {
         continue;
       }
-      if (createTransaction != null) {
-        // Transactional path. On exception, the
-        // transaction is rolled back; the migration is
-        // not recorded.
-        final MigrationTransaction tx = createTransaction!();
-        try {
-          m.up(tx.executor);
-          _recordApplied(tx.executor, m);
-          tx.commit();
-        } catch (_) {
-          tx.rollback();
-          rethrow;
+      final DateTime started = DateTime.now();
+      try {
+        if (createTransaction != null) {
+          // Transactional path. On exception, the
+          // transaction is rolled back; the migration is
+          // not recorded.
+          final MigrationTransaction tx = createTransaction!();
+          try {
+            m.up(tx.executor);
+            _recordApplied(tx.executor, m);
+            tx.commit();
+          } catch (_) {
+            tx.rollback();
+            rethrow;
+          }
+        } else {
+          // Non-transactional path (backward-compat with
+          // behaviour).
+          m.up(exec);
+          _recordApplied(exec, m);
         }
-      } else {
-        // Non-transactional path (backward-compat with
-        // behaviour).
-        m.up(exec);
-        _recordApplied(exec, m);
+      } catch (error) {
+        _recordMigrationEvent(m, started, error: error);
+        rethrow;
       }
+      _recordMigrationEvent(m, started);
       alreadyApplied.add(m.id);
       applied.add(m);
     }
@@ -357,6 +389,7 @@ class MigrationRunner {
 
     final List<MigrationBase> rolledBack = <MigrationBase>[];
     for (final MigrationBase m in sorted.reversed) {
+      final DateTime started = DateTime.now();
       try {
         if (createTransaction != null) {
           final MigrationTransaction tx = createTransaction!();
@@ -374,7 +407,11 @@ class MigrationRunner {
         }
       } on UnsupportedError {
         continue; // irreversible migration: skip
+      } catch (error) {
+        _recordMigrationEvent(m, started, operation: 'rollback', error: error);
+        rethrow;
       }
+      _recordMigrationEvent(m, started, operation: 'rollback');
       rolledBack.add(m);
     }
     return rolledBack;
@@ -517,20 +554,27 @@ class MigrationRunner {
       if (alreadyApplied.contains(m.id)) {
         continue;
       }
-      if (createAsyncTransaction != null) {
-        final AsyncMigrationTransaction tx = await createAsyncTransaction!();
-        try {
-          await m.upAsync(tx.executor);
-          await _recordAppliedAsync(tx.executor, m);
-          await tx.commit();
-        } catch (_) {
-          await tx.rollback();
-          rethrow;
+      final DateTime started = DateTime.now();
+      try {
+        if (createAsyncTransaction != null) {
+          final AsyncMigrationTransaction tx = await createAsyncTransaction!();
+          try {
+            await m.upAsync(tx.executor);
+            await _recordAppliedAsync(tx.executor, m);
+            await tx.commit();
+          } catch (_) {
+            await tx.rollback();
+            rethrow;
+          }
+        } else {
+          await m.upAsync(exec);
+          await _recordAppliedAsync(exec, m);
         }
-      } else {
-        await m.upAsync(exec);
-        await _recordAppliedAsync(exec, m);
+      } catch (error) {
+        _recordMigrationEvent(m, started, error: error);
+        rethrow;
       }
+      _recordMigrationEvent(m, started);
       alreadyApplied.add(m.id);
       applied.add(m);
     }
@@ -551,6 +595,7 @@ class MigrationRunner {
 
     final List<MigrationBase> rolledBack = <MigrationBase>[];
     for (final MigrationBase m in sorted.reversed) {
+      final DateTime started = DateTime.now();
       try {
         if (createAsyncTransaction != null) {
           final AsyncMigrationTransaction tx = await createAsyncTransaction!();
@@ -568,7 +613,11 @@ class MigrationRunner {
         }
       } on UnsupportedError {
         continue; // irreversible migration: skip
+      } catch (error) {
+        _recordMigrationEvent(m, started, operation: 'rollback', error: error);
+        rethrow;
       }
+      _recordMigrationEvent(m, started, operation: 'rollback');
       rolledBack.add(m);
     }
     return rolledBack;

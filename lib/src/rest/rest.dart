@@ -4,6 +4,7 @@ library;
 export 'annotations/annotations.dart';
 export 'client/http_client.dart';
 export 'client/http_package_client.dart';
+export 'client/diagnostic_http_client.dart';
 export 'client/rest_client.dart';
 export 'client/rest_client_config.dart';
 export 'clients/cached_http_client.dart';

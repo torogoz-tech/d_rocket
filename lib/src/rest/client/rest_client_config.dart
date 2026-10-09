@@ -1,4 +1,6 @@
 import 'http_client.dart';
+import 'diagnostic_http_client.dart';
+import '../../diagnostics/drocket_diagnostics.dart';
 
 /// Builds the HTTP client used by one generated REST client.
 typedef HttpClientWrapper = HttpClient Function(HttpClient inner);
@@ -26,6 +28,10 @@ class RestClientConfig {
     HttpClient current = client ?? fallback;
     for (int i = wrappers.length - 1; i >= 0; i--) {
       current = wrappers[i](current);
+    }
+    if (DrocketDiagnostics.instance.enabled &&
+        current is! DiagnosticHttpClient) {
+      current = DiagnosticHttpClient(current);
     }
     return current;
   }

@@ -35,6 +35,8 @@
 /// See `CHANGELOG.md` for the full history.
 library;
 
+export 'src/diagnostics/diagnostics.dart';
+
 // ─── Layer 3: LINQ-style queries ─────────────────────────────────────
 export 'src/linq/linq.dart';
 export 'src/linq/record.dart';

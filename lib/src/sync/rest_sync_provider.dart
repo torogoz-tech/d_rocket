@@ -26,6 +26,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../diagnostics/diagnostic_category.dart';
+import '../diagnostics/diagnostic_event.dart';
+import '../diagnostics/drocket_diagnostics.dart';
 import '../rest/client/http_client.dart';
 import '../rest/client/http_package_client.dart';
 import '../rest/cancel_token.dart';
@@ -97,6 +100,7 @@ class RestSyncProvider implements SyncProvider {
 
   @override
   Future<SyncEnvelope> syncAsync(SyncEnvelope envelope) async {
+    final DateTime started = DateTime.now();
     final RestRequest request = RestRequest(
       method: 'POST',
       path: '/sync',
@@ -111,10 +115,12 @@ class RestSyncProvider implements SyncProvider {
         decoder: _identityDecoder,
       );
       final Map<String, Object?> json = response.body! as Map<String, Object?>;
+      _recordSyncDiagnostic(started, envelope, response: response);
       return SyncEnvelope.fromJson(json);
     } on RequestCancelledException {
       rethrow;
     } on RestException catch (e) {
+      _recordSyncDiagnostic(started, envelope, error: e);
       throw RestSyncException(
         'POST $baseUrl/sync failed: ${e.message}',
         cause: e,
@@ -124,6 +130,7 @@ class RestSyncProvider implements SyncProvider {
 
   @override
   Future<int> currentWatermarkAsync() async {
+    final DateTime started = DateTime.now();
     final RestRequest request = RestRequest(
       method: 'GET',
       path: '/sync/watermark',
@@ -136,10 +143,17 @@ class RestSyncProvider implements SyncProvider {
         request,
         decoder: _identityDecoder,
       );
+      _recordSyncDiagnostic(
+        started,
+        null,
+        operation: 'watermark',
+        response: response,
+      );
       return int.parse(response.rawBody.trim());
     } on RequestCancelledException {
       rethrow;
     } on RestException catch (e) {
+      _recordSyncDiagnostic(started, null, operation: 'watermark', error: e);
       throw RestSyncException(
         'GET $baseUrl/sync/watermark failed: ${e.message}',
         cause: e,
@@ -150,6 +164,29 @@ class RestSyncProvider implements SyncProvider {
   /// +: closes the
   /// underlying HTTP client. Call from `dispose`.
   Future<void> close() => _client.close();
+}
+
+void _recordSyncDiagnostic(
+  DateTime started,
+  SyncEnvelope? envelope, {
+  String operation = 'sync',
+  RestResponse<dynamic>? response,
+  Object? error,
+}) {
+  DrocketDiagnostics.instance.record(
+    DiagnosticEvent(
+      category: DiagnosticCategory.sync,
+      operation: operation,
+      startedAt: started,
+      duration: DateTime.now().difference(started),
+      success: error == null,
+      statusCode: response?.statusCode,
+      error: error?.toString(),
+      metadata: <String, Object?>{
+        if (envelope != null) 'since': envelope.since,
+      },
+    ),
+  );
 }
 
 /// Identity decoder — the `HttpClient` interface
