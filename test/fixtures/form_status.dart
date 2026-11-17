@@ -1,0 +1,4 @@
+enum FormStatus {
+  draft,
+  active,
+}

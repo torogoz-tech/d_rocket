@@ -2,7 +2,7 @@
 #
 # The example at `example/bookstore.dart` declares
 # `extends Record` classes (`Author`, `Book`, `Sale`) that
-# need codegen. This `build.yaml` wires the five
+# need codegen. This `build.yaml` wires the six
 # `d_rocket_builder` builders to the `d_rocket` package
 # itself so the example can be exercised with
 # `dart run example/bookstore.dart`. (As of v1.0.1
@@ -19,6 +19,7 @@
 #   - *.d_rocket_serializer.g.dart   (serializer)
 #   - *.d_rocket_rest_client.g.dart  (rest_client)
 #   - *.d_rocket_orm.g.dart          (rocket_table)
+#   - *.d_rocket_form.g.dart         (form)
 #   - d_rocket_registry.g.dart       (record_registry)
 
 targets:
@@ -31,6 +32,8 @@ targets:
       d_rocket_builder:rest_client:
         enabled: true
       d_rocket_builder:rocket_table:
+        enabled: true
+      d_rocket_builder:form:
         enabled: true
       d_rocket_builder:record_registry:
         enabled: true

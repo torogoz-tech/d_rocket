@@ -5,6 +5,17 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — Unreleased
+
+### Added
+
+* Model-driven form capture, validation, typed conversion and construction,
+  generic binding to existing controls, field errors with stable codes, and
+  integration with the existing serializer and REST annotations. Numeric,
+  boolean, date and enum inputs support raw-value parsing through `bindRaw()`;
+  existing string/date formatters are applied during capture. See
+  `doc/2.2-formularios-modelo.md`.
+
 ## [2.1.0] — Unreleased
 
 ### Added

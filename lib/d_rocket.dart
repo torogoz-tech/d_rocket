@@ -37,6 +37,13 @@ library;
 
 export 'src/diagnostics/diagnostics.dart';
 
+// ─── Layer 7: Model-driven forms ─────────────────────────────────────
+//
+// Form annotations and runtime types are intentionally independent from
+// Flutter widgets, REST and database engines. The builder emits the
+// `*.d_rocket_form.g.dart` adapters for models marked with `@Form`.
+export 'src/form/form_annotations.dart';
+
 // ─── Layer 3: LINQ-style queries ─────────────────────────────────────
 export 'src/linq/linq.dart';
 export 'src/linq/record.dart';

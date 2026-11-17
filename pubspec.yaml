@@ -5,7 +5,7 @@ description: >-
   engine-agnostic ORM with pluggable backends
   (d_rocket_engine_sqlite, d_rocket_engine_postgres,
   d_rocket_engine_web).
-version: 2.1.0
+version: 2.2.0
 
 repository: https://github.com/torogoz-tech/d_rocket
 homepage: https://github.com/torogoz-tech/d_rocket
