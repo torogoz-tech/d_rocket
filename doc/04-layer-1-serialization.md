@@ -4,7 +4,7 @@
 codegen (`d_rocket_builder`) reads the annotation and
 emits a `fromJson` constructor, a `toJson` method,
 and a registration call into the central
-[`Serializer`](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/lib/src/serializer/serializer.dart)
+[`Serializer`](https://github.com/torogoz-tech/d_rocket/blob/main/lib/src/serializer/serializer.dart)
 registry. The `@SerializableUnion` annotation
 turns a sealed class into a discriminated-union
 deserializer.

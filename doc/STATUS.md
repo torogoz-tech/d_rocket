@@ -95,9 +95,9 @@ been performed.
 
 ## Where to read more
 
-- [README](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/README.md) — landing page, 6-layer overview.
-- [CHANGELOG](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/CHANGELOG.md) — every release.
-- [ROADMAP](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/ROADMAP.md) — historical phases + post-2.0 candidates.
-- [BUG_REVIEW](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/BUG_REVIEW.md) — bugs found and fixed (1 through B-09, all closed as of 1.2.1; B-21/22/23/24/25/27/28 fixed at 2.0.0).
-- [FAQ](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/13-faq.md) — common questions.
-- [doc/](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/) — the full reference (overview, quickstart, installation, 6 layer guides, migrations, CLI, cookbook, FAQ, architecture).
+- [README](https://github.com/torogoz-tech/d_rocket/blob/main/README.md) — landing page, 7-layer overview.
+- [CHANGELOG](https://github.com/torogoz-tech/d_rocket/blob/main/CHANGELOG.md) — every release.
+- [ROADMAP](https://github.com/torogoz-tech/d_rocket/blob/main/doc/ROADMAP.md) — historical phases + post-2.0 candidates.
+- [BUG_REVIEW](https://github.com/torogoz-tech/d_rocket/blob/main/doc/BUG_REVIEW.md) — bugs found and fixed (1 through B-09, all closed as of 1.2.1; B-21/22/23/24/25/27/28 fixed at 2.0.0).
+- [FAQ](https://github.com/torogoz-tech/d_rocket/blob/main/doc/13-faq.md) — common questions.
+- [doc/](https://github.com/torogoz-tech/d_rocket/tree/main/doc/) — the full reference (overview, quickstart, installation, 7 layer guides, migrations, CLI, cookbook, FAQ, architecture).

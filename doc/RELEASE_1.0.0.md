@@ -2,7 +2,7 @@
 
 > **Historical release notes.** For the current state of d_rocket,
 > see [`STATUS.md`](STATUS.md) and the
-> [CHANGELOG](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/CHANGELOG.md).
+> [CHANGELOG](https://github.com/torogoz-tech/d_rocket/blob/main/CHANGELOG.md).
 > The `1.x` line is in maintenance mode; the `2.0.0` release
 > (engine-agnostic multi-engine) is current.
 

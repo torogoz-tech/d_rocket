@@ -12,14 +12,14 @@
 
 **d_rocket** is the engine-agnostic core of a single-package framework
 for the data layer of Dart and Flutter applications. It unifies the
-six concerns that, in most stacks, force you to glue together half
+seven concerns that, in most stacks, force you to glue together half
 a dozen different libraries: **JSON serialization**, **typed HTTP
 clients**, **LINQ-style queries**, **an ORM**, **offline-first sync**,
 and **WebSocket / SSE realtime**.
 
 ## Modular by design
 
-The framework is built as **six independent layers**. A single
+The framework is built as **seven independent layers**. A single
 import — `package:d_rocket/d_rocket.dart` — exposes them all,
 but **only the code you use is in your final app**:
 
@@ -30,7 +30,7 @@ but **only the code you use is in your final app**:
   the ORM, sync, or realtime.
 - A client with an HTTP API + offline cache + push notifications
   picks **Layers 2 + 4 + 6** and ships just those (≈ 290 KB).
-- A full backend client that uses **all six** ships the whole
+- A full backend client that uses **all seven** ships the whole
   package (≈ 530 KB pre-tree-shake).
 
 There is no global state, no `main()`-time side effects, no
@@ -45,20 +45,21 @@ don't bloat the runtime.
 > Later add the ORM. The migration is per-class, not
 > project-wide.
 
-## The six layers
+## The seven layers
 
 | # | Layer | Highlights | Doc |
 |---|---|---|---|
-| 1 | **Serialization** | `@Serializable` → `fromJson` / `toJson`; `@SerializableUnion`; `@JsonKey` + `JsonNaming`; `JsonFactory` / `JsonEncoder`; `CodecEncoder` (json, msgpack, cbor, bson, xml, url-form, multipart, raw); `SerializerSnapshot`. | [04](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/04-layer-1-serialization.md) |
-| 2 | **REST** | `@RestClient` + 6 verbs + 7 parameter annotations; **7 wrap-around clients** — `HttpCache`, `GzipCodec`, `HmacSha256Signer`, `OAuth2HttpClient`, `RateLimitedHttpClient`, `RetryingHttpClient`, `CircuitBreakerHttpClient`; streaming; `CancelToken`; `LoggingInterceptor`. | [05](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/05-layer-2-rest.md) |
-| 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [06](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/06-layer-3-linq.md) |
-| 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/07-layer-4-orm.md) |
-| 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
-| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); `WebSocketReconnector` (backoff + heartbeat). | [09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
+| 1 | **Serialization** | `@Serializable` → `fromJson` / `toJson`; `@SerializableUnion`; `@JsonKey` + `JsonNaming`; `JsonFactory` / `JsonEncoder`; `CodecEncoder` (json, msgpack, cbor, bson, xml, url-form, multipart, raw); `SerializerSnapshot`. | [04](https://github.com/torogoz-tech/d_rocket/blob/main/doc/04-layer-1-serialization.md) |
+| 2 | **REST** | `@RestClient` + 6 verbs + 7 parameter annotations; **7 wrap-around clients** — `HttpCache`, `GzipCodec`, `HmacSha256Signer`, `OAuth2HttpClient`, `RateLimitedHttpClient`, `RetryingHttpClient`, `CircuitBreakerHttpClient`; streaming; `CancelToken`; `LoggingInterceptor`. | [05](https://github.com/torogoz-tech/d_rocket/blob/main/doc/05-layer-2-rest.md) |
+| 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [06](https://github.com/torogoz-tech/d_rocket/blob/main/doc/06-layer-3-linq.md) |
+| 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/doc/07-layer-4-orm.md) |
+| 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/doc/08-layer-5-sync.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); `WebSocketReconnector` (backoff + heartbeat). | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
+| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model validation, typed conversion, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
 
-Forms are a cross-cutting capability available in 2.2.0. They bind existing
-Flutter or Dart controls to an annotated model without introducing framework
-widgets or a parallel form model. See
+Forms are the seventh framework layer, available since 2.2.0. They bind
+existing Flutter or Dart controls to an annotated model without introducing
+framework widgets or a parallel form model. See
 [`RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md) and
 [`2.2-formularios-modelo.md`](doc/2.2-formularios-modelo.md).
 

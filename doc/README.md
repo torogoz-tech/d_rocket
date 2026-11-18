@@ -17,16 +17,16 @@ day-to-day.
 ### Getting started
 
 - **[01 — Overview](01-overview.md)** — what `d_rocket` is, why
-  it exists, the six layers, and the design philosophy.
+  it exists, the seven layers, and the design philosophy.
 - **[02 — Quickstart](02-quickstart.md)** — a complete runnable
   example from `pubspec.yaml` to a working `Db` query, in
   five minutes.
 - **[03 — Installation](03-installation.md)** — pubspec config,
   `build_runner` setup, dependency choices, and troubleshooting.
 
-### The six layers
+### The seven layers
 
-The framework is organized as **six cooperating layers**. Each
+The framework is organized as **seven cooperating layers**. Each
 layer has its own annotation dialect, its own runtime, and its own
 codegen phase. You can pick the layers you need and ignore the
 rest.
@@ -53,6 +53,9 @@ rest.
 - **[Layer 6 — Realtime](09-layer-6-realtime.md)** —
   `@WebSocketRoute` and `@SseRoute`, typed `Stream<T>`
   methods, reconnection with backoff, and heartbeat.
+- **[Layer 7 — Forms](RELEASE_2.2.0.md)** — model-driven field
+  binding, validation, typed conversion and safe construction without
+  requiring d_rocket widgets.
 
 ### Migrations and tooling
 

@@ -8,7 +8,7 @@ JSON, HTTP, SQL, sync, and realtime libraries that an average
 Dart/Flutter app accumulates, with **one package, one mental model,
 one generator**.
 
-The framework is organized as **six cooperating layers**, each
+The framework is organized as **seven cooperating layers**, each
 with its own annotation dialect, its own runtime, and its own
 codegen phase. You can pick the layers you need and ignore the
 rest:
@@ -21,12 +21,13 @@ rest:
 | 4 | **ORM (engine-agnostic)** | Local + remote persistence | `@Table`, `@PrimaryKey`, `@Column`, `@ForeignKey`, `@Index`, `@Embedded`, `@Migration` |
 | 5 | **Sync (offline-first)** | Push/pull against a backend | `class SyncProvider` (no annotation) |
 | 6 | **Realtime** | WebSocket / SSE | `@WebSocketClient`, `@SseClient` |
+| 7 | **Forms** | Model-driven capture and validation | `@Form`, `@FormField`, validation annotations |
 
 A single `initializeD()` call wires every annotated class in your
 project. There is no per-file `registerAll()`, no abstract
 `AsyncQueryProvider` to wire up by hand, no `as` aliases.
 
-## The six layers, in detail
+## The seven layers, in detail
 
 ### Layer 1 — Serialization
 
@@ -304,7 +305,7 @@ packages/d_rocket_engine_web/
 
 ## When to use which layer
 
-You don't have to use all six. The framework is designed to
+You don't have to use all seven. The framework is designed to
 be picked apart.
 
 | You need... | Use these layers |

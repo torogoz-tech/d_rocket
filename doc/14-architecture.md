@@ -74,7 +74,7 @@ extend the framework.
 The runtime is split into two tiers in 2.0.0:
 
 * **Core** (`d_rocket`) — engine-agnostic. Contains all
-  six layers, the `DbEngine` contract, the `SqlDialect`
+  seven layers, the `DbEngine` contract, the `SqlDialect`
   contract, the `EngineRegistry`, and the
   `AsyncQueryProvider` interface. No DB driver dependency.
 * **Engines** (one package per engine) — implements
@@ -134,7 +134,7 @@ and the provider rewrites on emit). Adding a new
 engine (e.g. MySQL for 2.2.0) means implementing
 `DbEngine` + `AsyncQueryProvider` + `SqlDialect`.
 
-## The six layers, internally
+## The seven layers, internally
 
 Each layer in `d_rocket` is a focused module with a
 clean contract to the others. Cross-layer dependencies

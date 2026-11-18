@@ -5,6 +5,19 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] — 2026-11-18
+
+### Fixed
+
+* Shortened the package description to satisfy pub.dev's 60–180 character
+  search-description requirement.
+* Corrected README links to the repository's top-level `doc/` directory.
+
+### Documentation
+
+* Added Forms as the seventh documented framework layer.
+* Added the complete 2.2.0 Forms release guide and usage references.
+
 ## [2.2.0] — 2026-11-18
 
 ### Added

@@ -173,7 +173,7 @@ skip` and the CI stays green.
 ## What's in the public barrel
 
 The 6 layers and their public surface are listed in the
-[`README.md`](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/README.md).
+[`README.md`](https://github.com/torogoz-tech/d_rocket/blob/main/README.md).
 The per-layer reference is in
 [`doc/04-layer-1-serialization.md`](04-layer-1-serialization.md)
 through
