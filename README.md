@@ -56,6 +56,12 @@ don't bloat the runtime.
 | 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/08-layer-5-sync.md) |
 | 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); `WebSocketReconnector` (backoff + heartbeat). | [09](https://github.com/torogoz-tech/d_rocket/blob/main/packages/d_rocket/doc/09-layer-6-realtime.md) |
 
+Forms are a cross-cutting capability available in 2.2.0. They bind existing
+Flutter or Dart controls to an annotated model without introducing framework
+widgets or a parallel form model. See
+[`RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md) and
+[`2.2-formularios-modelo.md`](doc/2.2-formularios-modelo.md).
+
 A single `initializeD()` call (emitted by `d_rocket_builder` into
 `d_rocket_registry.g.dart`) wires every annotated class in your
 project. There is no per-file `registerAll()`.
@@ -83,21 +89,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.1.0
+  d_rocket: ^2.2.0
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.1.0
+  d_rocket: ^2.2.0
 dev_dependencies:
-  d_rocket_builder: ^2.1.0
+  d_rocket_builder: ^2.2.0
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.1.0
-  d_rocket_engine_sqlite: ^2.1.0   # SQLite in 2.1.0
+  d_rocket: ^2.2.0
+  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.2.0
 dev_dependencies:
-  d_rocket_builder: ^2.1.0
+  d_rocket_builder: ^2.2.0
   d_rocket_lints: ^2.1.0            # N+1 + closure-linq lints
   build_runner: ^2.4.13
 ```
@@ -152,6 +158,10 @@ cookbook, FAQ, and architecture). The package targets
 The complete 2.1.0 production flow, including SQLite, sync, connectivity,
 migrations and DevTools, is documented in
 [`doc/2.1-production-example.md`](doc/2.1-production-example.md).
+
+The 2.2.0 model-driven forms contract, including Flutter bindings, raw input
+conversion, validation modes, JSON/REST integration and non-nullable handling,
+is documented in [`doc/RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md).
 
 ## License
 
