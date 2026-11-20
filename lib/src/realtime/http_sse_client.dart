@@ -1,25 +1,3 @@
-// SSE (Server-Sent Events) client over plain HTTP.
-//
-// Wire format:
-//
-// ```
-// event: foo
-// id: 42
-// retry: 5000
-// data: line 1
-// data: line 2
-// <— blank line: end of event
-// ```
-//
-// Each event has optional `event`, `id`, `retry`
-// fields and one or more `data` lines (joined
-// with `\n`). The blank line signals "emit this
-// event now".
-//
-// Uses `package:http` + `Client.send` (streaming)
-// so it works on the Dart VM, Flutter, and
-// (eventually) the web.
-
 import 'dart:async';
 import 'dart:convert';
 
@@ -27,19 +5,32 @@ import 'package:http/http.dart' as http;
 
 import 'sse_connection.dart';
 import 'sse_event.dart';
+import 'sse_http_exception.dart';
 
-/// An SSE client backed by `package:http`. The
-/// [httpClient] is DI-friendly (default is a fresh
-/// `http.Client` per instance). For tests, inject
-/// a `MockClient` or a real `http.Client`.
+/// An SSE client backed by `package:http`.
 class HttpSseClient implements SseConnection {
   HttpSseClient({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+      : _httpClient = httpClient,
+        _ownsHttpClient = httpClient == null;
 
-  final http.Client _httpClient;
-  // ignore: unused_field
-  http.StreamedResponse? _response;
+  http.Client? _httpClient;
+  final bool _ownsHttpClient;
   StreamController<SseEvent>? _controller;
+  StreamController<void>? _activityController;
+  StreamSubscription<String>? _lineSubscription;
+  Completer<void>? _readyCompleter;
+  int? _statusCode;
+  bool _closed = false;
+
+  @override
+  Future<void> get ready => _readyCompleter?.future ?? Future<void>.value();
+
+  @override
+  int? get statusCode => _statusCode;
+
+  @override
+  Stream<void> get activity =>
+      _activityController?.stream ?? const Stream<void>.empty();
 
   @override
   Stream<SseEvent> connect(
@@ -47,121 +38,147 @@ class HttpSseClient implements SseConnection {
     Map<String, String>? headers,
     String? lastEventId,
   }) {
+    _closed = false;
+    _statusCode = null;
     final StreamController<SseEvent> controller = StreamController<SseEvent>();
+    final StreamController<void> activityController =
+        StreamController<void>.broadcast();
     _controller = controller;
+    _activityController = activityController;
+    _readyCompleter = Completer<void>();
+    _httpClient ??= http.Client();
 
-    Future<void>(() async {
-      try {
-        final Map<String, String> allHeaders = <String, String>{
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          ...?headers,
-        };
-        if (lastEventId != null) {
-          allHeaders['Last-Event-ID'] = lastEventId;
-        }
+    unawaited(_open(
+      url,
+      headers,
+      lastEventId,
+      controller,
+      activityController,
+    ));
+    return controller.stream;
+  }
 
-        final http.Request request = http.Request('GET', url);
-        request.headers.addAll(allHeaders);
+  Future<void> _open(
+    Uri url,
+    Map<String, String>? headers,
+    String? lastEventId,
+    StreamController<SseEvent> controller,
+    StreamController<void> activityController,
+  ) async {
+    try {
+      final Map<String, String> allHeaders = <String, String>{
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        ...?headers,
+      };
+      if (lastEventId != null) allHeaders['Last-Event-ID'] = lastEventId;
 
-        final http.StreamedResponse response = await _httpClient.send(request);
-        if (response.statusCode != 200) {
-          controller.addError(StateError(
-            'SSE connect failed: HTTP ${response.statusCode}',
-          ));
-          await controller.close();
-          return;
-        }
-        _response = response;
+      final http.Request request = http.Request('GET', url)
+        ..headers.addAll(allHeaders);
+      final http.StreamedResponse response = await _httpClient!.send(request);
+      if (_closed || !identical(_controller, controller)) return;
+      _statusCode = response.statusCode;
+      _readyCompleter?.complete();
+      if (response.statusCode != 200) {
+        controller.addError(SseHttpException(response.statusCode));
+        await controller.close();
+        return;
+      }
 
-        final Stream<List<int>> byteStream = response.stream;
-        final Stream<String> lineStream =
-            byteStream.transform(utf8.decoder).transform(const LineSplitter());
+      final Stream<String> lineStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+      String dataBuf = '';
+      String? eventBuf;
+      String? idBuf;
+      Duration? retryBuf;
 
-        String dataBuf = '';
-        String? eventBuf;
-        String? idBuf;
-        Duration? retryBuf;
+      void emit() {
+        if (dataBuf.isEmpty && eventBuf == null && idBuf == null) return;
+        controller.add(SseEvent(
+          data: dataBuf,
+          event: eventBuf,
+          id: idBuf,
+          retry: retryBuf,
+        ));
+        dataBuf = '';
+        eventBuf = null;
+        idBuf = null;
+        retryBuf = null;
+      }
 
-        void emit() {
-          if (dataBuf.isEmpty && eventBuf == null && idBuf == null) {
+      _lineSubscription = lineStream.listen(
+        (String line) {
+          if (_closed) return;
+          activityController.add(null);
+          if (line.isEmpty) {
+            emit();
             return;
           }
-          controller.add(SseEvent(
-            data: dataBuf,
-            event: eventBuf,
-            id: idBuf,
-            retry: retryBuf,
-          ));
-          dataBuf = '';
-          eventBuf = null;
-          idBuf = null;
-          retryBuf = null;
-        }
-
-        final StreamSubscription<String> sub = lineStream.listen(
-          (String line) {
-            if (line.isEmpty) {
-              emit();
-              return;
-            }
-            if (line.startsWith(':')) {
-              return;
-            }
-            final int colon = line.indexOf(':');
-            final String field;
-            final String value;
-            if (colon < 0) {
-              field = line;
-              value = '';
-            } else {
-              field = line.substring(0, colon);
-              value = colon + 1 < line.length && line[colon + 1] == ' '
+          if (line.startsWith(':')) return;
+          final int colon = line.indexOf(':');
+          final String field = colon < 0 ? line : line.substring(0, colon);
+          final String value = colon < 0
+              ? ''
+              : colon + 1 < line.length && line[colon + 1] == ' '
                   ? line.substring(colon + 2)
                   : line.substring(colon + 1);
-            }
-            switch (field) {
-              case 'data':
-                dataBuf = dataBuf.isEmpty ? value : '$dataBuf\n$value';
-                break;
-              case 'event':
-                eventBuf = value;
-                break;
-              case 'id':
-                idBuf = value;
-                break;
-              case 'retry':
-                final int? ms = int.tryParse(value);
-                if (ms != null) retryBuf = Duration(milliseconds: ms);
-                break;
-            }
-          },
-          onError: (Object e, StackTrace st) {
-            controller.addError(e, st);
-          },
-          onDone: () {
-            emit();
-            controller.close();
-          },
-          cancelOnError: false,
-        );
-
-        controller.onCancel = () async {
-          await sub.cancel();
-        };
-      } catch (e, st) {
-        controller.addError(e, st);
+          switch (field) {
+            case 'data':
+              dataBuf = dataBuf.isEmpty ? value : '$dataBuf\n$value';
+            case 'event':
+              eventBuf = value;
+            case 'id':
+              idBuf = value;
+            case 'retry':
+              final int? milliseconds = int.tryParse(value);
+              if (milliseconds != null) {
+                retryBuf = Duration(milliseconds: milliseconds);
+              }
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!_closed) controller.addError(error, stackTrace);
+        },
+        onDone: () {
+          emit();
+          unawaited(controller.close());
+        },
+        cancelOnError: false,
+      );
+      controller.onCancel = () async {
+        await _lineSubscription?.cancel();
+      };
+    } catch (error, stackTrace) {
+      if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+        _readyCompleter!.complete();
+      }
+      if (!_closed && identical(_controller, controller)) {
+        controller.addError(error, stackTrace);
         await controller.close();
       }
-    });
-
-    return controller.stream;
+    }
   }
 
   @override
   Future<void> close() async {
-    await _controller?.close();
+    _closed = true;
+    if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
+      _readyCompleter!.complete();
+    }
+    await _lineSubscription?.cancel();
+    _lineSubscription = null;
+    if (_controller != null && !_controller!.isClosed) {
+      await _controller!.close();
+    }
+    if (_activityController != null && !_activityController!.isClosed) {
+      await _activityController!.close();
+    }
     _controller = null;
-    _response = null;
+    _activityController = null;
+    if (_ownsHttpClient) {
+      _httpClient?.close();
+      _httpClient = null;
+    }
   }
 }

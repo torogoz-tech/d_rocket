@@ -9,9 +9,13 @@ class FormState<T> {
   FormState({
     required Map<String, FormFieldState<Object?>> fields,
     required T Function() builder,
+    List<FormValidator<T>>? validators,
     this.validationMode = FormValidationMode.onSubmit,
   })  : _fields = Map<String, FormFieldState<Object?>>.unmodifiable(fields),
-        _builder = builder {
+        _builder = builder,
+        _validators = List<FormValidator<T>>.unmodifiable(
+          validators ?? <FormValidator<T>>[],
+        ) {
     for (final FormFieldState<Object?> field in _fields.values) {
       field.validationMode = validationMode;
     }
@@ -19,6 +23,8 @@ class FormState<T> {
 
   final Map<String, FormFieldState<Object?>> _fields;
   final T Function() _builder;
+  final List<FormValidator<T>> _validators;
+  final List<FormError> _formErrors = <FormError>[];
 
   /// Controls automatic validation for registered fields.
   final FormValidationMode validationMode;
@@ -41,7 +47,37 @@ class FormState<T> {
       field.validate();
     }
 
+    _formErrors.clear();
+    if (_buildValidationResult().errors.isNotEmpty) return false;
+
+    final T model = _builder();
+    for (final FormValidator<T> validator in _validators) {
+      final FormError? error = validator(model);
+      if (error != null) _formErrors.add(error);
+    }
+
     return validation.isValid;
+  }
+
+  /// Updates multiple fields from one control value.
+  ///
+  /// The mapper returns raw values keyed by model field name, so each target
+  /// field keeps its own parser and validation rules.
+  void setCompositeValues(Map<String, Object?> values) {
+    for (final MapEntry<String, Object?> entry in values.entries) {
+      final FormFieldState<Object?>? field = _fields[entry.key];
+      if (field == null) {
+        throw ArgumentError.value(entry.key, 'field', 'Unknown form field');
+      }
+      field.setRawValue(entry.value);
+    }
+  }
+
+  /// Creates a callback for a control that supplies several model fields.
+  void Function(TValue) bindComposite<TValue>(
+    Map<String, Object?> Function(TValue value) mapper,
+  ) {
+    return (TValue value) => setCompositeValues(mapper(value));
   }
 
   /// Builds the model only after a successful validation.
@@ -65,6 +101,7 @@ class FormState<T> {
     for (final FormFieldState<Object?> field in _fields.values) {
       field.reset();
     }
+    _formErrors.clear();
   }
 
   FormValidationResult _buildValidationResult() {
@@ -82,6 +119,8 @@ class FormState<T> {
       fieldErrors[entry.key] = currentErrors;
       errors.addAll(currentErrors);
     }
+
+    errors.addAll(_formErrors);
 
     return FormValidationResult(
       isValid: errors.isEmpty,

@@ -11,6 +11,15 @@ class DiagnosticSseConnection implements SseConnection {
   final SseConnection inner;
 
   @override
+  Future<void> get ready => inner.ready;
+
+  @override
+  int? get statusCode => inner.statusCode;
+
+  @override
+  Stream<void> get activity => inner.activity;
+
+  @override
   Stream<SseEvent> connect(
     Uri url, {
     Map<String, String>? headers,

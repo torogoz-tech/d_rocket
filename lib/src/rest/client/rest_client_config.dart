@@ -15,6 +15,7 @@ class RestClientConfig {
   const RestClientConfig({
     this.client,
     this.wrappers = const <HttpClientWrapper>[],
+    this.baseUrl,
   });
 
   /// Optional transport. Defaults to the current `dRest.client`.
@@ -22,6 +23,11 @@ class RestClientConfig {
 
   /// Wrappers ordered from outermost to innermost.
   final List<HttpClientWrapper> wrappers;
+
+  /// Optional runtime base URL for this generated client instance.
+  ///
+  /// When omitted, the URL declared by `@RestClient` is used.
+  final String? baseUrl;
 
   /// Creates the configured pipeline around [fallback].
   HttpClient build(HttpClient fallback) {

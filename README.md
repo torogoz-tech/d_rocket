@@ -54,7 +54,7 @@ don't bloat the runtime.
 | 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [06](https://github.com/torogoz-tech/d_rocket/blob/main/doc/06-layer-3-linq.md) |
 | 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/doc/07-layer-4-orm.md) |
 | 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/doc/08-layer-5-sync.md) |
-| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); `WebSocketReconnector` (backoff + heartbeat). | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); controlled `WebSocketReconnector` and `SseReconnector` with backoff, dynamic auth headers, heartbeats and resumable cursors. | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
 | 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model validation, typed conversion, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
 
 Forms are the seventh framework layer, available since 2.2.0. They bind
@@ -90,21 +90,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.2.0
+  d_rocket: ^2.2.2
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.2.0
+  d_rocket: ^2.2.2
 dev_dependencies:
-  d_rocket_builder: ^2.2.0
+  d_rocket_builder: ^2.2.2
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.2.0
-  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.2.0
+  d_rocket: ^2.2.2
+  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.2.2
 dev_dependencies:
-  d_rocket_builder: ^2.2.0
+  d_rocket_builder: ^2.2.2
   d_rocket_lints: ^2.1.0            # N+1 + closure-linq lints
   build_runner: ^2.4.13
 ```
@@ -163,6 +163,11 @@ migrations and DevTools, is documented in
 The 2.2.0 model-driven forms contract, including Flutter bindings, raw input
 conversion, validation modes, JSON/REST integration and non-nullable handling,
 is documented in [`doc/RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md).
+
+The 2.2.2 SSE transport contract, including dynamic headers, authentication
+recovery, lifecycle states, manual cursor acknowledgement, heartbeat-aware
+inactivity and complete transport shutdown, is documented in
+[`doc/2.2.2-sse-reconnect.md`](doc/2.2.2-sse-reconnect.md).
 
 ## License
 

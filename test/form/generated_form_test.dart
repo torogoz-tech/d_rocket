@@ -62,4 +62,29 @@ void main() {
     expect(transport.lastRequest?.bodyAsString, contains('person@example.com'));
     expect(transport.lastRequest?.bodyAsString, contains('strong-password'));
   });
+
+  test('generated REST client accepts a per-instance base URL', () async {
+    final RequestCaptureHttpClient transport = RequestCaptureHttpClient(
+      RestResponse<dynamic>(
+        statusCode: 200,
+        headers: const <String, String>{},
+        body: <String, dynamic>{'ok': true},
+        rawBody: '{"ok":true}',
+        request: RestRequest(method: 'GET', path: '/placeholder'),
+      ),
+    );
+    final AuthClientFixture client = createAuthClientFixture(
+      config: RestClientConfig(
+        client: transport,
+        baseUrl: 'https://tenant.example/api',
+      ),
+    );
+
+    await client.login(
+      LoginRequest(email: 'person@example.com', password: 'strong-password'),
+    );
+
+    expect(transport.lastRequest?.fullUrl,
+        'https://tenant.example/api/auth/login');
+  });
 }

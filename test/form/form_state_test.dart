@@ -130,5 +130,67 @@ void main() {
       expect(first.value, 'one');
       expect(form.isValid, isTrue);
     });
+
+    test('runs model-level validators after field validation', () {
+      final FormFieldState<String> number = FormFieldState<String>(
+        initialValue: '4111111111111111',
+      );
+      final FormFieldState<String> cvv = FormFieldState<String>(
+        initialValue: '123',
+      );
+      final FormState<Map<String, String>> form =
+          FormState<Map<String, String>>(
+        fields: <String, FormFieldState<Object?>>{
+          'number': number,
+          'cvv': cvv,
+        },
+        builder: () => <String, String>{
+          'number': number.value!,
+          'cvv': cvv.value!,
+        },
+        validators: <FormValidator<Map<String, String>>>[
+          (Map<String, String>? model) =>
+              model!['number']!.startsWith('3') && model['cvv']!.length != 4
+                  ? const FormError(
+                      code: 'cvv.invalid_for_brand',
+                      message: 'El CVV debe tener cuatro dígitos',
+                    )
+                  : null,
+        ],
+      );
+
+      expect(form.validate(), isTrue);
+      number.setValue('378282246310005');
+
+      expect(form.validate(), isFalse);
+      expect(form.errors.single.code, 'cvv.invalid_for_brand');
+    });
+
+    test('bindComposite updates several raw fields through their parsers', () {
+      final FormFieldState<int> month = FormFieldState<int>(
+        parser: FormValueParser<int>(parse: (Object? raw) => int.parse('$raw')),
+      );
+      final FormFieldState<int> year = FormFieldState<int>(
+        parser: FormValueParser<int>(parse: (Object? raw) => int.parse('$raw')),
+      );
+      final FormState<List<int>> form = FormState<List<int>>(
+        fields: <String, FormFieldState<Object?>>{
+          'month': month,
+          'year': year,
+        },
+        builder: () => <int>[month.value!, year.value!],
+      );
+
+      final void Function(String) bind = form.bindComposite<String>(
+        (String value) => <String, Object?>{
+          'month': value.substring(0, 2),
+          'year': value.substring(3),
+        },
+      );
+      bind('04/29');
+
+      expect(month.value, 4);
+      expect(year.value, 29);
+    });
   });
 }

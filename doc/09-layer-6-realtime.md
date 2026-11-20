@@ -119,6 +119,45 @@ annotation has no `sendEventNames` (the client
 cannot send events over SSE — it would use a
 `@WebSocketClient` for that).
 
+## `SseReconnector` robusto
+
+Desde 2.2.2, el runtime también expone `SseReconnector` para consumidores que
+necesitan controlar directamente la conexión SSE. `headersProvider` se ejecuta
+antes de cada intento y `onUnauthorized` puede renovar la sesión cuando el
+servidor responde `401`:
+
+```dart
+final SseReconnector stream = SseReconnector(
+  factory: HttpSseClient.new,
+  url: Uri.parse('https://api.example.com/events'),
+  headersProvider: () async => <String, String>{
+    'Authorization': 'Bearer ${await session.accessToken()}',
+  },
+  onUnauthorized: () async => session.refresh(),
+  inactivityTimeout: const Duration(minutes: 2),
+  manualAcknowledge: true,
+);
+```
+
+El estado se observa mediante `states` (`connecting`, `connected`, `retrying`,
+`stopped` y `failed`). Los errores HTTP se exponen como `SseHttpException` con
+su `statusCode`; un `403` es terminal y no crea reintentos infinitos.
+
+El cursor se puede confirmar después de persistir el evento:
+
+```dart
+stream.events.listen((event) async {
+  await repository.save(event.data);
+  stream.acknowledge(event);
+});
+```
+
+`clearLastEventId()` elimina el cursor. `stop()` cancela reintentos,
+suscripciones y transporte, y un `start()` posterior crea una nueva generación
+que ignora eventos tardíos de la conexión anterior. `dispose()` cierra también
+los streams públicos. El temporizador de `inactivityTimeout` considera tanto
+eventos como comentarios SSE usados como heartbeats.
+
 ## Generated event API
 
 The codegen reads the user's `@Serializable` classes

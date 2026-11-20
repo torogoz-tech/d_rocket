@@ -5,6 +5,35 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] — 2026-11-20
+
+### Fixed
+
+* `SseReconnector` now resolves asynchronous headers before every connection
+  and reconnection, including refreshed authentication headers after HTTP 401.
+* SSE shutdown now cancels retry timers, subscriptions, pending connections and
+  the active transport; `start()` can safely begin a new lifecycle.
+* Reconnect attempts use bounded exponential backoff and reset only after the
+  transport reports a successful connection.
+* HTTP status, authentication recovery, 403 terminal failures, observable
+  lifecycle states and stale-connection cancellation are now exposed by the
+  SSE runtime.
+* SSE resume cursors can be cleared or acknowledged manually after successful
+  event processing, and inactivity timers count protocol heartbeats.
+* `HttpSseClient.close()` now cancels the response stream and closes an owned
+  `http.Client`, while injected clients remain caller-owned.
+* Form adapters now support model-level cross-field validators and composite
+  bindings for controls that update several properties at once.
+* Serializer codegen safely handles nullable nested models, and form codegen
+  escapes `$` in `@Pattern` expressions.
+* Generated REST clients accept a per-instance runtime base URL override.
+
+### Tests
+
+* Added regression coverage for dynamic headers, 401/403 handling, manual
+  cursor acknowledgement, heartbeat inactivity, lifecycle restart and stream
+  disposal.
+
 ## [2.2.1] — 2026-11-18
 
 ### Fixed

@@ -6,6 +6,16 @@ import 'sse_event.dart';
 /// * [HttpSseClient] — `package:http` (Dart VM +
 /// Flutter + web).
 abstract class SseConnection {
+  /// Completes when the connection attempt has received its initial response.
+  /// Existing implementations can keep the default immediate completion.
+  Future<void> get ready => Future<void>.value();
+
+  /// HTTP status returned by the most recent connection attempt, when known.
+  int? get statusCode => null;
+
+  /// Activity emitted by the transport, including protocol heartbeats.
+  Stream<void> get activity => const Stream<void>.empty();
+
   /// Opens a connection to [url] and returns a
   /// stream of [SseEvent]s. The stream ends when
   /// the server closes the connection. The
