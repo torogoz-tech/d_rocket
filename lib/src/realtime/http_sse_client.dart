@@ -151,7 +151,11 @@ class HttpSseClient implements SseConnection {
       };
     } catch (error, stackTrace) {
       if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
-        _readyCompleter!.complete();
+        // A transport failure before receiving the HTTP response is not a
+        // successful connection. Propagate it through `ready` so
+        // SseReconnector does not reset its retry budget for a stream that
+        // is already closing.
+        _readyCompleter!.completeError(error, stackTrace);
       }
       if (!_closed && identical(_controller, controller)) {
         controller.addError(error, stackTrace);

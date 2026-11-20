@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:d_rocket/d_rocket.dart';
+import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 import 'fake_sse_connection.dart';
@@ -61,6 +62,31 @@ void main() {
     expect(connections, hasLength(2));
     await reconnector.stop();
     await subscription.cancel();
+  });
+
+  test('does not reset attempts when the stream closes before a response',
+      () async {
+    int connections = 0;
+    final MockClient client = MockClient(
+      (_) async => throw StateError('network unavailable'),
+    );
+    final SseReconnector reconnector = SseReconnector(
+      url: Uri.parse('https://example.test/events'),
+      factory: () {
+        connections++;
+        return HttpSseClient(httpClient: client);
+      },
+      initialBackoff: Duration.zero,
+      maxAttempts: 1,
+    );
+
+    await reconnector.start();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(connections, 2);
+    expect(reconnector.state, SseReconnectorState.failed);
+    await reconnector.dispose();
+    client.close();
   });
 
   test('resolves headers before every connection attempt', () async {
