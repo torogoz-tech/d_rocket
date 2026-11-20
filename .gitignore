@@ -12,6 +12,12 @@ build/
 pubspec.lock
 pubspec_overrides.yaml
 
+# The published DevTools extension requires its compiled web build.
+!extension/
+!extension/devtools/
+!extension/devtools/build/
+!extension/devtools/build/**
+
 # OS
 .DS_Store
 Thumbs.db
