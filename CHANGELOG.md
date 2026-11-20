@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Serializer codegen safely handles nullable nested models, and form codegen
   escapes `$` in `@Pattern` expressions.
 * Generated REST clients accept a per-instance runtime base URL override.
+* Updated the development test constraint to `^1.31.2` for compatibility
+  with the Analyzer 13 code-generation toolchain.
+* Removed the unused `flutter_test` development dependency; the runtime test
+  suite uses `package:test`, avoiding SDK-pinned `test_api` conflicts.
 
 ### Tests
 
