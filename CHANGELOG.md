@@ -5,6 +5,30 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] — 2026-11-20
+
+### Added
+
+* `HttpSseClient` now exposes SSE configuration directly through default
+  headers, request/response/error interceptors, connection timeout,
+  redirect policy and content-type validation.
+* Added the public `SseInterceptor` and `CompositeSseInterceptor` APIs so
+  applications can customize SSE requests without creating a custom HTTP
+  transport or subclassing `HttpSseClient`.
+
+### Fixed
+
+* Successful SSE responses are validated as `text/event-stream` while HTTP
+  error statuses remain available to `SseReconnector`.
+* Owned transports are released when the initial connection timeout expires.
+* `HttpSseClient.close()` no longer waits for an unused single-subscription
+  stream to acquire a listener, so pending connections can be stopped safely.
+
+### Tests
+
+* Added regression coverage for SSE configuration, interceptor execution,
+  content-type validation and closing before the stream is listened to.
+
 ## [2.2.3] — 2026-11-20
 
 ### Fixed

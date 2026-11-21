@@ -1,4 +1,5 @@
 export 'http_sse_client.dart';
+export 'sse_interceptor.dart';
 export 'sse_connection.dart';
 export 'sse_event.dart';
 export 'sse_http_exception.dart';

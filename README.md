@@ -90,19 +90,19 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.2.2
+  d_rocket: ^2.2.4
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.2.2
+  d_rocket: ^2.2.4
 dev_dependencies:
   d_rocket_builder: ^2.2.2
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.2.2
-  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.2.2
+  d_rocket: ^2.2.4
+  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.2.4
 dev_dependencies:
   d_rocket_builder: ^2.2.2
   d_rocket_lints: ^2.1.0            # N+1 + closure-linq lints
@@ -164,10 +164,11 @@ The 2.2.0 model-driven forms contract, including Flutter bindings, raw input
 conversion, validation modes, JSON/REST integration and non-nullable handling,
 is documented in [`doc/RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md).
 
-The 2.2.2 SSE transport contract, including dynamic headers, authentication
-recovery, lifecycle states, manual cursor acknowledgement, heartbeat-aware
-inactivity and complete transport shutdown, is documented in
-[`doc/2.2.2-sse-reconnect.md`](doc/2.2.2-sse-reconnect.md).
+The 2.2.4 SSE transport contract, including direct `HttpSseClient`
+configuration, interceptors, connection timeout, content-type validation,
+dynamic headers, authentication recovery, lifecycle states, manual cursor
+acknowledgement, heartbeat-aware inactivity and complete transport shutdown,
+is documented in [`doc/2.2.2-sse-reconnect.md`](doc/2.2.2-sse-reconnect.md).
 
 ## License
 

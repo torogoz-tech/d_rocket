@@ -1,6 +1,6 @@
 name: d_rocket
 description: Engine-agnostic Dart and Flutter framework for serialization, REST, LINQ, ORM, offline-first sync, realtime, and model-driven forms.
-version: 2.2.3
+version: 2.2.4
 
 repository: https://github.com/torogoz-tech/d_rocket
 homepage: https://github.com/torogoz-tech/d_rocket

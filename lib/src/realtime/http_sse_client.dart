@@ -6,12 +6,37 @@ import 'package:http/http.dart' as http;
 import 'sse_connection.dart';
 import 'sse_event.dart';
 import 'sse_http_exception.dart';
+import 'sse_interceptor.dart';
 
 /// An SSE client backed by `package:http`.
 class HttpSseClient implements SseConnection {
-  HttpSseClient({http.Client? httpClient})
-      : _httpClient = httpClient,
+  HttpSseClient({
+    http.Client? httpClient,
+    this.defaultHeaders = const <String, String>{},
+    this.interceptors = const <SseInterceptor>[],
+    this.connectTimeout = const Duration(seconds: 30),
+    this.followRedirects = true,
+    this.validateContentType = true,
+  })  : _httpClient = httpClient,
         _ownsHttpClient = httpClient == null;
+
+  /// Headers applied to every connection before per-connection headers.
+  final Map<String, String> defaultHeaders;
+
+  /// Interceptors invoked for requests, responses and connection failures.
+  final List<SseInterceptor> interceptors;
+
+  /// Maximum time allowed to receive the initial HTTP response.
+  /// Set to `null` to disable the timeout.
+  final Duration? connectTimeout;
+
+  /// Whether HTTP redirects should be followed by the underlying request.
+  final bool followRedirects;
+
+  /// Whether successful responses must declare `text/event-stream`.
+  final bool validateContentType;
+  late final CompositeSseInterceptor _interceptorChain =
+      CompositeSseInterceptor(interceptors);
 
   http.Client? _httpClient;
   final bool _ownsHttpClient;
@@ -67,25 +92,38 @@ class HttpSseClient implements SseConnection {
   ) async {
     try {
       final Map<String, String> allHeaders = <String, String>{
+        ...defaultHeaders,
         'Accept': 'text/event-stream',
         'Cache-Control': 'no-cache',
         ...?headers,
       };
       if (lastEventId != null) allHeaders['Last-Event-ID'] = lastEventId;
 
-      final http.Request request = http.Request('GET', url)
+      http.BaseRequest request = http.Request('GET', url)
+        ..followRedirects = followRedirects
         ..headers.addAll(allHeaders);
-      final http.StreamedResponse response = await _httpClient!.send(request);
+      request = await _interceptorChain.onRequest(request);
+      final Future<http.StreamedResponse> responseFuture = _httpClient!.send(
+        request,
+      );
+      final http.StreamedResponse response = connectTimeout == null
+          ? await responseFuture
+          : await responseFuture.timeout(connectTimeout!);
       if (_closed || !identical(_controller, controller)) return;
-      _statusCode = response.statusCode;
+      final http.StreamedResponse interceptedResponse =
+          await _interceptorChain.onResponse(response);
+      _statusCode = interceptedResponse.statusCode;
       _readyCompleter?.complete();
-      if (response.statusCode != 200) {
-        controller.addError(SseHttpException(response.statusCode));
+      if (interceptedResponse.statusCode != 200) {
+        controller.addError(SseHttpException(interceptedResponse.statusCode));
         await controller.close();
         return;
       }
+      if (validateContentType && !_isEventStream(interceptedResponse)) {
+        throw const FormatException('Expected text/event-stream');
+      }
 
-      final Stream<String> lineStream = response.stream
+      final Stream<String> lineStream = interceptedResponse.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter());
       String dataBuf = '';
@@ -138,6 +176,7 @@ class HttpSseClient implements SseConnection {
           }
         },
         onError: (Object error, StackTrace stackTrace) {
+          unawaited(_interceptorChain.onError(error, stackTrace));
           if (!_closed) controller.addError(error, stackTrace);
         },
         onDone: () {
@@ -150,6 +189,11 @@ class HttpSseClient implements SseConnection {
         await _lineSubscription?.cancel();
       };
     } catch (error, stackTrace) {
+      if (error is TimeoutException && _ownsHttpClient) {
+        _httpClient?.close();
+        _httpClient = null;
+      }
+      await _interceptorChain.onError(error, stackTrace);
       if (_readyCompleter != null && !_readyCompleter!.isCompleted) {
         // A transport failure before receiving the HTTP response is not a
         // successful connection. Propagate it through `ready` so
@@ -173,7 +217,10 @@ class HttpSseClient implements SseConnection {
     await _lineSubscription?.cancel();
     _lineSubscription = null;
     if (_controller != null && !_controller!.isClosed) {
-      await _controller!.close();
+      // A single-subscription controller waits for a listener before its
+      // close future completes. Closing must not depend on the consumer
+      // having listened, especially while a connection attempt is pending.
+      unawaited(_controller!.close());
     }
     if (_activityController != null && !_activityController!.isClosed) {
       await _activityController!.close();
@@ -184,5 +231,11 @@ class HttpSseClient implements SseConnection {
       _httpClient?.close();
       _httpClient = null;
     }
+  }
+
+  bool _isEventStream(http.StreamedResponse response) {
+    final String contentType = response.headers['content-type'] ?? '';
+    final String mediaType = contentType.split(';').first.trim().toLowerCase();
+    return mediaType == 'text/event-stream';
   }
 }

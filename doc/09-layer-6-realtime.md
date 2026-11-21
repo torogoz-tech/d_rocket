@@ -268,7 +268,13 @@ from where the client left off.
 
 ```dart
 class HttpSseClient implements SseConnection {
-  HttpSseClient({http.Client? httpClient});
+  HttpSseClient({
+    Map<String, String> defaultHeaders = const {},
+    List<SseInterceptor> interceptors = const [],
+    Duration? connectTimeout = const Duration(seconds: 30),
+    bool followRedirects = true,
+    bool validateContentType = true,
+  });
 
   Stream<SseEvent> connect(
     Uri url, {
@@ -279,11 +285,13 @@ class HttpSseClient implements SseConnection {
 }
 ```
 
-The `httpClient` is DI-friendly (default is a
-fresh `http.Client` per instance). For tests,
-inject a `MockClient` (via
-`http.Client` constructor) or a real
-`http.Client`.
+The normal constructor creates and owns its HTTP
+transport. `defaultHeaders`, `interceptors`, the
+initial response timeout, redirect policy and
+`text/event-stream` validation are configured on
+`HttpSseClient` itself. An optional `http.Client`
+can still be injected for tests or specialized
+transports; injected clients remain caller-owned.
 
 ## `WebSocketReconnector`
 
