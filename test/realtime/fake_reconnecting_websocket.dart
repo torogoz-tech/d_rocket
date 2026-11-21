@@ -8,6 +8,7 @@ class FakeReconnectingWebSocket implements WebSocketConnection {
   final StreamController<WebSocketMessage> controller =
       StreamController<WebSocketMessage>.broadcast();
   bool connected = false;
+  Map<String, String>? lastHeaders;
   final List<WebSocketMessage> sent = <WebSocketMessage>[];
 
   @override
@@ -18,6 +19,7 @@ class FakeReconnectingWebSocket implements WebSocketConnection {
 
   @override
   Future<void> connect(Uri url, {Map<String, String>? headers}) async {
+    lastHeaders = headers;
     connected = true;
   }
 

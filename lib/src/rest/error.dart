@@ -41,6 +41,9 @@ class RestHttpException extends RestException {
     if (body is Map<String, dynamic>) return body;
     return null;
   }
+
+  /// Typed RFC 7807 view, including field validation messages when present.
+  RestProblemDetails get problem => RestProblemDetails.fromJson(errorBody);
 }
 
 /// The connection failed (no response from the server).

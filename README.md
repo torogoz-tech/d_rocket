@@ -54,8 +54,8 @@ don't bloat the runtime.
 | 3 | **LINQ** | Deferred `Queryable<T>` with **35+ operators** (filter, project, order, page, group, join, aggregate, set, quantifier, element, convert). Engine-agnostic `Expr` AST. Sync `*_` + async `*Async_` terminals. | [06](https://github.com/torogoz-tech/d_rocket/blob/main/doc/06-layer-3-linq.md) |
 | 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/doc/07-layer-4-orm.md) |
 | 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/doc/08-layer-5-sync.md) |
-| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); controlled `WebSocketReconnector` and `SseReconnector` with backoff, dynamic auth headers, heartbeats and resumable cursors. | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
-| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model validation, typed conversion, observable field changes, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
+| 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); controlled reconnectors with backoff, dynamic auth headers, lifecycle states, inactivity detection, heartbeats and resumable cursors. | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
+| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model-level cross-field validation, composite bindings, typed conversion, observable field changes, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
 
 Forms are the seventh framework layer, available since 2.2.0. They bind
 existing Flutter or Dart controls to an annotated model without introducing
@@ -199,6 +199,11 @@ The 2.4.0 integration contract is documented in
 policies for REST, SSE and downloads, contextual retries, configurable
 diagnostic redaction, explicit SSE transport ownership, generated generic
 serializer registrations and the optional `d_rocket_flutter` bindings.
+
+The 2.5.0 hardening adds `WebSocketReconnector.headersProvider`,
+`WebSocketReconnector.states`, `onUnauthorized`, `statusCode` and
+`inactivityTimeout`. REST callers can read typed problem details from
+`RestHttpException.problem` without losing access to the original JSON body.
 
 For Flutter applications, install the optional adapter alongside the core:
 

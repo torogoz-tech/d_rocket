@@ -10,6 +10,17 @@ class DiagnosticWebSocketConnection implements WebSocketConnection {
 
   final WebSocketConnection inner;
 
+  /// Preserves an optional HTTP upgrade status from decorated transports.
+  int? get statusCode {
+    try {
+      final dynamic value = inner;
+      final Object? status = value.statusCode;
+      return status is int ? status : null;
+    } on NoSuchMethodError {
+      return null;
+    }
+  }
+
   @override
   Stream<WebSocketMessage> get messages => inner.messages.map((message) {
         _record('message');

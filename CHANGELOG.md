@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the model-driven `@Uuid()` validator for canonical UUID values.
 * Added `UuidVersion.v1` through `UuidVersion.v8` for optional version-specific
   validation, including custom messages and stable validation codes.
+* Hardened `WebSocketReconnector` with asynchronous headers, lifecycle states,
+  bounded reconnects, authentication recovery and heartbeat-aware inactivity
+  detection.
+* Added typed RFC 7807 access through `RestHttpException.problem`, including
+  field validation messages, while preserving the raw `problemDetails` API.
+
+### Forms
+
+* Documented model-level cross-field validation and composite bindings as the
+  supported way to validate related fields without adding input controllers.
 
 ### Compatibility
 

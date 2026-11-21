@@ -388,8 +388,13 @@ await for (final msg in reconnector.messages) {
 |---|---|
 | `client` | The underlying `WebSocketConnection`. `null` before `start` and during reconnects. |
 | `messages` | Broadcast `Stream<WebSocketMessage>` forwarded from the underlying client and preserved across reconnects. |
+| `states` / `state` | Observable `connecting`, `connected`, `retrying`, `stopped` and `failed` lifecycle. |
+| `headersProvider` | Async callback evaluated before every connection and retry. Use it for rotating tokens. |
+| `statusCode` | HTTP status exposed by transports that can report the WebSocket upgrade response. |
+| `onUnauthorized` | One-shot 401 recovery callback. Return `true` after refreshing auth; 403 is terminal. |
+| `inactivityTimeout` | Reconnects after no inbound traffic. Heartbeat sends reset this timer. |
 | `start()` | Tries `maxAttempts` times with exponential backoff; re-throws on exhaustion. |
-| `stop()` | Closes the underlying client. |
+| `stop()` / `dispose()` | Cancel retries, timers and subscriptions; close the connection. `start()` can be called again after `stop()`. |
 
 ### Behaviour and limitations
 
@@ -397,13 +402,9 @@ The backoff is exponential:
 `1s, 2s, 4s, 8s, 16s`. After `maxAttempts` the
 last error is re-thrown.
 
-**Mid-session reconnects are NOT automatic** — the
-user wires their own `onDone` handler to re-arm
-the reconnector when the underlying connection
-ends. This is intentional: a long-lived
-realtime stream's reconnect policy is a
-user-facing decision (per-screen, per-event-type,
-etc.), and the framework doesn't presume.
+Mid-session reconnects are automatic and use the same bounded exponential
+backoff. A successful connection resets the retry counter. Events from an old
+connection are ignored after `stop()` or a later `start()`.
 
 ```dart
 final sub = reconnector.client!.messages.listen(

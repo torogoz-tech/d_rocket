@@ -32,3 +32,4 @@ export 'websocket_message.dart';
 export 'diagnostic_websocket_connection.dart';
 export 'websocket_message_type.dart';
 export 'websocket_reconnector.dart';
+export 'websocket_reconnector_state.dart';

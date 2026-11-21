@@ -23,7 +23,7 @@
 ///
 /// ## Status
 ///
-/// `d_rocket` is at 2.1.0 (engine-agnostic, lockstep
+/// `d_rocket` is at 2.5.0 (engine-agnostic, lockstep
 /// with the `d_rocket_engine_*` packages). All six
 /// data layers are complete: LINQ, Serializer, REST
 /// (with wrap-around resilience + cancelable requests),

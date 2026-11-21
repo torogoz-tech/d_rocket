@@ -1204,3 +1204,21 @@ Cancellation. See [Cancellation](#cancellation).
 | `RestConfigException` | Misconfiguration. |
 | `CircuitOpenException` | Circuit breaker open. (Not a `RestException`.) |
 | `RequestCancelledException` | Token cancelled. (Not a `RestException`.) |
+
+### Typed problem details
+
+`RestHttpException.problem` exposes an RFC 7807-style error payload through
+`RestProblemDetails` while `problemDetails` remains available for callers
+that need the original JSON map. The typed view includes `type`, `title`,
+`status`, `detail`, `instance`, arbitrary extensions and normalized field
+messages through `validationErrors`.
+
+```dart
+try {
+  await client.execute(request);
+} on RestHttpException catch (error) {
+  final List<String> emailErrors =
+      error.problem.validationErrors['email'] ?? const <String>[];
+  print(emailErrors);
+}
+```
