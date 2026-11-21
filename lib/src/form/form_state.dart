@@ -104,6 +104,13 @@ class FormState<T> {
     _formErrors.clear();
   }
 
+  /// Releases all registered field states.
+  Future<void> dispose() async {
+    for (final FormFieldState<Object?> field in _fields.values) {
+      await field.dispose();
+    }
+  }
+
   FormValidationResult _buildValidationResult() {
     final List<FormError> errors = <FormError>[];
     final Map<String, List<FormError>> fieldErrors =

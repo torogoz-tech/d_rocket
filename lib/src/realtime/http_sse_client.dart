@@ -17,11 +17,12 @@ class HttpSseClient implements SseConnection {
     this.defaultHeaders = const <String, String>{},
     this.interceptors = const <SseInterceptor>[],
     this.transportPolicy,
+    bool? ownsHttpClient,
     this.connectTimeout = const Duration(seconds: 30),
     this.followRedirects = true,
     this.validateContentType = true,
   })  : _httpClient = httpClient,
-        _ownsHttpClient = httpClient == null;
+        ownsHttpClient = ownsHttpClient ?? httpClient == null;
 
   /// Headers applied to every connection before per-connection headers.
   final Map<String, String> defaultHeaders;
@@ -31,6 +32,13 @@ class HttpSseClient implements SseConnection {
 
   /// Optional policy shared with REST and download transports.
   final TransportPolicy? transportPolicy;
+
+  /// Whether [close] closes the configured HTTP transport.
+  ///
+  /// A client created without an injected transport owns the transport it
+  /// creates. Injected transports are shared by default and remain open unless
+  /// this flag is explicitly set to `true`.
+  final bool ownsHttpClient;
 
   /// Maximum time allowed to receive the initial HTTP response.
   /// Set to `null` to disable the timeout.
@@ -49,7 +57,6 @@ class HttpSseClient implements SseConnection {
   ]);
 
   http.Client? _httpClient;
-  final bool _ownsHttpClient;
   StreamController<SseEvent>? _controller;
   StreamController<void>? _activityController;
   StreamSubscription<String>? _lineSubscription;
@@ -199,7 +206,7 @@ class HttpSseClient implements SseConnection {
         await _lineSubscription?.cancel();
       };
     } catch (error, stackTrace) {
-      if (error is TimeoutException && _ownsHttpClient) {
+      if (error is TimeoutException && ownsHttpClient) {
         _httpClient?.close();
         _httpClient = null;
       }
@@ -237,7 +244,7 @@ class HttpSseClient implements SseConnection {
     }
     _controller = null;
     _activityController = null;
-    if (_ownsHttpClient) {
+    if (ownsHttpClient) {
       _httpClient?.close();
       _httpClient = null;
     }

@@ -43,6 +43,7 @@ export 'src/diagnostics/diagnostics.dart';
 // Flutter widgets, REST and database engines. The builder emits the
 // `*.d_rocket_form.g.dart` adapters for models marked with `@Form`.
 export 'src/form/form_annotations.dart';
+export 'src/form/form_field_change.dart';
 
 // ─── Layer 3: LINQ-style queries ─────────────────────────────────────
 export 'src/linq/linq.dart';

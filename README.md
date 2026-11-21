@@ -55,13 +55,19 @@ don't bloat the runtime.
 | 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/doc/07-layer-4-orm.md) |
 | 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/doc/08-layer-5-sync.md) |
 | 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); controlled `WebSocketReconnector` and `SseReconnector` with backoff, dynamic auth headers, heartbeats and resumable cursors. | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
-| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model validation, typed conversion, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
+| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model validation, typed conversion, observable field changes, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
 
 Forms are the seventh framework layer, available since 2.2.0. They bind
 existing Flutter or Dart controls to an annotated model without introducing
 framework widgets or a parallel form model. See
 [`RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md) and
 [`2.2-formularios-modelo.md`](doc/2.2-formularios-modelo.md).
+
+For Flutter applications, the optional [`d_rocket_flutter`](https://pub.dev/packages/d_rocket_flutter)
+package provides `DrocketFormBuilder` and generic field bindings. It does not
+replace `TextField`, `DropdownButton` or any other control: the application
+passes each control's existing callback to `onChanged`, `onChangedNullable` or
+`onChangedRaw` and reads `errorText` from the same model field state.
 
 A single `initializeD()` call (emitted by `d_rocket_builder` into
 `d_rocket_registry.g.dart`) wires every annotated class in your
@@ -90,21 +96,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.3.0
+  d_rocket: ^2.4.0
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.3.0
+  d_rocket: ^2.4.0
 dev_dependencies:
-  d_rocket_builder: ^2.3.0
+  d_rocket_builder: ^2.4.0
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.3.0
+  d_rocket: ^2.4.0
   d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.3.0
 dev_dependencies:
-  d_rocket_builder: ^2.3.0
+  d_rocket_builder: ^2.4.0
   d_rocket_lints: ^2.3.0            # N+1 + closure-linq + enum guidance
   build_runner: ^2.4.13
 ```

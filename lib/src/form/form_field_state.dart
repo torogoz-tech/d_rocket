@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'form_field_change.dart';
 import 'form_error.dart';
 import 'form_validation_mode.dart';
 import 'form_value_parser.dart';
@@ -23,9 +26,12 @@ class FormFieldState<T> {
   final T? _initialValue;
   final List<FormValidator<T>> _validators;
   final List<FormError> _errors = <FormError>[];
+  final StreamController<FormFieldChange<T>> _changeController =
+      StreamController<FormFieldChange<T>>.broadcast();
   T? _value;
   Object? _rawValue;
   bool _isTouched = false;
+  bool _isDisposed = false;
 
   /// Converts raw values before validation.
   final FormValueParser<T>? parser;
@@ -53,6 +59,9 @@ class FormFieldState<T> {
 
   /// Whether a user or control has interacted with this field.
   bool get isTouched => _isTouched;
+
+  /// Emits after a control changes this field.
+  Stream<FormFieldChange<T>> get changes => _changeController.stream;
 
   /// Creates a callback for controls whose callback value is non-nullable.
   void Function(T) bind() {
@@ -89,6 +98,7 @@ class FormFieldState<T> {
     if (validationMode == FormValidationMode.onChange) {
       validate();
     }
+    _emitChange();
   }
 
   /// Sets a raw control value and converts it when a parser is available.
@@ -119,6 +129,7 @@ class FormFieldState<T> {
     if (validationMode == FormValidationMode.onChange) {
       validate();
     }
+    _emitChange();
   }
 
   /// Marks the field as interacted with and validates in blur mode.
@@ -172,5 +183,21 @@ class FormFieldState<T> {
     _rawValue = _initialValue;
     _errors.clear();
     _isTouched = false;
+    _emitChange();
+  }
+
+  /// Releases the field's change stream.
+  Future<void> dispose() async {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    await _changeController.close();
+  }
+
+  void _emitChange() {
+    if (!_isDisposed) {
+      _changeController.add(
+        FormFieldChange<T>(value: _value, rawValue: _rawValue),
+      );
+    }
   }
 }

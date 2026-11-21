@@ -17,6 +17,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added guidance for replacing fixed-value `String` fields and `@Pattern`
   expressions with strongly typed enums.
 
+## [2.4.0] — 2026-11-21
+
+### Added
+
+* Added shared transport policies for REST and SSE, including per-attempt
+  headers, bounded response decisions and explicit redirect-context handling.
+* Added contextual retry decisions with request metadata and cancellation-aware
+  backoff; ambiguous non-idempotent requests are not retried by default.
+* Added configurable diagnostic redaction for sensitive headers and nested JSON
+  payloads.
+* Added explicit `HttpSseClient.ownsHttpClient` ownership semantics. Injected
+  transports are shared by default and owned transports are closed idempotently.
+* Added observable `FormFieldState.changes` events and deterministic disposal.
+  The optional `d_rocket_flutter` package binds any existing Flutter control
+  without introducing framework-specific input widgets.
+
+### Tests
+
+* Added regression coverage for owned/shared SSE transports, pending SSE
+  closure, observable form changes and generic Flutter control binding.
+
 ## [2.2.4] — 2026-11-20
 
 ### Added
