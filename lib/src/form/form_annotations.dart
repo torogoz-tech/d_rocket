@@ -5,6 +5,8 @@ export 'annotations/length.dart';
 export 'annotations/pattern.dart';
 export 'annotations/range.dart';
 export 'annotations/required.dart';
+export 'annotations/uuid.dart';
+export 'annotations/uuid_version.dart';
 export 'form_error.dart';
 export 'form_field_definition.dart';
 export 'form_field_state.dart';

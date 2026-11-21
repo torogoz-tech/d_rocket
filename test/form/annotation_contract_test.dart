@@ -57,6 +57,25 @@ void main() {
       expect(range.max, 10);
     });
 
+    test('Uuid exposes general and version-specific metadata', () {
+      const Uuid general = Uuid();
+      const Uuid v4 = Uuid(version: UuidVersion.v4);
+      const Uuid custom = Uuid(
+        version: UuidVersion.v7,
+        message: 'Identificador inválido',
+        code: 'request.id.uuid',
+      );
+
+      expect(general.version, isNull);
+      expect(general.message, isNull);
+      expect(general.code, 'uuid.invalid');
+      expect(v4.version, UuidVersion.v4);
+      expect(custom.version, UuidVersion.v7);
+      expect(custom.message, 'Identificador inválido');
+      expect(custom.code, 'request.id.uuid');
+      expect(UuidVersion.values, hasLength(8));
+    });
+
     test('FormInput exposes the first supported control kinds', () {
       expect(
         FormInput.values,
