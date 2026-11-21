@@ -1,8 +1,9 @@
 # Release cadence
 
 > **Effective from `d_rocket 2.0.0`.** From this release onwards,
-> new `d_rocket` integrations (a new minor or major version of
-> any of the 6 public packages) ship on a **monthly cadence**.
+> new `d_rocket` integrations ship on a **monthly cadence**. The core
+> runtime and builder are coordinated; optional bindings, lints and engines
+> may advance on compatible independent version lines.
 
 ## The policy
 
@@ -12,46 +13,38 @@
 - **Patch releases** (bug fixes, security fixes, doc-only fixes)
   can ship at any time against the latest minor version. A
   patch release does not skip the next monthly minor.
-- **Pre-release versions** (`2.1.0-dev`, `2.1.0-beta`) can be
+- **Pre-release versions** (`2.5.0-dev`, `2.5.0-beta`) can be
   tagged at any time but do not count toward the monthly
   cadence. They are tagged at the maintainer's discretion when
   enough of a new feature is stable enough to need early
   integration.
 
-## The 6 public packages
+## Package version lines
 
-A monthly release is **lockstep** — every public package
-version bumps on the same tag:
+A coordinated core release updates `d_rocket` and
+`d_rocket_builder` together. Other packages are compatible dependencies,
+not automatic lockstep participants:
 
-| Package | `2.0.0` → `2.1.0` |
+| Package family | Current local line |
 |---|---|
-| `d_rocket` | `2.0.0` → `2.1.0` |
-| `d_rocket_builder` | `2.0.0` → `2.1.0` |
-| `d_rocket_lints` | `2.0.0` → `2.1.0` |
-| `d_rocket_engine_sqlite` | `2.0.0` → `2.1.0` |
-| `d_rocket_engine_postgres` | `2.0.0` → `2.1.0` |
-| `d_rocket_engine_web` | `2.0.0` → `2.1.0` |
+| `d_rocket` + `d_rocket_builder` | `2.5.0` |
+| `d_rocket_flutter` | `2.4.0` |
+| `d_rocket_lints` | `2.3.0` |
+| `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` | `2.1.0` |
 
-Consumers pin a single constraint (`d_rocket: ^2.0.0`) and
-`pub` picks up the matching engine and builder versions
-transitively.
+Consumers should follow the compatibility table in each release guide and
+pin the core and builder constraints explicitly when using code generation.
 
-## Calendar of upcoming monthly releases
+## Release sequence
 
-The next 6 scheduled monthly release dates (lockstep):
+The 2.5.0 release candidate is prepared locally and has not been pushed or
+published. Future minor releases follow the monthly policy; exact dates are
+recorded in the corresponding GitHub milestone.
 
 | Version | Date |
 |---|---|
-| `2.1.0` | first Tuesday of next month |
-| `2.2.0` | first Tuesday, +1 month |
-| `2.3.0` | first Tuesday, +2 months |
-| `2.4.0` | first Tuesday, +3 months |
-| `2.5.0` | first Tuesday, +4 months |
-| `2.6.0` | first Tuesday, +5 months |
-
-(The specific dates are listed in the GitHub milestone view in
-the source repository; the dates above are the policy, not the
-calendar.)
+| `2.5.0` | release candidate; date set at publication |
+| `2.6.0` | first Tuesday after the 2.5.0 release |
 
 ## What "integration" means in this context
 
@@ -86,8 +79,9 @@ monthly cadence, in the following cases:
 - **Build breakage**: a released `2.x.y` fails to compile on a
   `Dart 3.x` minor that the package claimed to support.
 
-The patch release follows the same lockstep rule (every
-package gets a `2.x.y+1`).
+The patch release updates the affected package family and any package that
+must remain compatible with it. Core and builder remain coordinated when the
+generated contract changes.
 
 ## When a monthly release is skipped
 
@@ -109,9 +103,8 @@ The release is announced in three places:
    of the source repository.
 2. The `CHANGELOG.md` of every public package (regenerated
    automatically from the release tag).
-3. A new entry in
-   [`STATUS.md`](STATUS.md) listing the version, the date, and
-   the headline changes.
+3. A new entry in [`STATUS.md`](STATUS.md) listing the version, the date,
+   package versions and headline changes.
 
 The release is **not** announced on Twitter, Discord, or any
 external channel — those channels are for high-level project

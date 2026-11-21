@@ -487,16 +487,15 @@ generated files are up-to-date with
 
 ## Future directions
 
-The framework is at 2.0.0. Future directions include:
+The framework is at 2.5.0 locally. Future directions include:
 
 - **`d_rocket_admin`** — a Flutter web admin UI
   on top of the engine.
 - **Dart macros** for codegen (replaces the
   `build_runner` integration; requires analyzer
   `^13.0.0`).
-- **Form binding** — a `@RocketForm` annotation
-  for two-way binding of `@Table` entities to form
-  widgets.
+- **Advanced forms** — dynamic groups, arrays and richer
+  composition on top of the existing `@Form` model adapter.
 - **Cross-engine benchmarks** — quantify the
   per-engine LINQ-to-SQL overhead vs EF Core /
   Hibernate.
@@ -508,8 +507,8 @@ contributions are welcome.
 
 Open an issue first to discuss the design. For
 bugfixes, a PR with a test is the standard
-contribution. The framework has 989 tests; new
-features should be accompanied by tests that cover
+contribution. The current local package has 900 tests and the builder has
+74 additional tests. New features should be accompanied by tests that cover
 the happy path and the obvious edge cases.
 
 The CI runs:

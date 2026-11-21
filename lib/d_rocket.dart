@@ -1,7 +1,7 @@
 /// 🚀 d_rocket — Dart's data rocket.
 ///
-/// `d_rocket` is a unified package for the four pillars of data
-/// handling in Dart/Flutter applications:
+/// `d_rocket` is a unified package for seven data-layer concerns
+/// in Dart/Flutter applications:
 ///
 /// 1. LINQ-style queries — `IQueryable<T>` with deferred execution.
 /// 2. Serialization — annotation-driven `toJson` / `fromJson`.
@@ -20,17 +20,19 @@
 /// pipeline, identity persistence, conflict resolution, retry
 /// with exponential backoff, sync triggers.
 /// 6. Realtime — WebSocket + SSE clients with codegen.
+/// 7. Forms — model-driven fields, bindings and validation.
 ///
 /// ## Status
 ///
-/// `d_rocket` is at 2.5.0 (engine-agnostic, lockstep
-/// with the `d_rocket_engine_*` packages). All six
-/// data layers are complete: LINQ, Serializer, REST
+/// `d_rocket` is at 2.5.0 locally. Core and builder are
+/// coordinated; engine and optional package versions are
+/// tracked independently. All seven data layers are complete:
+/// LINQ, Serializer, REST
 /// (with wrap-around resilience + cancelable requests),
 /// ORM (engine-agnostic, three engines in 2.0: SQLite,
-/// Postgres, libsql_wasm), Sync (offline-first with
+/// Postgres, IndexedDB web), Sync (offline-first with
 /// conflict resolution), Realtime (WebSocket + SSE with
-/// codegen).
+/// codegen), and model-driven Forms.
 ///
 /// See `CHANGELOG.md` for the full history.
 library;

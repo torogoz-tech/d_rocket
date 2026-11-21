@@ -1,7 +1,7 @@
 # d_rocket — Roadmap
 
-> What shipped in 1.x and 2.0.0, and what is on the
-> post-2.0.0 roadmap. The 2.x line is the current line; the
+> What shipped in 1.x through 2.5.0, and what remains on the
+> post-2.5.0 roadmap. The 2.x line is the current line; the
 > 1.x line is in maintenance mode.
 
 ---
@@ -10,22 +10,42 @@
 
 | | |
 |---|---|
-| Current line | **2.1.0** (local release candidate; not pushed) |
-| Previous release | 1.2.2 (auto-migrations, 1.x maintenance) |
-| Test suite | All available package suites pass locally; external Postgres/browser tests remain skip-gated |
+| Current line | **2.5.0** (local release candidate; not pushed) |
+| Previous release | 2.4.2 |
+| Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
+| Package versions | core/builder `2.5.0`; Flutter bindings `2.4.0`; lints `2.3.0`; engines `2.1.0` |
 | Source | `github.com/torogoz-tech/d_rocket` |
-| pub.dev | `pub.dev/packages/d_rocket` (and 5 siblings) |
+| pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
 
 The five legacy packages (`d_serializer`,
 `d_serializer_builder`, `d_rest`, `d_rest_build`, `d_builder`)
 are absorbed. They are no longer published; `d_rocket 2.0.0`
-is the single source of truth for the data layer.
+is the single source of truth for the data layer. Core and builder are
+coordinated; optional bindings, lints and engines have compatible but
+independent version lines.
 
 ---
 
 ## Shipped versions
+
+### 2.5.0 — forms, serialization and realtime hardening
+
+The current release candidate adds async form validation with debounce and
+REST error mapping, detailed serializer diagnostics, UUID validation and
+robust WebSocket lifecycle/authentication handling. Dart 3.11.5, 3.12.0 and
+3.13.0 are covered by CI; Web, Android, iOS, macOS and Linux were validated
+manually. No push or publication has been performed.
+
+### 2.4.0–2.4.2 — transport and generic codegen hardening
+
+Shared transport policies, owned SSE lifecycle handling and generic registry
+and opaque-payload fixes.
+
+### 2.2.0–2.3.0 — forms and enum contracts
+
+Model-driven forms, generic/composite bindings, field validation and the
+cross-layer enum contract shipped in these releases.
 
 ### 2.1.0 — production-readiness consolidation
 
@@ -93,7 +113,7 @@ Constraint bump for downstream consumers. The 1.x line is
 now in maintenance mode (bug fixes and security patches only,
 no new features).
 
-### 2.0.0 — Engine-agnostic multi-engine (current)
+### 2.0.0 — Engine-agnostic multi-engine
 
 The ORM is decoupled from the engine. Three engines ship as
 separate packages (`d_rocket_engine_sqlite`,
@@ -111,7 +131,7 @@ release notes and the breaking-change list.
 
 ---
 
-## Post-2.0.0 candidates
+## Post-2.5.0 candidates
 
 Items that have been discussed for the 2.x line. Listed in
 priority order; the maintainer picks a subset for each
@@ -152,8 +172,8 @@ to the next monthly release.
 
 ### Tier 3 — community asks (next 3-6 monthly releases)
 
-- **Form binding (`@RocketForm`).** Declarative form model
-  with validation. Would be Layer 7.
+- **Advanced form structures.** Dynamic groups, arrays and richer control
+  composition beyond the current `@Form` model adapter.
 - **Benchmarks vs `drift`.** A "d_rocket vs drift"
   performance comparison across 10 common ORM operations.
 - **Dart macros.** Eliminate `part '*.g.dart';` directives
@@ -182,8 +202,8 @@ to the next monthly release.
 
 ## Release cadence
 
-`d_rocket 2.1.0` will ship on the first Tuesday of next
-month. Bug fixes can ship at any time as patch releases. See
+`d_rocket 2.5.0` is prepared locally and has not been pushed or published.
+Bug fixes can ship at any time as patch releases. See
 [`RELEASE_CADENCE.md`](RELEASE_CADENCE.md) for the full
 policy, the calendar of upcoming releases, and the criteria
 for out-of-band patch releases.

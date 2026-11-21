@@ -15,7 +15,7 @@ for the data layer of Dart and Flutter applications. It unifies the
 seven concerns that, in most stacks, force you to glue together half
 a dozen different libraries: **JSON serialization**, **typed HTTP
 clients**, **LINQ-style queries**, **an ORM**, **offline-first sync**,
-and **WebSocket / SSE realtime**.
+and **WebSocket / SSE realtime**, plus model-driven forms.
 
 ## Modular by design
 
@@ -120,21 +120,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.4.0
+  d_rocket: ^2.5.0
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.4.0
+  d_rocket: ^2.5.0
 dev_dependencies:
-  d_rocket_builder: ^2.4.0
+  d_rocket_builder: ^2.5.0
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.4.0
-  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.4.0
+  d_rocket: ^2.5.0
+  d_rocket_engine_sqlite: ^2.1.0   # Compatible engine line for core 2.5.0
 dev_dependencies:
-  d_rocket_builder: ^2.4.0
+  d_rocket_builder: ^2.5.0
   d_rocket_lints: ^2.3.0            # N+1 + closure-linq + enum guidance
   build_runner: ^2.4.13
 ```

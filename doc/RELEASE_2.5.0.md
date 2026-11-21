@@ -72,7 +72,8 @@ final form = LoginRequestForm(
 ```
 
 Un `RestHttpException` puede aplicarse directamente al formulario mediante
-`form.applyRestError(error)`, mapeando `problem.errors` a los campos generados.
+`form.applyRestError(error)`, mapeando `problem.validationErrors` a los campos
+generados.
 
 ## Diagnóstico de serialización
 

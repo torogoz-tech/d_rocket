@@ -7,14 +7,14 @@
 
 | Metric | Value |
 |---|---|
-| Current line | **2.1.0** (local release candidate; not pushed) |
-| Previous release | 1.2.2 |
-| Test suite | All available package suites pass locally; external Postgres/browser tests remain skip-gated |
+| Current line | **2.5.0** (local release candidate; not pushed) |
+| Previous release | 2.4.2 |
+| Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Public packages | `d_rocket`, `d_rocket_builder`, `d_rocket_lints`, `d_rocket_engine_sqlite`, `d_rocket_engine_postgres`, `d_rocket_engine_web`, `d_rocket_engine_mobile` (lockstep since 2.1.0) |
-| Lockstep versioning | yes — every release publishes all 7 packages at the same version on the same tag |
+| Package versions | core/builder `2.5.0`; Flutter bindings `2.4.0`; lints `2.3.0`; engines `2.1.0` |
+| Release policy | core and builder are coordinated; bindings, lints and engines advance independently when their APIs require it |
 | Source | `github.com/torogoz-tech/d_rocket` |
-| pub.dev | `pub.dev/packages/d_rocket` (and 5 siblings) |
+| pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
 
 ## What d_rocket is (one-liner per layer)
 
@@ -24,8 +24,35 @@
 4. **ORM (engine-agnostic)** — `DbContext` + `DbSet<T>` with change tracking, code-first `@Migration`, auto-migrator with `pendingSchemaDiff()`, eager-loading `include_<TNav>()`, reactive `watch()`, `DbInterceptor` chain, `redactPragmaKey`.
 5. **Sync** — `SyncProvider` + `RestSyncProvider` + persistent identity + push / pull + pluggable conflict resolution.
 6. **Realtime** — `@WebSocketClient` + `@SseClient` codegen → typed `Stream<T>` with reconnect + backoff + heartbeat.
+7. **Forms** — `@Form` model adapters with typed bindings, synchronous/asynchronous validation, debounce, composite values and REST field errors.
 
 ## Releases at a glance
+
+### 2.5.0 — forms, serialization and realtime hardening
+
+- Asynchronous form validators, validation states, debounce and direct REST
+  validation error mapping.
+- Detailed generated serialization failures through `SerializationException`.
+- UUID validation with optional version restrictions from v1 through v8.
+- Dynamic WebSocket authentication headers, bounded reconnection, lifecycle
+  states, heartbeat-aware inactivity detection and correlated diagnostics.
+- Compatibility workflow for Dart 3.11.5, 3.12.0 and 3.13.0, plus manual
+  validation on Web, Android, iOS, macOS and Linux.
+
+This version is prepared in local commits only; no push or publication has
+been performed.
+
+### 2.4.0–2.4.2 — transport and generic codegen hardening
+
+- Shared transport policies, owned SSE transport shutdown and generic registry
+  fixes for external models and opaque `Object?` payloads.
+
+### 2.2.0–2.3.0 — forms and enum contracts
+
+- Model-driven forms, generic/composite bindings and field validation shipped
+  in 2.2.0.
+- Enum contracts were aligned across JSON, forms, REST and SQLite persistence
+  in 2.3.0, including explicit unknown-value policies.
 
 ### 2.1.0 — production-readiness consolidation
 
@@ -38,10 +65,7 @@
 - `d_rocket_engine_mobile` provides the `connectivity_plus` adapter for
   Flutter applications.
 
-This version is prepared in local commits only; no push or publication has
-been performed.
-
-### 2.0.0 — engine-agnostic multi-engine (current)
+### 2.0.0 — engine-agnostic multi-engine
 
 - **Engine split.** The ORM core is engine-agnostic. The DB facade
   moved to separate packages:
@@ -83,15 +107,16 @@ been performed.
   `d_serializer_builder`, `d_rest_build`) marked deprecated and
   the migration path documented.
 
-## Roadmap (post-2.0.0 candidates)
+## Roadmap (post-2.5.0 candidates)
 
 | Feature | Status | Notes |
 |---|---|---|
 | `d_rocket_engine_libsql_wasm` | not started | dropped in 2.0.0 (the web engine uses IndexedDB instead). |
 | `d_rocket_admin` (DB console UI) | not started | Would be a Flutter web app on top of the engine. |
 | Codegen using `package:macros` | not started | Requires analyzer ^13; we're on ^10 today. |
-| Form binding (`@RocketForm`) | not started | Cross-cutting concern; deferred. |
-| Benchmarks vs the EF Core / Hibernate | partial | One SQLite benchmark exists; cross-engine comparison not built. |
+| Form binding | shipped | `@Form` shipped in 2.2.0; asynchronous validation and REST mapping are in 2.5.0. |
+| Postgres/Web parity | partial | SQLite is the reference engine; broader parity tests remain future work. |
+| Benchmarks vs Drift / EF Core / Hibernate | partial | Cross-engine comparison is not built. |
 
 ## Where to read more
 
