@@ -54,3 +54,36 @@ Los validadores de nivel de modelo de `FormState<T>` se ejecutan después de
 las validaciones de campo y permiten reglas como confirmar contraseñas o
 calcular la longitud del CVV según la marca. `bindComposite()` mantiene el
 binding de controles que alimentan más de una propiedad.
+
+## Validación asíncrona
+
+Los adaptadores generados aceptan `AsyncFormValidator<T>` y exponen
+`validateAsync()` y `buildAsync()`. `FormFieldState` y `FormState` publican
+`FormValidationState.validating`, `valid` e `invalid`; el debounce evita
+solicitudes remotas por cada pulsación.
+
+```dart
+final form = LoginRequestForm(
+  asyncValidators: <AsyncFormValidator<LoginRequest>>[
+    (LoginRequest? value) => checkEmailAvailability(value?.email),
+  ],
+  asyncValidationDebounce: const Duration(milliseconds: 300),
+);
+```
+
+Un `RestHttpException` puede aplicarse directamente al formulario mediante
+`form.applyRestError(error)`, mapeando `problem.errors` a los campos generados.
+
+## Diagnóstico de serialización
+
+Las conversiones generadas ahora lanzan `SerializationException` con el campo,
+tipo esperado, valor recibido y causa original. Se mantienen las políticas
+explícitas `UnknownKeyPolicy.strict`, `ignore` y `capture`; las fechas,
+decimales equivalentes (`double`/`num`), enums y UUID continúan usando sus
+contratos declarativos existentes.
+
+## Compatibilidad
+
+El workflow `Compatibility` regenera y prueba el paquete con Dart 3.11.5,
+3.12.0 y 3.13.0 junto con Flutter estable. Su ejecución manual puede activar
+la comprobación de resolución exclusiva desde pub.dev para los paquetes 2.5.0.

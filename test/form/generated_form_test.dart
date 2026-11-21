@@ -38,6 +38,44 @@ void main() {
         containsAll(<String>['email', 'password']));
   });
 
+  test('generated form exposes asynchronous model validators', () async {
+    final LoginRequestForm form = LoginRequestForm(
+      asyncValidators: <AsyncFormValidator<LoginRequest>>[
+        (LoginRequest? value) async => value?.email == 'blocked@example.com'
+            ? const FormError(
+                code: 'email.blocked',
+                message: 'Este correo está bloqueado',
+              )
+            : null,
+      ],
+      asyncValidationDebounce: const Duration(milliseconds: 1),
+    );
+    form.email.bind()('blocked@example.com');
+    form.password.bind()('strong-password');
+
+    expect(await form.validateAsync(), isFalse);
+    expect(form.state.validationState, FormValidationState.invalid);
+    expect(form.state.errors.single.code, 'email.blocked');
+  });
+
+  test('generated form forwards REST field errors to its controls', () {
+    final LoginRequestForm form = LoginRequestForm();
+    form.applyRestError(
+      RestHttpException(
+        statusCode: 422,
+        request: const RestRequest(method: 'POST', path: '/auth/login'),
+        errorBody: const <String, Object?>{
+          'errors': <String, Object?>{
+            'email': <String>['Correo inválido'],
+          },
+        },
+      ),
+    );
+
+    expect(form.email.errorCode, 'server');
+    expect(form.email.error, 'Correo inválido');
+  });
+
   test('generated REST client accepts the generated model body', () async {
     registerLoginRequestSerializer();
     final RequestCaptureHttpClient transport = RequestCaptureHttpClient(

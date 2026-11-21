@@ -1,0 +1,98 @@
+name: Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      verify_pubdev:
+        description: Verify the published 2.5.0 package graph from pub.dev
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dart-matrix:
+    name: Dart ${{ matrix.dart }} with Flutter stable
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dart: ['3.11.5', '3.12.0', '3.13.0']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: torogoz-tech/d_rocket_engine_sqlite
+          ref: main
+          path: .ci/deps/d_rocket_engine_sqlite
+      - uses: actions/checkout@v4
+        with:
+          repository: torogoz-tech/d_rocket_builder
+          ref: main
+          path: .ci/deps/d_rocket_builder
+      - uses: actions/checkout@v4
+        with:
+          repository: torogoz-tech/d_rocket_lints
+          ref: main
+          path: .ci/deps/d_rocket_lints
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Preserve Flutter SDK path
+        run: echo "FLUTTER_ROOT=$(dirname "$(dirname "$(which flutter)")")" >> "$GITHUB_ENV"
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.dart }}
+      - name: Configure local package overrides
+        run: |
+          printf '%s\n' \
+            'dependency_overrides:' \
+            '  d_rocket_engine_sqlite:' \
+            '    path: .ci/deps/d_rocket_engine_sqlite' \
+            '  d_rocket_builder:' \
+            '    path: .ci/deps/d_rocket_builder' \
+            '  d_rocket_lints:' \
+            '    path: .ci/deps/d_rocket_lints' > pubspec_overrides.yaml
+      - run: dart --version
+      - run: dart pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: dart run tool/verify_generated.dart
+      - run: dart analyze
+      - run: dart test --reporter=expanded
+
+  published-graph:
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_pubdev == true
+    name: Published package graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Resolve packages from pub.dev
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cat > "$temp_dir/pubspec.yaml" <<'EOF'
+          name: d_rocket_pubdev_compatibility
+          environment:
+            sdk: ^3.6.0
+            flutter: '>=3.10.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            d_rocket: ^2.5.0
+            d_rocket_builder: ^2.5.0
+            build_runner: ^2.4.13
+          dev_dependencies:
+            d_rocket_lints: ^2.3.0
+          EOF
+          (cd "$temp_dir" && flutter pub get && dart pub deps)

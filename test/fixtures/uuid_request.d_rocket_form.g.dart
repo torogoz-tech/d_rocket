@@ -17,6 +17,9 @@ class UuidRequestForm {
     String? initialOptionalId,
     List<FormValidator<UuidRequest>> validators =
         const <FormValidator<UuidRequest>>[],
+    List<AsyncFormValidator<UuidRequest>> asyncValidators =
+        const <AsyncFormValidator<UuidRequest>>[],
+    Duration? asyncValidationDebounce,
     FormValidationMode validationMode = FormValidationMode.onSubmit,
   }) : state = _createState(
           initialRequestId,
@@ -24,6 +27,8 @@ class UuidRequestForm {
           initialVersionedId,
           initialOptionalId,
           validators,
+          asyncValidators,
+          asyncValidationDebounce,
           validationMode,
         );
 
@@ -48,7 +53,10 @@ class UuidRequestForm {
   FormFieldState<String?> get optionalId =>
       state.fields['optionalId']! as FormFieldState<String?>;
   bool validate() => state.validate();
+  Future<bool> validateAsync() => state.validateAsync();
   UuidRequest build() => state.build();
+  Future<UuidRequest> buildAsync() => state.buildAsync();
+  void applyRestError(RestHttpException error) => state.applyRestError(error);
 
   void Function(TValue) bindComposite<TValue>(
     Map<String, Object?> Function(TValue value) mapper,
@@ -61,6 +69,8 @@ class UuidRequestForm {
     String? initialVersionedId,
     String? initialOptionalId,
     List<FormValidator<UuidRequest>> validators,
+    List<AsyncFormValidator<UuidRequest>> asyncValidators,
+    Duration? asyncValidationDebounce,
     FormValidationMode validationMode,
   ) {
     final fields = <String, FormFieldState<Object?>>{
@@ -110,6 +120,8 @@ class UuidRequestForm {
     final form = FormState<UuidRequest>(
       fields: fields,
       validators: validators,
+      asyncValidators: asyncValidators,
+      asyncValidationDebounce: asyncValidationDebounce,
       builder: () => UuidRequest(
         requestId: fields['requestId']!.value as String,
         generalId: fields['generalId']!.value as String,

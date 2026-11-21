@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the model-driven `@Uuid()` validator for canonical UUID values.
 * Added `UuidVersion.v1` through `UuidVersion.v8` for optional version-specific
   validation, including custom messages and stable validation codes.
+* Added asynchronous form validators with debounce, observable validation
+  states and generated `validateAsync()` / `buildAsync()` adapters.
+* Added direct REST validation error binding through `applyRestError()` on
+  generated forms.
+* Added `SerializationException` with model field, expected type, raw value
+  and original cause context for generated conversion failures.
 * Hardened `WebSocketReconnector` with asynchronous headers, lifecycle states,
   bounded reconnects, authentication recovery and heartbeat-aware inactivity
   detection.
@@ -27,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added generated-output sanity validation for known invalid tokens and
   nullable type regressions.
 * CI now regenerates source files and validates generated Dart before analysis.
+* Added compatibility workflow coverage for Dart 3.11.5, 3.12.0 and 3.13.0,
+  Flutter stable, and an opt-in pub.dev-only dependency graph check.
 
 ### Forms
 

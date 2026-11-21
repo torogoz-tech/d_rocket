@@ -3,10 +3,9 @@ import 'dart:async';
 import 'form_field_change.dart';
 import 'form_error.dart';
 import 'form_validation_mode.dart';
+import 'form_validation_state.dart';
+import 'form_validator.dart';
 import 'form_value_parser.dart';
-
-/// Produces an error when a typed value is invalid.
-typedef FormValidator<T> = FormError? Function(T? value);
 
 /// Holds the typed and raw state of one generated form field.
 class FormFieldState<T> {
@@ -15,26 +14,40 @@ class FormFieldState<T> {
     T? initialValue,
     this.parser,
     List<FormValidator<T>>? validators,
+    List<AsyncFormValidator<T>>? asyncValidators,
+    this.asyncValidationDebounce,
     this.validationMode = FormValidationMode.manual,
   })  : _initialValue = initialValue,
         _value = initialValue,
         _rawValue = initialValue,
         _validators = List<FormValidator<T>>.unmodifiable(
           validators ?? <FormValidator<T>>[],
+        ),
+        _asyncValidators = List<AsyncFormValidator<T>>.unmodifiable(
+          asyncValidators ?? <AsyncFormValidator<T>>[],
         );
 
   final T? _initialValue;
   final List<FormValidator<T>> _validators;
+  final List<AsyncFormValidator<T>> _asyncValidators;
   final List<FormError> _errors = <FormError>[];
+  final List<FormError> _externalErrors = <FormError>[];
   final StreamController<FormFieldChange<T>> _changeController =
       StreamController<FormFieldChange<T>>.broadcast();
+  final StreamController<FormValidationState> _validationStateController =
+      StreamController<FormValidationState>.broadcast(sync: true);
   T? _value;
   Object? _rawValue;
   bool _isTouched = false;
   bool _isDisposed = false;
+  int _validationGeneration = 0;
+  FormValidationState _validationState = FormValidationState.idle;
 
   /// Converts raw values before validation.
   final FormValueParser<T>? parser;
+
+  /// Waits before invoking asynchronous validators after a value change.
+  final Duration? asyncValidationDebounce;
 
   /// Controls automatic validation for this field.
   FormValidationMode validationMode;
@@ -46,16 +59,25 @@ class FormFieldState<T> {
   Object? get rawValue => _rawValue;
 
   /// All current validation errors in declaration order.
-  List<FormError> get errors => List<FormError>.unmodifiable(_errors);
+  List<FormError> get errors => List<FormError>.unmodifiable(
+        <FormError>[..._errors, ..._externalErrors],
+      );
 
   /// First current error message, if any.
-  String? get error => _errors.isEmpty ? null : _errors.first.message;
+  String? get error => errors.isEmpty ? null : errors.first.message;
 
   /// First current error code, if any.
-  String? get errorCode => _errors.isEmpty ? null : _errors.first.code;
+  String? get errorCode => errors.isEmpty ? null : errors.first.code;
 
   /// Whether this field currently has one or more errors.
-  bool get hasError => _errors.isNotEmpty;
+  bool get hasError => _errors.isNotEmpty || _externalErrors.isNotEmpty;
+
+  /// Current synchronous/asynchronous validation state.
+  FormValidationState get validationState => _validationState;
+
+  /// Emits whenever [validationState] changes.
+  Stream<FormValidationState> get validationStates =>
+      _validationStateController.stream;
 
   /// Whether a user or control has interacted with this field.
   bool get isTouched => _isTouched;
@@ -90,13 +112,18 @@ class FormFieldState<T> {
     _rawValue = nextValue;
     _isTouched = true;
     _errors.clear();
+    _externalErrors.clear();
 
     if (nextValue == null && null is! T && _validators.isEmpty) {
       _errors.add(_invalidConversionError);
     }
 
     if (validationMode == FormValidationMode.onChange) {
-      validate();
+      if (_asyncValidators.isEmpty) {
+        validate();
+      } else {
+        unawaited(validateAsync());
+      }
     }
     _emitChange();
   }
@@ -106,11 +133,13 @@ class FormFieldState<T> {
     _rawValue = nextRawValue;
     _isTouched = true;
     _errors.clear();
+    _externalErrors.clear();
 
     if (parser == null) {
       try {
         if (nextRawValue == null && null is! T) {
-          throw const FormatException('A null value is not valid for this field');
+          throw const FormatException(
+              'A null value is not valid for this field');
         }
         _value = nextRawValue as T?;
       } on Object {
@@ -127,7 +156,11 @@ class FormFieldState<T> {
     }
 
     if (validationMode == FormValidationMode.onChange) {
-      validate();
+      if (_asyncValidators.isEmpty) {
+        validate();
+      } else {
+        unawaited(validateAsync());
+      }
     }
     _emitChange();
   }
@@ -137,7 +170,11 @@ class FormFieldState<T> {
     _isTouched = true;
 
     if (validationMode == FormValidationMode.onBlur) {
-      validate();
+      if (_asyncValidators.isEmpty) {
+        validate();
+      } else {
+        unawaited(validateAsync());
+      }
     }
   }
 
@@ -169,7 +206,57 @@ class FormFieldState<T> {
       }
     }
 
-    return _errors.isEmpty;
+    _setValidationState(
+      _errors.isEmpty && _externalErrors.isEmpty
+          ? FormValidationState.valid
+          : FormValidationState.invalid,
+    );
+    return _errors.isEmpty && _externalErrors.isEmpty;
+  }
+
+  /// Runs synchronous and asynchronous validators with optional debounce.
+  Future<bool> validateAsync() async {
+    final int generation = ++_validationGeneration;
+    _setValidationState(FormValidationState.validating);
+    final Duration? debounce = asyncValidationDebounce;
+    if (debounce != null && debounce > Duration.zero) {
+      await Future<void>.delayed(debounce);
+      if (generation != _validationGeneration) return false;
+    }
+
+    if (!validate()) return false;
+    for (final AsyncFormValidator<T> validator in _asyncValidators) {
+      try {
+        final FormError? error = await validator(_value);
+        if (generation != _validationGeneration) return false;
+        if (error != null) _errors.add(error);
+      } on Object {
+        if (generation != _validationGeneration) return false;
+        _errors.add(const FormError(
+          code: 'validation.exception',
+          message: 'No se pudo validar el valor',
+        ));
+      }
+    }
+    _setValidationState(
+      _errors.isEmpty && _externalErrors.isEmpty
+          ? FormValidationState.valid
+          : FormValidationState.invalid,
+    );
+    return _errors.isEmpty && _externalErrors.isEmpty;
+  }
+
+  /// Adds server-side errors until the field receives a new value or resets.
+  void setExternalErrors(List<FormError> errors) {
+    _externalErrors
+      ..clear()
+      ..addAll(errors);
+    _setValidationState(
+      _externalErrors.isEmpty
+          ? FormValidationState.valid
+          : FormValidationState.invalid,
+    );
+    _emitChange();
   }
 
   static const FormError _invalidConversionError = FormError(
@@ -182,7 +269,10 @@ class FormFieldState<T> {
     _value = _initialValue;
     _rawValue = _initialValue;
     _errors.clear();
+    _externalErrors.clear();
     _isTouched = false;
+    ++_validationGeneration;
+    _setValidationState(FormValidationState.idle);
     _emitChange();
   }
 
@@ -191,6 +281,7 @@ class FormFieldState<T> {
     if (_isDisposed) return;
     _isDisposed = true;
     await _changeController.close();
+    await _validationStateController.close();
   }
 
   void _emitChange() {
@@ -198,6 +289,13 @@ class FormFieldState<T> {
       _changeController.add(
         FormFieldChange<T>(value: _value, rawValue: _rawValue),
       );
+    }
+  }
+
+  void _setValidationState(FormValidationState state) {
+    _validationState = state;
+    if (!_isDisposed && !_validationStateController.isClosed) {
+      _validationStateController.add(state);
     }
   }
 }

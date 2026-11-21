@@ -16,6 +16,9 @@ import 'dart:convert';
 import 'codec_encoder.dart';
 import 'json_encoder.dart';
 import 'json_factory.dart';
+import 'serialization_exception.dart';
+
+export 'serialization_exception.dart';
 
 export 'codec_encoder.dart';
 export 'json_encoder.dart';
@@ -116,6 +119,27 @@ class Serializer {
     }
 
     throw ArgumentError('Unsupported JSON payload for type $T');
+  }
+
+  /// Wraps a generated field conversion with model and field context.
+  static T decodeField<T>({
+    required String field,
+    required Object? raw,
+    required T Function() decode,
+  }) {
+    try {
+      return decode();
+    } on SerializationException {
+      rethrow;
+    } catch (error, stackTrace) {
+      throw SerializationException(
+        field: field,
+        expectedType: '$T',
+        rawValue: raw,
+        cause: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   /// Encodes a runtime value to a JSON-compatible

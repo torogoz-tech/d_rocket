@@ -55,7 +55,7 @@ don't bloat the runtime.
 | 4 | **ORM** | `DbContext` + change-tracked `DbSet<T>` (`add` / `markModified` / `remove` + `saveChanges`); `include_<TNav>()`; `watch()`; `DbInterceptor` chain; `@Migration` + auto-migrator (`pendingSchemaDiff()` / `runAutoMigrations()`); bulk ops. | [07](https://github.com/torogoz-tech/d_rocket/blob/main/doc/07-layer-4-orm.md) |
 | 5 | **Sync** | `SyncProvider` (sealed) — `RestSyncProvider`, `WebSocketSyncProvider`, `MultiTransportSyncProvider`; persistent identity; push + pull; **conflict resolution** (`Lww`, `ClientWins`, `Custom`, `MergeStrategies`); 4 retry policies; 3 `SyncStateStore` impls; `ConnectivityProvider`; `MultiTenantSync`; `AuthRefreshSync`; `VectorClock`. | [08](https://github.com/torogoz-tech/d_rocket/blob/main/doc/08-layer-5-sync.md) |
 | 6 | **Realtime** | `@WebSocketClient` + `@SseClient` → typed `Stream<T>`; `IOWebSocketClient` (dart:io) + `WebWebSocketClient` (browser); controlled reconnectors with backoff, dynamic auth headers, lifecycle states, inactivity detection, heartbeats and resumable cursors. | [09](https://github.com/torogoz-tech/d_rocket/blob/main/doc/09-layer-6-realtime.md) |
-| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic `bind()` / `bindRaw()`, model-level cross-field validation, composite bindings, typed conversion, observable field changes, stable errors and safe construction for Flutter or Dart controls. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
+| 7 | **Forms** | `@Form` → `<ModelName>Form`; generic bindings, model-level and asynchronous validation with debounce, REST error mapping, composite bindings, typed conversion, observable states and safe construction. | [2.2](https://github.com/torogoz-tech/d_rocket/blob/main/doc/RELEASE_2.2.0.md) |
 
 Forms are the seventh framework layer, available since 2.2.0. They bind
 existing Flutter or Dart controls to an annotated model without introducing
@@ -80,6 +80,12 @@ class RequestModel {
 `@Uuid()` accepts supported UUID versions, while `version` restricts the
 field to one version. Validation is separate from UUID generation through
 `generateUuidV4()`.
+
+Generated forms also expose `validateAsync()` and `buildAsync()` for remote
+checks, with `FormValidationState.validating`, `valid` and `invalid`. REST
+validation responses can be mapped directly with `form.applyRestError(error)`.
+Generated serializer conversions report the model field and expected type via
+`SerializationException`.
 
 For Flutter applications, the optional [`d_rocket_flutter`](https://pub.dev/packages/d_rocket_flutter)
 package provides `DrocketFormBuilder` and generic field bindings. It does not

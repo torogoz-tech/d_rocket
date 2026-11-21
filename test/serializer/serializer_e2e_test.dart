@@ -7,9 +7,32 @@
 import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
 
+import '../fixtures/codegen_types.dart';
+
 void main() {
   setUp(Serializer.reset);
   tearDown(Serializer.reset);
+
+  test('reports the model field when generated conversion fails', () {
+    registerCodegenTypesEntitySerializer();
+
+    expect(
+      () => CodegenTypesEntityFromJson(<String, dynamic>{
+        'id': 'evt-1',
+        'name': 'event',
+        'description': null,
+        'timestamp': 'not-a-date',
+        'optionalTimestamp': null,
+        'amount': 12.5,
+      }),
+      throwsA(
+        isA<SerializationException>()
+            .having(
+                (error) => error.field, 'field', 'CodegenTypesEntity.timestamp')
+            .having((error) => error.expectedType, 'expectedType', 'DateTime'),
+      ),
+    );
+  });
 
   group('Fase 6.3 — Serializer: nested types', () {
     test('a class with a List<OtherClass> field round-trips', () {
