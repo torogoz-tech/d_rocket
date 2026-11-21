@@ -63,6 +63,24 @@ framework widgets or a parallel form model. See
 [`RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md) and
 [`2.2-formularios-modelo.md`](doc/2.2-formularios-modelo.md).
 
+UUID fields can use the dedicated validator instead of repeating a regular
+expression:
+
+```dart
+@Form()
+class RequestModel {
+  RequestModel({required this.requestId});
+
+  @Required()
+  @Uuid(version: UuidVersion.v4)
+  final String requestId;
+}
+```
+
+`@Uuid()` accepts supported UUID versions, while `version` restricts the
+field to one version. Validation is separate from UUID generation through
+`generateUuidV4()`.
+
 For Flutter applications, the optional [`d_rocket_flutter`](https://pub.dev/packages/d_rocket_flutter)
 package provides `DrocketFormBuilder` and generic field bindings. It does not
 replace `TextField`, `DropdownButton` or any other control: the application

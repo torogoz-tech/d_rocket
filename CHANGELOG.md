@@ -5,6 +5,19 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-11-21
+
+### Added
+
+* Added the model-driven `@Uuid()` validator for canonical UUID values.
+* Added `UuidVersion.v1` through `UuidVersion.v8` for optional version-specific
+  validation, including custom messages and stable validation codes.
+
+### Compatibility
+
+* Existing `@Pattern` declarations and UUID generation through
+  `generateUuidV4()` remain unchanged.
+
 ## [2.3.0] — 2026-11-21
 
 ### Added
