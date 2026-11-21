@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'diagnostic_event.dart';
+import 'diagnostic_policy.dart';
 
 /// Development diagnostics hub shared by all d_rocket layers.
 class DrocketDiagnostics {
@@ -19,6 +20,7 @@ class DrocketDiagnostics {
   bool includeSensitiveData = false;
   int maxPayloadLength = 32768;
   int maxEvents = 500;
+  DiagnosticPolicy diagnosticPolicy = const DiagnosticPolicy();
 
   Stream<DiagnosticEvent> get events => _controller.stream;
   List<DiagnosticEvent> get snapshot =>
@@ -41,6 +43,7 @@ class DrocketDiagnostics {
     bool? includeSensitiveData,
     int? maxPayloadLength,
     int? maxEvents,
+    DiagnosticPolicy? diagnosticPolicy,
   }) {
     if (enabled != null) this.enabled = enabled;
     if (publishToVmService != null) {
@@ -65,6 +68,9 @@ class DrocketDiagnostics {
       }
       this.maxEvents = maxEvents;
       _trim();
+    }
+    if (diagnosticPolicy != null) {
+      this.diagnosticPolicy = diagnosticPolicy;
     }
   }
 

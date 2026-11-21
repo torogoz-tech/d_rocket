@@ -4,9 +4,10 @@ import 'diagnostic_payload.dart';
 
 /// HTTP wrapper that publishes one structured event per request.
 class DiagnosticHttpClient implements HttpClient {
-  const DiagnosticHttpClient(this.inner);
+  const DiagnosticHttpClient(this.inner, {this.policy});
 
   final HttpClient inner;
+  final DiagnosticPolicy? policy;
 
   @override
   Future<RestResponse<dynamic>> execute(
@@ -15,16 +16,19 @@ class DiagnosticHttpClient implements HttpClient {
     CancelToken? cancelToken,
   }) async {
     final DateTime started = DateTime.now();
+    final DrocketDiagnostics diagnostics = DrocketDiagnostics.instance;
+    final DiagnosticPolicy activePolicy =
+        policy ?? diagnostics.diagnosticPolicy;
     try {
       final response = await inner.execute(
         request,
         decoder: decoder,
         cancelToken: cancelToken,
       );
-      _record(request, started, response: response);
+      _record(request, started, response: response, policy: activePolicy);
       return response;
     } catch (error) {
-      _record(request, started, error: error);
+      _record(request, started, error: error, policy: activePolicy);
       rethrow;
     }
   }
@@ -37,6 +41,7 @@ class DiagnosticHttpClient implements HttpClient {
     DateTime started, {
     RestResponse<dynamic>? response,
     Object? error,
+    required DiagnosticPolicy policy,
   }) {
     final diagnostics = DrocketDiagnostics.instance;
     DrocketDiagnostics.instance.record(
@@ -50,10 +55,10 @@ class DiagnosticHttpClient implements HttpClient {
             (error is RestHttpException ? error.statusCode : null),
         error: error?.toString(),
         metadata: <String, Object?>{
-          'request': _requestPayload(request, diagnostics),
+          'request': _requestPayload(request, diagnostics, policy),
           'response': response != null
-              ? _responsePayload(response, diagnostics)
-              : _errorResponsePayload(error, diagnostics),
+              ? _responsePayload(response, diagnostics, policy)
+              : _errorResponsePayload(error, diagnostics, policy),
         },
       ),
     );
@@ -62,14 +67,18 @@ class DiagnosticHttpClient implements HttpClient {
   Map<String, Object?> _requestPayload(
     RestRequest request,
     DrocketDiagnostics diagnostics,
+    DiagnosticPolicy policy,
   ) {
     final String body = request.bodyAsString;
-    final payload = _boundedPayload(body, diagnostics.maxPayloadLength);
+    final payload = _boundedPayload(
+      policy.redactBodyText(body),
+      diagnostics.maxPayloadLength,
+    );
     return <String, Object?>{
       'method': request.method,
       'url': request.fullUrl,
       'headers': diagnostics.includeSensitiveData
-          ? _redactHeaders(request.headers)
+          ? policy.redactHeaders(request.headers)
           : request.headers.keys.toList(growable: false),
       'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': body.length,
@@ -80,17 +89,18 @@ class DiagnosticHttpClient implements HttpClient {
   Map<String, Object?> _responsePayload(
     RestResponse<dynamic>? response,
     DrocketDiagnostics diagnostics,
+    DiagnosticPolicy policy,
   ) {
     if (response == null) return const <String, Object?>{};
     final payload = _boundedPayload(
-      response.rawBody,
+      policy.redactBodyText(response.rawBody),
       diagnostics.maxPayloadLength,
     );
     return <String, Object?>{
       'statusCode': response.statusCode,
       if (response.reasonPhrase != null) 'reasonPhrase': response.reasonPhrase,
       'headers': diagnostics.includeSensitiveData
-          ? _redactHeaders(response.headers)
+          ? policy.redactHeaders(response.headers)
           : response.headers.keys.toList(growable: false),
       'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': response.rawBody.length,
@@ -101,10 +111,11 @@ class DiagnosticHttpClient implements HttpClient {
   Map<String, Object?> _errorResponsePayload(
     Object? error,
     DrocketDiagnostics diagnostics,
+    DiagnosticPolicy policy,
   ) {
     if (error is! RestHttpException) return const <String, Object?>{};
     final payload = _boundedPayload(
-      error.rawBody,
+      policy.redactBodyText(error.rawBody),
       diagnostics.maxPayloadLength,
     );
     return <String, Object?>{
@@ -125,23 +136,4 @@ class DiagnosticHttpClient implements HttpClient {
       truncated: true,
     );
   }
-
-  Map<String, String> _redactHeaders(Map<String, String> headers) {
-    return headers.map(
-      (key, value) => MapEntry(
-        key,
-        _sensitiveHeaderNames.contains(key.toLowerCase())
-            ? '<redacted>'
-            : value,
-      ),
-    );
-  }
-
-  static const Set<String> _sensitiveHeaderNames = <String>{
-    'authorization',
-    'cookie',
-    'set-cookie',
-    'proxy-authorization',
-    'x-api-key',
-  };
 }
