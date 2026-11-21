@@ -2785,8 +2785,8 @@ class SqliteSetOpQueryable<T> extends Queryable<T> {
     SqlDialect? dialect,
     required String table,
     required ResultRowReader<T> reader,
-    required EntityMeta meta,
-    AsyncQueryProvider? asyncProvider,
+    required super.meta,
+    super.asyncProvider,
   })  : _left = left,
         _right = right,
         _kind = kind,
@@ -2795,8 +2795,6 @@ class SqliteSetOpQueryable<T> extends Queryable<T> {
           dialect ?? _kDefaultDialect,
           table,
           reader,
-          meta: meta,
-          asyncProvider: asyncProvider,
         );
 
   @override
