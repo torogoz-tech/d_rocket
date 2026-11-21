@@ -77,6 +77,15 @@ void main() {
       ).data,
       isNull,
     );
+    expect(
+      () => IntegrationVehicleResponseFromJson(<String, dynamic>{
+        'id': 'vehicle-unknown',
+        'type': 'scooter',
+        'plate': 'P-ABC',
+        'year': 2020,
+      }),
+      throwsArgumentError,
+    );
   });
 
   test('generated REST client preserves typed response contracts', () async {
