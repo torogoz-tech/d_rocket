@@ -5,6 +5,18 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-11-21
+
+### Added
+
+* Documented the complete enum contract across JSON, model-driven forms and
+  SQLite ORM persistence. Enums use their Dart `.name` on the wire and in
+  SQLite `TEXT` columns.
+* `@JsonKey(unknownEnumValue: ...)` is the explicit fallback policy for
+  unknown enum values; without a fallback, unknown values are rejected.
+* Added guidance for replacing fixed-value `String` fields and `@Pattern`
+  expressions with strongly typed enums.
+
 ## [2.2.4] — 2026-11-20
 
 ### Added

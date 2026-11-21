@@ -569,6 +569,29 @@ and convert at the domain boundary; for JSON, use the serializer's explicit
 `@JsonKey(converter: ...)` contract. d_rocket never silently chooses a
 precision-losing representation for an exact decimal object.
 
+#### Enum columns
+
+Declare fixed-value fields as Dart enums instead of `String` fields with a
+large `@Pattern` expression:
+
+```dart
+enum LocationStatus {
+  available,
+  permissionDenied,
+  deniedForever,
+  serviceDisabled,
+  pending,
+  timeout,
+  unavailable,
+}
+```
+
+The generated ORM stores `LocationStatus.permissionDenied` as the SQLite text
+`permissionDenied` and reconstructs the enum from that name. Add
+`@JsonKey(unknownEnumValue: 'unavailable')` when the database or backend may
+introduce values newer than the application. Without that fallback, unknown
+values fail explicitly instead of being silently coerced.
+
 ## API reference
 
 ### `@Table(...)` / `@Table.tph(...)` / `@Table.tpc(...)`

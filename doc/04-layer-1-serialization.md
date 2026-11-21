@@ -262,6 +262,10 @@ class ApiResponse {
 | `requiredKey` | `bool` | `false` | Throw if the input key is missing or null during deserialisation. |
 | `unknownEnumValue` | `String?` | `null` | For enum fields: the value name to use when an unknown input is received. Defaults to throwing. |
 
+Enum fields are serialized by their `.name` by default and are decoded back to
+the declared enum type. The same `unknownEnumValue` fallback is honored by the
+generated SQLite ORM mapper in `d_rocket_builder`.
+
 ## Polymorphism and sealed unions
 
 For sum types, use `@SerializableUnion` on the
