@@ -291,7 +291,41 @@ initial response timeout, redirect policy and
 `text/event-stream` validation are configured on
 `HttpSseClient` itself. An optional `http.Client`
 can still be injected for tests or specialized
-transports; injected clients remain caller-owned.
+transports; injected clients remain caller-owned unless
+`ownsHttpClient: true` is supplied. Calling `close()`
+twice is safe and closes an owned pending or active
+transport.
+
+## Shared transport policies
+
+`TransportPolicy` can be shared by generated REST
+clients, `HttpSseClient` and `TransportStreamingClient`.
+The request callback receives the final URI for each
+attempt, so an application can add a current token or a
+new DPoP proof. The response callback can request a
+bounded repeat:
+
+```dart
+final policy = TransportPolicy(
+  onRequest: (context) async => context.copyWith(
+    headers: <String, String>{
+      ...context.headers,
+      'Authorization': 'Bearer ${await session.accessToken()}',
+    },
+  ),
+  onResponse: (context) => context.statusCode == 401
+      ? const TransportResponseDecision.retry()
+      : const TransportResponseDecision.accept(),
+);
+
+final downloads = TransportStreamingClient(policy: policy);
+```
+
+Streaming downloads follow redirects through the policy
+pipeline. When the origin changes,
+`TransportRequestContext.forRedirect` removes credential
+headers before the next request; the policy can then add
+credentials suitable for the redirected URI.
 
 ## `WebSocketReconnector`
 

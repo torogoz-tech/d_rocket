@@ -13,6 +13,29 @@ adds method, URI, status, attempt and idempotency information to REST retry
 decisions. A `CancelToken` interrupts retry backoff instead of waiting for the
 full delay.
 
+For streaming downloads, use `TransportStreamingClient` with the same policy:
+
+```dart
+final downloads = TransportStreamingClient(
+  policy: TransportPolicy(
+    onRequest: (context) async => context.copyWith(
+      headers: <String, String>{
+        ...context.headers,
+        'DPoP': await proofFor(context.uri),
+      },
+    ),
+  ),
+);
+
+final response = await downloads.send(
+  http.Request('GET', Uri.parse('https://api.example.com/file.zip')),
+);
+```
+
+The client follows redirects itself so a cross-origin redirect removes
+credential headers before the next policy invocation. The policy therefore
+receives the actual URI that will be sent and can generate a new proof.
+
 ## SSE transport ownership
 
 An injected `http.Client` is shared by default:
@@ -40,9 +63,10 @@ only when ownership is enabled.
 streams. The separate `d_rocket_flutter` package exposes
 `DrocketFormBuilder` and `FormBindingField`; applications continue using their
 own `TextField`, dropdown, date picker or custom control. For text controls,
-`FormBinding.text(name, controller)` synchronizes model normalization and reset
-with the caller-owned `TextEditingController`; disposing the binding does not
-dispose that controller.
+`FormBinding.text(name, controller)` returns a `FormTextBinding` that
+synchronizes model normalization and reset with the caller-owned
+`TextEditingController`; disposing the binding does not dispose that
+controller.
 
 ```dart
 DrocketFormBuilder<Login>(

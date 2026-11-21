@@ -108,7 +108,7 @@ dev_dependencies:
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
   d_rocket: ^2.4.0
-  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.3.0
+  d_rocket_engine_sqlite: ^2.1.0   # Compatible with core 2.4.0
 dev_dependencies:
   d_rocket_builder: ^2.4.0
   d_rocket_lints: ^2.3.0            # N+1 + closure-linq + enum guidance
@@ -175,6 +175,20 @@ configuration, interceptors, connection timeout, content-type validation,
 dynamic headers, authentication recovery, lifecycle states, manual cursor
 acknowledgement, heartbeat-aware inactivity and complete transport shutdown,
 is documented in [`doc/2.2.2-sse-reconnect.md`](doc/2.2.2-sse-reconnect.md).
+
+The 2.4.0 integration contract is documented in
+[`doc/RELEASE_2.4.0.md`](doc/RELEASE_2.4.0.md). It covers shared transport
+policies for REST, SSE and downloads, contextual retries, configurable
+diagnostic redaction, explicit SSE transport ownership, generated generic
+serializer registrations and the optional `d_rocket_flutter` bindings.
+
+For Flutter applications, install the optional adapter alongside the core:
+
+```yaml
+dependencies:
+  d_rocket: ^2.4.0
+  d_rocket_flutter: ^2.4.0
+```
 
 ## License
 
