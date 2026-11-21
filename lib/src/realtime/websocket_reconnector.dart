@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import '../diagnostics/diagnostic_category.dart';
+import '../diagnostics/diagnostic_event.dart';
+import '../diagnostics/drocket_diagnostics.dart';
 import 'websocket_connection.dart';
 import 'websocket_message.dart';
 import 'websocket_reconnector_state.dart';
@@ -65,6 +68,10 @@ class WebSocketReconnector {
   int _attempt = 0;
   int _generation = 0;
   int? _statusCode;
+  Object? _lastError;
+  StackTrace? _lastStackTrace;
+  int? _lastCloseCode;
+  String? _lastCloseReason;
   bool _stopped = true;
   bool _disposed = false;
   WebSocketReconnectorState _state = WebSocketReconnectorState.stopped;
@@ -84,6 +91,18 @@ class WebSocketReconnector {
   /// HTTP status reported by the most recent transport, if available.
   int? get statusCode => _statusCode;
 
+  /// Last connection error, if a connection or retry failed.
+  Object? get lastError => _lastError;
+
+  /// Stack trace associated with [lastError].
+  StackTrace? get lastStackTrace => _lastStackTrace;
+
+  /// Close code reported by a transport, when available.
+  int? get lastCloseCode => _lastCloseCode;
+
+  /// Close reason reported by a transport, when available.
+  String? get lastCloseReason => _lastCloseReason;
+
   /// Starts a connection and returns when the first connection succeeds.
   Future<void> start() {
     _ensureNotDisposed();
@@ -94,6 +113,10 @@ class WebSocketReconnector {
     _stopped = false;
     final int generation = ++_generation;
     _attempt = 0;
+    _lastError = null;
+    _lastStackTrace = null;
+    _lastCloseCode = null;
+    _lastCloseReason = null;
     _connectionFuture = _connectLoop(generation, 0);
     return _connectionFuture!;
   }
@@ -162,7 +185,10 @@ class WebSocketReconnector {
         return;
       } catch (error, stackTrace) {
         if (!_isCurrent(generation)) return;
+        _lastError = error;
+        _lastStackTrace = stackTrace;
         _statusCode = _readStatusCode(candidate);
+        _captureCloseDetails(candidate);
         await _closeCandidate(candidate);
         if (_statusCode == 401 && !unauthorizedHandled) {
           unauthorizedHandled = true;
@@ -206,6 +232,11 @@ class WebSocketReconnector {
     _inactivityTimer = null;
     final WebSocketConnection? oldClient = _client;
     _client = null;
+    if (error != null) {
+      _lastError = error;
+      _lastStackTrace = stackTrace;
+    }
+    _captureCloseDetails(oldClient);
     unawaited(_subscription?.cancel());
     _subscription = null;
     unawaited(oldClient?.close());
@@ -269,12 +300,28 @@ class WebSocketReconnector {
     await candidate.close();
   }
 
+  void _captureCloseDetails(WebSocketConnection? candidate) {
+    if (candidate == null) return;
+    final Object? code = _readOptional(candidate, 'closeCode');
+    final Object? reason = _readOptional(candidate, 'closeReason');
+    if (code is int) _lastCloseCode = code;
+    if (reason is String) _lastCloseReason = reason;
+  }
+
   int? _readStatusCode(WebSocketConnection? candidate) {
+    final Object? statusCode = _readOptional(candidate, 'statusCode');
+    return statusCode is int ? statusCode : null;
+  }
+
+  Object? _readOptional(WebSocketConnection? candidate, String member) {
     if (candidate == null) return null;
     try {
       final dynamic value = candidate;
-      final Object? statusCode = value.statusCode;
-      return statusCode is int ? statusCode : null;
+      return member == 'statusCode'
+          ? value.statusCode
+          : member == 'closeCode'
+              ? value.closeCode
+              : value.closeReason;
     } on NoSuchMethodError {
       return null;
     }
@@ -287,6 +334,29 @@ class WebSocketReconnector {
 
   void _emit(WebSocketReconnectorState next) {
     _state = next;
+    final DrocketDiagnostics diagnostics = DrocketDiagnostics.instance;
+    if (diagnostics.enabled) {
+      diagnostics.record(
+        DiagnosticEvent(
+          correlationId: '${url.toString()}-${identityHashCode(this)}',
+          category: DiagnosticCategory.realtime,
+          operation: 'websocket.state',
+          startedAt: DateTime.now(),
+          success: next != WebSocketReconnectorState.failed,
+          statusCode: _statusCode,
+          error: diagnostics.includeSensitiveData
+              ? _lastError?.toString()
+              : _lastError?.runtimeType.toString(),
+          metadata: <String, Object?>{
+            'state': next.name,
+            'attempt': _attempt,
+            'url': url.toString(),
+            if (_lastCloseCode != null) 'closeCode': _lastCloseCode,
+            if (_lastCloseReason != null) 'closeReason': _lastCloseReason,
+          },
+        ),
+      );
+    }
     if (!_states.isClosed) _states.add(next);
   }
 

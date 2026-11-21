@@ -118,9 +118,16 @@ class DiagnosticHttpClient implements HttpClient {
       policy.redactBodyText(error.rawBody),
       diagnostics.maxPayloadLength,
     );
+    final RestProblemDetails problem = error.problem;
     return <String, Object?>{
       'statusCode': error.statusCode,
       if (error.reasonPhrase != null) 'reasonPhrase': error.reasonPhrase,
+      if (problem.code != null) 'code': problem.code,
+      if (error.traceId != null) 'traceId': error.traceId,
+      if (error.requestId != null) 'requestId': error.requestId,
+      if (diagnostics.includeSensitiveData &&
+          problem.validationErrors.isNotEmpty)
+        'validationErrors': problem.validationErrors,
       'body': diagnostics.includeSensitiveData ? payload.value : '<hidden>',
       'bodyLength': error.rawBody.length,
       if (payload.truncated) 'bodyTruncated': true,

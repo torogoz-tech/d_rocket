@@ -74,6 +74,13 @@ void main() {
       statusCode: 503,
       reasonPhrase: 'Unavailable',
       rawBody: '{"error":"down"}',
+      responseHeaders: const <String, String>{'x-trace-id': 'trace-503'},
+      errorBody: const <String, Object?>{
+        'code': 'service.unavailable',
+        'errors': <String, Object?>{
+          'field': <String>['Invalid']
+        },
+      },
       request: request,
     );
     final httpClient = DiagnosticHttpClient(
@@ -91,6 +98,11 @@ void main() {
           as Map<String, Object?>)['body'],
       '{"error":"down"}',
     );
+    final Map<String, Object?> errorResponse = diagnostics
+        .snapshot.single.metadata['response']! as Map<String, Object?>;
+    expect(errorResponse['code'], 'service.unavailable');
+    expect(errorResponse['traceId'], 'trace-503');
+    expect(errorResponse['validationErrors'], isNotNull);
 
     diagnostics.clear();
     final networkError = NetworkException('timeout');

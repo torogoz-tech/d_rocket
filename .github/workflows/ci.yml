@@ -49,6 +49,8 @@ jobs:
       - run: flutter pub get
       - name: Generate source files
         run: dart run build_runner build --delete-conflicting-outputs
+      - name: Validate generated Dart
+        run: dart run tool/verify_generated.dart
       - run: dart analyze
       - run: dart test --reporter=expanded
 

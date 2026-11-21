@@ -33,8 +33,20 @@ utilizarse nuevamente y `dispose()` cierra también los streams públicos.
 ## Errores REST tipados
 
 `RestHttpException.problem` ofrece una vista `RestProblemDetails` de payloads
-RFC 7807, con `validationErrors` para mensajes por campo. El acceso original
-`problemDetails` continúa disponible para extensiones específicas del backend.
+RFC 7807, con `validationErrors`, código de negocio y metadatos de correlación.
+Los headers de respuesta `traceId` y `requestId` también quedan disponibles.
+El acceso original `problemDetails` continúa disponible para extensiones
+específicas del backend.
+
+## Diagnostics y codegen
+
+Los reconnectores publican eventos `websocket.state` correlacionados con el
+estado, intento, status HTTP y contexto de cierre. Los bodies y errores de
+validación permanecen ocultos salvo que se habilite explícitamente la captura
+de datos sensibles. El pipeline regenera los `.g.dart` y ejecuta
+`dart run tool/verify_generated.dart` antes del análisis para detectar tokens
+sin expandir, doble nulabilidad, casts nulos de `DateTime` y listas default
+con `<dynamic>`.
 
 ## Validación entre campos
 

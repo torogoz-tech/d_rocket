@@ -26,12 +26,14 @@ class RestHttpException extends RestException {
     this.reasonPhrase,
     this.rawBody = '',
     this.errorBody,
+    this.responseHeaders = const <String, String>{},
   }) : super('HTTP $statusCode${reasonPhrase != null ? ' $reasonPhrase' : ''}');
 
   final int statusCode;
   final String? reasonPhrase;
   final String rawBody;
   final Object? errorBody;
+  final Map<String, String> responseHeaders;
   final RestRequest request;
 
   /// For `application/problem+json` (RFC 7807), if the
@@ -44,6 +46,21 @@ class RestHttpException extends RestException {
 
   /// Typed RFC 7807 view, including field validation messages when present.
   RestProblemDetails get problem => RestProblemDetails.fromJson(errorBody);
+
+  /// Correlation id from response headers or the structured payload.
+  String? get traceId =>
+      _header('trace-id') ?? _header('x-trace-id') ?? problem.traceId;
+
+  /// Request id from response headers or the structured payload.
+  String? get requestId =>
+      _header('request-id') ?? _header('x-request-id') ?? problem.requestId;
+
+  String? _header(String name) {
+    for (final MapEntry<String, String> entry in responseHeaders.entries) {
+      if (entry.key.toLowerCase() == name) return entry.value;
+    }
+    return null;
+  }
 }
 
 /// The connection failed (no response from the server).

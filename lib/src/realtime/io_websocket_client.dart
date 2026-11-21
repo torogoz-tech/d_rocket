@@ -10,6 +10,8 @@ import 'websocket_message_type.dart';
 /// tests) and Flutter (iOS / Android / desktop).
 class IOWebSocketClient implements WebSocketConnection {
   WebSocket? _socket;
+  int? _closeCode;
+  String? _closeReason;
 
   final StreamController<WebSocketMessage> _messages =
       StreamController<WebSocketMessage>.broadcast();
@@ -32,6 +34,12 @@ class IOWebSocketClient implements WebSocketConnection {
   @override
   bool get isConnected => _socket != null;
 
+  /// Close code reported by the peer, when available.
+  int? get closeCode => _closeCode;
+
+  /// Close reason reported by the peer, when available.
+  String? get closeReason => _closeReason;
+
   @override
   Future<void> connect(
     Uri url, {
@@ -44,6 +52,8 @@ class IOWebSocketClient implements WebSocketConnection {
     }
     final WebSocket socket =
         await WebSocket.connect(url.toString(), headers: headers);
+    _closeCode = null;
+    _closeReason = null;
     _socket = socket;
     socket.listen(
       (dynamic data) {
@@ -58,6 +68,8 @@ class IOWebSocketClient implements WebSocketConnection {
       },
       onDone: () {
         _socket = null;
+        _closeCode = socket.closeCode;
+        _closeReason = socket.closeReason;
         if (!_closed.isCompleted) {
           _closed.complete();
         }
@@ -89,6 +101,8 @@ class IOWebSocketClient implements WebSocketConnection {
     if (socket == null) return;
     _socket = null;
     await socket.close(code ?? 1000, reason);
+    _closeCode = socket.closeCode ?? code;
+    _closeReason = socket.closeReason ?? reason;
     if (!_closed.isCompleted) {
       _closed.complete();
     }

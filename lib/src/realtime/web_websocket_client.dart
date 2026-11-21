@@ -48,4 +48,8 @@ class IOWebSocketClient implements WebSocketConnection {
 
   @override
   bool get isConnected => false;
+
+  int? get closeCode => null;
+
+  String? get closeReason => null;
 }

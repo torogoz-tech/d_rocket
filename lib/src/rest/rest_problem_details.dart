@@ -6,6 +6,9 @@ class RestProblemDetails {
     this.status,
     this.detail,
     this.instance,
+    this.code,
+    this.traceId,
+    this.requestId,
     this.extensions = const <String, Object?>{},
   });
 
@@ -33,6 +36,9 @@ class RestProblemDetails {
       status: status is int ? status : int.tryParse('$status'),
       detail: _asString(values['detail']),
       instance: _asString(values['instance']),
+      code: _asString(values['code'] ?? values['errorCode']),
+      traceId: _asString(values['traceId'] ?? values['trace_id']),
+      requestId: _asString(values['requestId'] ?? values['request_id']),
       extensions: extensions,
     );
   }
@@ -42,6 +48,9 @@ class RestProblemDetails {
   final int? status;
   final String? detail;
   final String? instance;
+  final String? code;
+  final String? traceId;
+  final String? requestId;
   final Map<String, Object?> extensions;
 
   /// Validation messages keyed by field when the payload contains `errors`.

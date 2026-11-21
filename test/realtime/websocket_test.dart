@@ -107,6 +107,17 @@ void main() {
       expect(client.isConnected, isFalse);
     });
 
+    test('captures the server close code and reason', () async {
+      final IOWebSocketClient client = IOWebSocketClient();
+      await client.connect(serverUri);
+      final WebSocket serverSocket = serverSockets.first;
+      await serverSocket.close(1001, 'going away');
+      await client.closed.timeout(const Duration(seconds: 2));
+
+      expect(client.closeCode, 1001);
+      expect(client.closeReason, 'going away');
+    });
+
     test('send() before connect() throws StateError', () {
       final IOWebSocketClient client = IOWebSocketClient();
       expect(

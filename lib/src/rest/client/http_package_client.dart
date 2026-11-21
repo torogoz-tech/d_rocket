@@ -115,6 +115,7 @@ class HttpPackageClient implements HttpClient {
         reasonPhrase: streamed.reasonPhrase,
         rawBody: raw,
         errorBody: decoded,
+        responseHeaders: responseHeaders,
       );
       throw await chain.onError(error);
     } on TimeoutException catch (e) {

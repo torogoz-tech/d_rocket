@@ -10,19 +10,22 @@ void main() {
         'status': 422,
         'detail': 'The request is invalid',
         'instance': '/orders/1',
+        'code': 'validation.failed',
+        'traceId': 'trace-body',
         'errors': <String, Object?>{
           'email': <String>['Invalid email'],
           'name': 'Required',
         },
-        'traceId': 'abc',
       },
     );
 
     expect(problem.status, 422);
     expect(problem.title, 'Validation failed');
+    expect(problem.code, 'validation.failed');
+    expect(problem.traceId, 'trace-body');
     expect(problem.validationErrors['email'], <String>['Invalid email']);
     expect(problem.validationErrors['name'], <String>['Required']);
-    expect(problem.extensions['traceId'], 'abc');
+    expect(problem.extensions['errors'], isNotNull);
   });
 
   test('preserves the existing raw problemDetails API', () {
@@ -30,10 +33,16 @@ void main() {
     final RestHttpException error = RestHttpException(
       statusCode: 400,
       request: const RestRequest(method: 'GET', path: '/items'),
+      responseHeaders: const <String, String>{
+        'x-trace-id': 'trace-header',
+        'x-request-id': 'request-header',
+      },
       errorBody: body,
     );
 
     expect(error.problemDetails, same(body));
     expect(error.problem.detail, 'Nope');
+    expect(error.traceId, 'trace-header');
+    expect(error.requestId, 'request-header');
   });
 }

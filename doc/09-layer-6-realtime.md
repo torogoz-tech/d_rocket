@@ -393,6 +393,8 @@ await for (final msg in reconnector.messages) {
 | `statusCode` | HTTP status exposed by transports that can report the WebSocket upgrade response. |
 | `onUnauthorized` | One-shot 401 recovery callback. Return `true` after refreshing auth; 403 is terminal. |
 | `inactivityTimeout` | Reconnects after no inbound traffic. Heartbeat sends reset this timer. |
+| `lastError` / `lastStackTrace` | Last connection failure retained for UI, logs or diagnostics. |
+| `lastCloseCode` / `lastCloseReason` | Optional peer close details from transports that expose them. |
 | `start()` | Tries `maxAttempts` times with exponential backoff; re-throws on exhaustion. |
 | `stop()` / `dispose()` | Cancel retries, timers and subscriptions; close the connection. `start()` can be called again after `stop()`. |
 

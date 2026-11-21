@@ -201,15 +201,18 @@ diagnostic redaction, explicit SSE transport ownership, generated generic
 serializer registrations and the optional `d_rocket_flutter` bindings.
 
 The 2.5.0 hardening adds `WebSocketReconnector.headersProvider`,
-`WebSocketReconnector.states`, `onUnauthorized`, `statusCode` and
-`inactivityTimeout`. REST callers can read typed problem details from
-`RestHttpException.problem` without losing access to the original JSON body.
+`WebSocketReconnector.states`, `onUnauthorized`, `statusCode`, close context
+and `inactivityTimeout`. Diagnostics publish correlated realtime transitions;
+REST callers can read typed problem details, business codes and correlation
+IDs from `RestHttpException.problem` without losing the original JSON body.
+CI regenerates and validates `.g.dart` output before analysis with
+`dart run tool/verify_generated.dart`.
 
 For Flutter applications, install the optional adapter alongside the core:
 
 ```yaml
 dependencies:
-  d_rocket: ^2.4.0
+  d_rocket: ^2.5.0
   d_rocket_flutter: ^2.4.0
 ```
 

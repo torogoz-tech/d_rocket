@@ -16,7 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bounded reconnects, authentication recovery and heartbeat-aware inactivity
   detection.
 * Added typed RFC 7807 access through `RestHttpException.problem`, including
-  field validation messages, while preserving the raw `problemDetails` API.
+  field validation messages, business codes, trace/request IDs and response
+  headers, while preserving the raw `problemDetails` API.
+* Realtime diagnostics now publish correlated `websocket.state` events with
+  state, attempt, status and optional close context under the existing
+  redaction policy.
+
+### Quality
+
+* Added generated-output sanity validation for known invalid tokens and
+  nullable type regressions.
+* CI now regenerates source files and validates generated Dart before analysis.
 
 ### Forms
 
