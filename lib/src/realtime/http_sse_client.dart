@@ -7,6 +7,8 @@ import 'sse_connection.dart';
 import 'sse_event.dart';
 import 'sse_http_exception.dart';
 import 'sse_interceptor.dart';
+import '../transport/transport_policy.dart';
+import '../transport/transport_policy_sse_interceptor.dart';
 
 /// An SSE client backed by `package:http`.
 class HttpSseClient implements SseConnection {
@@ -14,6 +16,7 @@ class HttpSseClient implements SseConnection {
     http.Client? httpClient,
     this.defaultHeaders = const <String, String>{},
     this.interceptors = const <SseInterceptor>[],
+    this.transportPolicy,
     this.connectTimeout = const Duration(seconds: 30),
     this.followRedirects = true,
     this.validateContentType = true,
@@ -26,6 +29,9 @@ class HttpSseClient implements SseConnection {
   /// Interceptors invoked for requests, responses and connection failures.
   final List<SseInterceptor> interceptors;
 
+  /// Optional policy shared with REST and download transports.
+  final TransportPolicy? transportPolicy;
+
   /// Maximum time allowed to receive the initial HTTP response.
   /// Set to `null` to disable the timeout.
   final Duration? connectTimeout;
@@ -36,7 +42,11 @@ class HttpSseClient implements SseConnection {
   /// Whether successful responses must declare `text/event-stream`.
   final bool validateContentType;
   late final CompositeSseInterceptor _interceptorChain =
-      CompositeSseInterceptor(interceptors);
+      CompositeSseInterceptor(<SseInterceptor>[
+    if (transportPolicy != null)
+      TransportPolicySseInterceptor(transportPolicy!),
+    ...interceptors,
+  ]);
 
   http.Client? _httpClient;
   final bool _ownsHttpClient;

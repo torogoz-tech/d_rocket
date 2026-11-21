@@ -31,4 +31,28 @@ void main() {
     final HttpClient fallback = RecordingHttpClient(<String>[], 'fallback');
     expect(config.build(fallback), same(fallback));
   });
+
+  test('configures a shared transport policy without a custom client',
+      () async {
+    final List<TransportRequestContext> requests = <TransportRequestContext>[];
+    final RestClientConfig config = RestClientConfig(
+      transportPolicy: TransportPolicy(
+        onRequest: (TransportRequestContext context) {
+          requests.add(context);
+          return context;
+        },
+      ),
+    );
+
+    await config.build(RecordingHttpClient(<String>[], 'fallback')).execute(
+          const RestRequest(
+            method: 'GET',
+            baseUrl: 'https://api.example.test',
+            path: '/events',
+          ),
+          decoder: (dynamic value) => value,
+        );
+
+    expect(requests.single.uri.toString(), 'https://api.example.test/events');
+  });
 }

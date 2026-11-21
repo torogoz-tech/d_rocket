@@ -63,6 +63,30 @@ class RestRequest {
     this.cancelToken,
   });
 
+  RestRequest copyWith({
+    String? method,
+    String? path,
+    String? baseUrl,
+    Map<String, String>? headers,
+    Object? body,
+    Map<String, String>? queryParameters,
+    Map<String, Object>? pathParameters,
+    Duration? timeout,
+    CancelToken? cancelToken,
+  }) {
+    return RestRequest(
+      method: method ?? this.method,
+      path: path ?? this.path,
+      baseUrl: baseUrl ?? this.baseUrl,
+      headers: headers ?? this.headers,
+      body: body ?? this.body,
+      queryParameters: queryParameters ?? this.queryParameters,
+      pathParameters: pathParameters ?? this.pathParameters,
+      timeout: timeout ?? this.timeout,
+      cancelToken: cancelToken ?? this.cancelToken,
+    );
+  }
+
   /// Full URL resolving `{name}` placeholders with
   /// [pathParameters].
   String get fullUrl {

@@ -1,6 +1,8 @@
 import 'http_client.dart';
 import 'diagnostic_http_client.dart';
 import '../../diagnostics/drocket_diagnostics.dart';
+import '../../transport/transport_policy.dart';
+import '../../transport/transport_policy_http_client.dart';
 
 /// Builds the HTTP client used by one generated REST client.
 typedef HttpClientWrapper = HttpClient Function(HttpClient inner);
@@ -16,6 +18,8 @@ class RestClientConfig {
     this.client,
     this.wrappers = const <HttpClientWrapper>[],
     this.baseUrl,
+    this.transportPolicy,
+    this.transportMaxAttempts = 1,
   });
 
   /// Optional transport. Defaults to the current `dRest.client`.
@@ -29,11 +33,24 @@ class RestClientConfig {
   /// When omitted, the URL declared by `@RestClient` is used.
   final String? baseUrl;
 
+  /// Optional policy shared with SSE and streaming transports.
+  final TransportPolicy? transportPolicy;
+
+  /// Maximum attempts allowed when [transportPolicy] requests a repeat.
+  final int transportMaxAttempts;
+
   /// Creates the configured pipeline around [fallback].
   HttpClient build(HttpClient fallback) {
     HttpClient current = client ?? fallback;
     for (int i = wrappers.length - 1; i >= 0; i--) {
       current = wrappers[i](current);
+    }
+    if (transportPolicy != null) {
+      current = TransportPolicyHttpClient(
+        inner: current,
+        policy: transportPolicy!,
+        maxAttempts: transportMaxAttempts,
+      );
     }
     if (DrocketDiagnostics.instance.enabled &&
         current is! DiagnosticHttpClient) {
