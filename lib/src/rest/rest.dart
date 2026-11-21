@@ -20,6 +20,7 @@ export 'interceptor.dart';
 export 'request_codec.dart';
 export 'rest_request.dart';
 export 'rest_response.dart';
+export 'retry_request_context.dart';
 export 'clients/gzip_codec_io.dart'
     if (dart.library.html) 'clients/gzip_codec_stub.dart'
     show gzipEncode, gzipDecode, isAvailable;

@@ -24,6 +24,7 @@ import '../rest_response.dart';
 import '../../sync/retry_decision.dart';
 import '../cancel_token.dart';
 import '../../sync/retry_policy.dart';
+import '../retry_request_context.dart';
 
 ///: an [HttpClient] that wraps an
 /// [inner] client and retries failed requests
@@ -48,11 +49,13 @@ class RetryingHttpClient implements HttpClient {
     required this.inner,
     required this.policy,
     this.shouldRetry,
+    this.shouldRetryContext,
   });
 
   final HttpClient inner;
   final RetryPolicy policy;
   final bool Function(Object error)? shouldRetry;
+  final bool Function(RetryRequestContext context)? shouldRetryContext;
 
   @override
   Future<RestResponse<dynamic>> execute(
@@ -66,17 +69,47 @@ class RetryingHttpClient implements HttpClient {
         return await inner.execute(request,
             decoder: decoder, cancelToken: cancelToken);
       } catch (e, st) {
+        final RetryRequestContext context = RetryRequestContext(
+          request: request,
+          error: e,
+          stackTrace: st,
+          attempt: attempt + 1,
+          cancelToken: cancelToken,
+        );
+        if (context.cancelled) {
+          if (cancelToken?.isCancelled == true) {
+            throw RequestCancelledException(cancelToken!.reason ?? 'cancelled');
+          }
+          rethrow;
+        }
         // (filter): if the user
         // provided a filter and it says "no", we
         // don't retry.
         if (shouldRetry != null && !shouldRetry!(e)) rethrow;
+        if (shouldRetryContext != null && !shouldRetryContext!(context)) {
+          rethrow;
+        }
+        if (shouldRetryContext == null &&
+            shouldRetry == null &&
+            !context.isIdempotent &&
+            !context.operationIsExplicitlyRetryable) {
+          rethrow;
+        }
         final RetryDecision decision = policy.shouldRetry(
           attempt: attempt,
           error: e,
           stackTrace: st,
         );
         if (decision.isGiveUp) rethrow;
-        await Future<void>.delayed(decision.after);
+        if (decision.after > Duration.zero) {
+          await Future.any<void>(<Future<void>>[
+            Future<void>.delayed(decision.after),
+            if (cancelToken != null)
+              cancelToken.whenCancelled.then<void>(
+                (String reason) => throw RequestCancelledException(reason),
+              ),
+          ]);
+        }
         attempt++;
       }
     }

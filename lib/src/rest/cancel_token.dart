@@ -1,3 +1,5 @@
+import 'dart:async';
+
 //: lightweight, framework-free
 // cancellation token. Modelled on `package:dio`'s
 // `CancelToken` (just the bits that matter):
@@ -50,6 +52,8 @@
 /// long-running request the user might want to
 /// abort.
 class CancelToken {
+  final Completer<String> _cancelledCompleter = Completer<String>();
+
   /// `true` after [cancel] has been called. Once
   /// `true`, the token cannot be reset.
   bool get isCancelled => _cancelled;
@@ -58,6 +62,9 @@ class CancelToken {
   /// `'cancelled'` if [cancel] was called without
   /// an argument). `null` until [cancel] is called.
   String? get reason => _reason;
+
+  /// Completes when [cancel] is called.
+  Future<String> get whenCancelled => _cancelledCompleter.future;
 
   bool _cancelled = false;
   String? _reason;
@@ -78,6 +85,7 @@ class CancelToken {
     if (_cancelled) return;
     _cancelled = true;
     _reason = reason;
+    _cancelledCompleter.complete(reason);
     _onCancel?.call(reason);
   }
 

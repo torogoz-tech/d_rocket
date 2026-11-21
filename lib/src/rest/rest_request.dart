@@ -51,6 +51,10 @@ class RestRequest {
   /// legacy behaviour).
   final CancelToken? cancelToken;
 
+  /// Explicitly permits retrying an operation that is not inherently
+  /// idempotent. Defaults to `false`.
+  final bool retryable;
+
   const RestRequest({
     required this.method,
     required this.path,
@@ -61,6 +65,7 @@ class RestRequest {
     this.pathParameters = const <String, Object>{},
     this.timeout,
     this.cancelToken,
+    this.retryable = false,
   });
 
   RestRequest copyWith({
@@ -73,6 +78,7 @@ class RestRequest {
     Map<String, Object>? pathParameters,
     Duration? timeout,
     CancelToken? cancelToken,
+    bool? retryable,
   }) {
     return RestRequest(
       method: method ?? this.method,
@@ -84,6 +90,7 @@ class RestRequest {
       pathParameters: pathParameters ?? this.pathParameters,
       timeout: timeout ?? this.timeout,
       cancelToken: cancelToken ?? this.cancelToken,
+      retryable: retryable ?? this.retryable,
     );
   }
 
