@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Added shared transport policies for REST and SSE, including per-attempt
   headers, bounded response decisions and explicit redirect-context handling.
+* Added `TransportStreamingClient` for downloads, including policy hooks,
+  bounded repeats and credential-safe cross-origin redirects.
 * Added contextual retry decisions with request metadata and cancellation-aware
   backoff; ambiguous non-idempotent requests are not retried by default.
 * Added configurable diagnostic redaction for sensitive headers and nested JSON
@@ -32,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added observable `FormFieldState.changes` events and deterministic disposal.
   The optional `d_rocket_flutter` package binds any existing Flutter control
   without introducing framework-specific input widgets.
+* The generated application registry now registers concrete generic response
+  shapes discovered from REST contracts without manual registration code.
 
 ### Tests
 

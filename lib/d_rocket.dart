@@ -85,6 +85,7 @@ export 'src/transport/transport_request_context.dart';
 export 'src/transport/transport_response_context.dart';
 export 'src/transport/transport_response_decision.dart';
 export 'src/transport/transport_retry_exception.dart';
+export 'src/transport/transport_streaming_client.dart';
 
 // ─── Layer 4: ORM (engine-agnostic in 2.0) ────────────────
 //

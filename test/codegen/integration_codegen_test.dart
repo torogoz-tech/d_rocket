@@ -1,24 +1,14 @@
 import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
 
-import '../fixtures/integration_vehicle_api.dart';
-import '../fixtures/integration_vehicle_request.dart';
+import 'package:d_rocket/example/integration_vehicle_api.dart';
+import 'package:d_rocket/example/integration_vehicle_request.dart';
+import 'package:d_rocket/d_rocket_registry.g.dart';
 import '../support/integration_vehicle_http_client.dart';
 
 void main() {
   setUp(() {
-    registerIntegrationVehicleRequestSerializer();
-    registerVehicleResponseSerializer();
-    registerResponseModelSerializer<VehicleResponse>(
-      decode: (Object? value) => Serializer.fromDynamic<VehicleResponse>(value),
-      encode: Serializer.encodeDynamic,
-    );
-    registerResponseModelSerializer<List<VehicleResponse>>(
-      decode: (Object? value) => (value as List<dynamic>)
-          .map(Serializer.fromDynamic<VehicleResponse>)
-          .toList(),
-      encode: Serializer.encodeDynamic,
-    );
+    initializeD();
   });
 
   test('combined form and serializer codegen preserves enum and typed input',
@@ -48,7 +38,7 @@ void main() {
     final IntegrationVehicleRequest request = form.build();
     final Map<String, dynamic> json = request.toJson();
 
-    expect(request.type, VehicleType.truck);
+    expect(request.type, IntegrationVehicleType.truck);
     expect(request.year, 2024);
     expect(json, <String, dynamic>{
       'type': 'truck',
@@ -59,30 +49,31 @@ void main() {
 
   test('generic response serialization preserves nullable data and enum types',
       () {
-    final ResponseModel<VehicleResponse> response =
-        ResponseModel<VehicleResponse>(
-      data: const VehicleResponse(
+    final IntegrationResponse<IntegrationVehicleResponse> response =
+        IntegrationResponse<IntegrationVehicleResponse>(
+      data: const IntegrationVehicleResponse(
         id: 'vehicle-1',
-        type: VehicleType.car,
+        type: IntegrationVehicleType.car,
         plate: 'P-ABC',
         year: 2020,
       ),
     );
 
-    final Map<String, dynamic> json = ResponseModelToJson<VehicleResponse>(
+    final Map<String, dynamic> json =
+        IntegrationResponseToJson<IntegrationVehicleResponse>(
       response,
       Serializer.encodeDynamic,
     );
-    final ResponseModel<VehicleResponse> restored =
-        ResponseModelFromJson<VehicleResponse>(json, (Object? value) {
-      return Serializer.fromDynamic<VehicleResponse>(value);
+    final IntegrationResponse<IntegrationVehicleResponse> restored =
+        IntegrationResponseFromJson<IntegrationVehicleResponse>(json, (Object? value) {
+      return Serializer.fromDynamic<IntegrationVehicleResponse>(value);
     });
 
-    expect(restored.data?.type, VehicleType.car);
+    expect(restored.data?.type, IntegrationVehicleType.car);
     expect(
-      ResponseModelFromJson<VehicleResponse>(
+      IntegrationResponseFromJson<IntegrationVehicleResponse>(
         <String, dynamic>{'data': null},
-        (Object? value) => Serializer.fromDynamic<VehicleResponse>(value),
+        (Object? value) => Serializer.fromDynamic<IntegrationVehicleResponse>(value),
       ).data,
       isNull,
     );
@@ -93,16 +84,17 @@ void main() {
       config: RestClientConfig(client: IntegrationVehicleHttpClient()),
     );
 
-    final ResponseModel<VehicleResponse> created = await client.add(
+    final IntegrationResponse<IntegrationVehicleResponse> created = await client.add(
       IntegrationVehicleRequest(
-        type: VehicleType.truck,
+        type: IntegrationVehicleType.truck,
         plate: 'AB-1A',
         year: 2024,
       ),
     );
-    final ResponseModel<List<VehicleResponse>> listed = await client.list();
+    final IntegrationResponse<List<IntegrationVehicleResponse>> listed =
+        await client.list();
 
-    expect(created.data?.type, VehicleType.truck);
+    expect(created.data?.type, IntegrationVehicleType.truck);
     expect(listed.data, hasLength(1));
     expect(listed.data?.single.plate, 'AB-1A');
   });
