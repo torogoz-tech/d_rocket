@@ -21,6 +21,7 @@ version is bumped or published.
 - OpenAPI 3.1 endpoint export/import is implemented in `d_rocket_builder`.
 - SQLite companion statements and deterministic read ordering are implemented
   in `d_rocket_engine_sqlite`.
+- `RestPage<T>` now has typed JSON conversion for cursor metadata and items.
 
 ## Still required before release
 

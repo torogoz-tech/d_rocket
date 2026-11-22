@@ -24,4 +24,22 @@ void main() {
     expect(progress.downloadFraction, 0.5);
     expect(progress.isComplete, isFalse);
   });
+
+  test('RestPage round-trips typed items', () {
+    const RestPage<int> page = RestPage<int>(
+      items: <int>[1, 2],
+      nextCursor: 'next',
+      hasMore: true,
+      totalCount: 4,
+    );
+    final RestPage<int> restored = RestPage<int>.fromJson(
+      page.toJson((int value) => value),
+      (Object? value) => (value as num).toInt(),
+    );
+
+    expect(restored.items, <int>[1, 2]);
+    expect(restored.nextCursor, 'next');
+    expect(restored.hasMore, isTrue);
+    expect(restored.totalCount, 4);
+  });
 }

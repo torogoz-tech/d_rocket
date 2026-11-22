@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
   contracts.
+* `RestPage<T>` now provides typed JSON round-tripping for items and cursor
+  metadata.
 * Added generated REST cache and `JsonKey.readValue` integration fixtures.
 * Added bounded realtime delivery acknowledgements and resumable attachment
   checkpoints for data-layer adapters.
