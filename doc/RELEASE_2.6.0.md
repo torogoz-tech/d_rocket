@@ -36,6 +36,8 @@ version is bumped or published.
   and bracketed field paths.
 - `SqliteMigrationReview` summarizes safe and unsafe schema changes so the CLI
   can identify when a manual `ALTER TABLE` migration needs review.
+- Realtime now includes named channel multiplexing and bounded outbound
+  delivery queues with explicit acknowledgement and retry limits.
 
 ## Still required before release
 

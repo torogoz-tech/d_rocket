@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reusable cross-field validators and robust dotted/bracket REST error paths.
 * Added a SQLite migration-review summary that highlights destructive changes
   before a manual `ALTER TABLE` migration is applied.
+* Added named realtime multiplexing and bounded outbound queues with explicit
+  acknowledgement and retry limits.
 
 ### SQLite scope
 

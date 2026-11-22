@@ -6,3 +6,6 @@ export 'sse_http_exception.dart';
 export 'sse_reconnector.dart';
 export 'sse_reconnector_state.dart';
 export 'diagnostic_sse_connection.dart';
+export 'realtime_multiplexer.dart';
+export 'realtime_outbound_message.dart';
+export 'realtime_outbound_queue.dart';
