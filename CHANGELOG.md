@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deduplication, tag invalidation, stale/cache lifetimes and generation-safe
   clearing through `dRest.queryCache` and `dRest.clearQueryCache()`.
 * Added `@QueryCache` and `@Invalidates` contracts for generated REST clients.
+* Generated REST clients can now receive an isolated `RestQueryCache` through
+  `RestClientConfig`; existing clients continue using the global fallback.
 * Added opt-in generated `copyWith`, deep value equality and JSON Schema
   metadata through `@Serializable(copyWith: true, equality: true)`.
 * Added `ValueEquality`, explicit `JsonConverter` registration and

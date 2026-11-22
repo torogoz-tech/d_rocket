@@ -8,6 +8,8 @@ version bump and before publication.
 - Reactive REST query cache with deduplication, tag invalidation and safe
   logout clearing.
 - Generated REST contracts for `@QueryCache` and `@Invalidates`.
+- Generated REST clients can receive an instance-scoped `RestQueryCache` via
+  `RestClientConfig`, while preserving the global fallback.
 - Opt-in generated `copyWith`, deep equality and JSON Schema metadata.
 - Explicit serializer converters and `@JsonKey(readValue: ...)`.
 - Nested/dynamic form groups and arrays.

@@ -104,7 +104,9 @@ abstract class AccountsClient {
 ```
 
 `dRest.clearQueryCache()` clears values and prevents late responses from
-repopulating the cache after logout. `@Serializable(copyWith: true,
+repopulating the cache after logout. A generated client can isolate its cache
+with `RestClientConfig(queryCache: RestQueryCache())`; when omitted it uses
+`dRest.queryCache`. `@Serializable(copyWith: true,
 equality: true)` additionally generates value helpers and a JSON Schema.
 When equality is enabled, add the generated mixin to the model:
 `class Account with _$AccountEquality { ... }`.
