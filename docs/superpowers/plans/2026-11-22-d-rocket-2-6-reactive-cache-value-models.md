@@ -167,12 +167,12 @@ outside the pure-Dart package by design.
 - Test: `packages/d_rocket/test/forms/advanced_form_state_test.dart`
 - Test: `packages/d_rocket_builder/test/forms/advanced_form_codegen_test.dart`
 
-- [ ] **Step 1: Add failing tests** for nested groups, dynamic arrays, reset/default values, dirty/pristine, enabled/disabled, pending and composite bindings.
-- [ ] **Step 2: Add composable async validators** with debounce, cancellation and `validating`/`valid`/`invalid` state transitions.
-- [ ] **Step 3: Add cross-field built-ins** such as comparison, matching, membership, containment, `requiredTrue` and credit-card validation without UI widgets.
-- [ ] **Step 4: Map typed REST/RFC 7807 field errors** to form and field state, preserving server field paths.
-- [ ] **Step 5: Add builder metadata and generated binding descriptors** for compound fields; reject ambiguous mappings with diagnostics.
-- [ ] **Step 6: Run focused form tests and commit** with `feat: expand data-layer forms`.
+- [x] **Step 1: Add failing tests** for nested groups, dynamic arrays, reset/default values, dirty/pristine, enabled/disabled, pending and composite bindings.
+- [x] **Step 2: Add composable async validators** with debounce, cancellation and `validating`/`valid`/`invalid` state transitions.
+- [x] **Step 3: Add cross-field built-ins** such as comparison, matching, membership, containment, `requiredTrue` and credit-card validation without UI widgets.
+- [x] **Step 4: Map typed REST/RFC 7807 field errors** to form and field state, preserving server field paths.
+- [x] **Step 5: Add builder metadata and generated binding descriptors** for compound fields; reject ambiguous mappings with diagnostics.
+- [x] **Step 6: Run focused form tests and commit** with `feat: expand data-layer forms`.
 
 ### Task 7: Serialization converters, unknown fields and schemas
 
@@ -273,7 +273,8 @@ outside the pure-Dart package by design.
 - [x] Value equality, nullable-safe `copyWith`, converter/read hooks,
   unknown-key policies and generated schemas are implemented and covered.
 - [x] Forms cover nested groups/arrays, async validation, dirty/pristine,
-  enabled/disabled state, composite callbacks and RFC 7807 field paths.
+  enabled/disabled state, composite callbacks, generated composite metadata,
+  reusable validators and RFC 7807 field paths.
 - [x] SQLite custom SQL, companions, value converters, serialized reads and
   destructive migration review are implemented and tested.
 - [x] REST pagination, transfers, multipart, streaming bodies, progress and
