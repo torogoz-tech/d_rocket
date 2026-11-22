@@ -18,14 +18,16 @@ version is bumped or published.
 - Generated `@JsonKey(readValue: ...)` fixture and runtime verification.
 - Bounded realtime delivery queue with explicit acknowledgements.
 - Resumable attachment chunks and progress checkpoints for sync adapters.
+- OpenAPI 3.1 endpoint export/import is implemented in `d_rocket_builder`.
+- SQLite companion statements and deterministic read ordering are implemented
+  in `d_rocket_engine_sqlite`.
 
 ## Still required before release
 
-OpenAPI import/export, complete pagination codegen, global/class converter
-metadata, SQLite companion/read-pool APIs and the published-package
-compatibility matrix remain pending. The realtime and attachment work currently
-provides pure-Dart contracts; transport/storage adapters still need to be
-implemented. The authoritative task list is the
+Complete pagination codegen, global/class converter metadata and the
+published-package compatibility matrix remain pending. The realtime and
+attachment work currently provides pure-Dart contracts; transport/storage
+adapters still need to be implemented. The authoritative task list is the
 [2.6.0 implementation plan](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).
 
 No generated file is edited manually. Generated fixtures are recreated with
