@@ -107,7 +107,18 @@ abstract class AccountsClient {
 repopulating the cache after logout. `@Serializable(copyWith: true,
 equality: true)` additionally generates value helpers and a JSON Schema
 function. Dynamic nested forms are available through `FormGroup` and
-`FormArray`, while field-level sync deltas are available through `DeltaSync`.
+`FormArray`; fields can be enabled or disabled without losing their value, and
+`FormValidators` provides reusable cross-field rules. REST validation errors
+can be applied from RFC 7807 payloads even when the server uses dotted or
+bracketed field paths. Field-level sync deltas are available through
+`DeltaSync`.
+
+Realtime consumers can use `RealtimeMultiplexer` for named channels and
+`RealtimeOutboundQueue` for bounded outbound delivery with explicit
+acknowledgement and retry limits. SQLite applications can register
+`SqliteValueConverter<T>` instances for decimals, dates and other custom
+values, and use `SqliteMigrationReview` before applying destructive schema
+changes.
 
 For Flutter applications, the optional [`d_rocket_flutter`](https://pub.dev/packages/d_rocket_flutter)
 package provides `DrocketFormBuilder` and generic field bindings. It does not
