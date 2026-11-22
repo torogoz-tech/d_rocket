@@ -62,12 +62,12 @@ outside the pure-Dart package by design.
 - Produce `RestQueryCache.clear() -> Future<void>`.
 - Expose the cache through `DRest.queryCache` and `DRest.clearQueryCache()`.
 
-- [ ] **Step 1: Write failing runtime tests** for concurrent deduplication, stale reuse, active invalidation/refetch, cache eviction, errors and generation-safe clear.
-- [ ] **Step 2: Run the focused tests** and verify they fail because the runtime contract does not exist.
-- [ ] **Step 3: Implement the cache** with normalized key records, in-flight futures, reference-counted broadcast streams, tag indexes, stale/cache timers and a generation counter.
-- [ ] **Step 4: Add the DRest facade** without changing existing `HttpCache` behavior.
-- [ ] **Step 5: Run `dart test test/rest/rest_query_cache_test.dart`** and verify all cases pass.
-- [ ] **Step 6: Commit** with `feat: add reactive rest query cache`.
+- [x] **Step 1: Write failing runtime tests** for concurrent deduplication, stale reuse, active invalidation/refetch, cache eviction, errors and generation-safe clear.
+- [x] **Step 2: Run the focused tests** and verify they fail because the runtime contract does not exist.
+- [x] **Step 3: Implement the cache** with normalized key records, in-flight futures, reference-counted broadcast streams, tag indexes, stale/cache timers and a generation counter.
+- [x] **Step 4: Add the DRest facade** without changing existing `HttpCache` behavior.
+- [x] **Step 5: Run `dart test test/rest/rest_query_cache_test.dart`** and verify all cases pass.
+- [x] **Step 6: Commit** with `feat: add reactive rest query cache`.
 
 ### Task 2: REST cache annotations and generated clients
 
@@ -88,13 +88,13 @@ outside the pure-Dart package by design.
 - Extend parsed REST methods with cache metadata and invalidation templates.
 - Generated query methods call `dRest.queryCache.watch` and generated mutations call `invalidate` only after a successful response.
 
-- [ ] **Step 1: Add failing generator fixtures** for path placeholders, body-property placeholders, static tags, non-cached methods and failed mutations.
-- [ ] **Step 2: Run builder tests** and verify annotations are not recognized/generated yet.
-- [ ] **Step 3: Implement annotation metadata parsing** with validation for supported placeholders and `Stream<T>` query return types.
-- [ ] **Step 4: Emit normalized keys and tag resolvers** from actual method parameters; reject unsupported expressions with `InvalidGenerationSourceError`.
-- [ ] **Step 5: Emit post-success invalidation** while preserving return values, errors, cancellation and existing per-instance base URL behavior.
-- [ ] **Step 6: Regenerate fixtures and run builder/core focused tests.**
-- [ ] **Step 7: Commit** with `feat: generate reactive rest cache contracts`.
+- [x] **Step 1: Add failing generator fixtures** for path placeholders, body-property placeholders, static tags, non-cached methods and failed mutations.
+- [x] **Step 2: Run builder tests** and verify annotations are not recognized/generated yet.
+- [x] **Step 3: Implement annotation metadata parsing** with validation for supported placeholders and `Stream<T>` query return types.
+- [x] **Step 4: Emit normalized keys and tag resolvers** from actual method parameters; reject unsupported expressions with `InvalidGenerationSourceError`.
+- [x] **Step 5: Emit post-success invalidation** while preserving return values, errors, cancellation and existing per-instance base URL behavior.
+- [x] **Step 6: Regenerate fixtures and run builder/core focused tests.**
+- [x] **Step 7: Commit** with `feat: generate reactive rest cache contracts`.
 
 ### Task 3: Serializable options and equality runtime helper
 
@@ -109,12 +109,12 @@ outside the pure-Dart package by design.
 - Add `Serializable.copyWith` and `Serializable.equality`, both defaulting to `false`.
 - Produce `ValueEquality.equals(Object? left, Object? right) -> bool` and `ValueEquality.hash(Object? value) -> int` for nested JSON-like values.
 
-- [ ] **Step 1: Write failing tests** for scalar, nullable, nested list/map/set equality and stable hash results.
-- [ ] **Step 2: Run focused serializer tests** and verify the new API is absent.
-- [ ] **Step 3: Implement the dependency-free deep equality helper** with cycle-safe behavior for supported JSON-like values and deterministic map key ordering.
-- [ ] **Step 4: Add additive annotation flags and public exports.**
-- [ ] **Step 5: Run `dart test test/serializer/value_equality_test.dart`** and verify all cases pass.
-- [ ] **Step 6: Commit** with `feat: add generated value equality support`.
+- [x] **Step 1: Write failing tests** for scalar, nullable, nested list/map/set equality and stable hash results.
+- [x] **Step 2: Run focused serializer tests** and verify the new API is absent.
+- [x] **Step 3: Implement the dependency-free deep equality helper** with cycle-safe behavior for supported JSON-like values and deterministic map key ordering.
+- [x] **Step 4: Add additive annotation flags and public exports.**
+- [x] **Step 5: Run `dart test test/serializer/value_equality_test.dart`** and verify all cases pass.
+- [x] **Step 6: Commit** with `feat: add generated value equality support`.
 
 ### Task 4: Serializer codegen for copyWith and equality
 
@@ -129,12 +129,12 @@ outside the pure-Dart package by design.
 - When `equality: true`, generate `mixin _$<ModelName>Equality on <ModelName>` implementing `operator ==` and `hashCode` using `ValueEquality`.
 - Emit a clear generation error when equality is enabled without `with _$<ModelName>Equality` on the model.
 
-- [ ] **Step 1: Add failing fixtures/tests** for required fields, nullable fields set to null, omitted fields, nested values and equality mixin validation.
-- [ ] **Step 2: Run builder tests** and verify generated helpers are missing or invalid.
-- [ ] **Step 3: Implement constructor metadata analysis** and reject unsupported constructors with actionable diagnostics.
-- [ ] **Step 4: Generate the copyWith extension and equality mixin** in a dedicated writer, preserving generic and nullable types.
-- [ ] **Step 5: Regenerate fixtures and run builder/core focused tests.**
-- [ ] **Step 6: Commit** with `feat: generate copyWith and equality helpers`.
+- [x] **Step 1: Add failing fixtures/tests** for required fields, nullable fields set to null, omitted fields, nested values and equality mixin validation.
+- [x] **Step 2: Run builder tests** and verify generated helpers are missing or invalid.
+- [x] **Step 3: Implement constructor metadata analysis** and reject unsupported constructors with actionable diagnostics.
+- [x] **Step 4: Generate the copyWith extension and equality mixin** in a dedicated writer, preserving generic and nullable types.
+- [x] **Step 5: Regenerate fixtures and run builder/core focused tests.**
+- [x] **Step 6: Commit** with `feat: generate copyWith and equality helpers`.
 
 ### Task 5: Integration, docs and compatibility
 
@@ -203,7 +203,7 @@ outside the pure-Dart package by design.
 - [ ] **Step 1: Add failing SQLite tests** for manager APIs, incremental predicates, ordering, paging, reactive query granularity and companion-style partial writes.
 - [ ] **Step 2: Add extensible SQLite type converters** and validate custom SQL parameters, functions and aggregates.
 - [ ] **Step 3: Add SQL/schema inspection and generated migration tests**, explicitly flagging destructive `ALTER TABLE`, drops and type changes for review.
-- [ ] **Step 4: Add optional read-isolate/read-pool execution policies** without changing the SQLite public contract.
+- [x] **Step 4: Add optional read-isolate/read-pool execution policies** without changing the SQLite public contract.
 - [ ] **Step 5: Run the complete SQLite suite and commit** with `feat: deepen sqlite query tooling`.
 
 ### Task 9: REST contracts, pagination and transfers
@@ -294,10 +294,12 @@ outside the pure-Dart package by design.
   it requires the coordinated 2.6.0 packages to exist on pub.dev and is not
   performed during local implementation.
 
-- [ ] `d_rocket` and `d_rocket_builder` analyze cleanly.
-- [ ] All existing tests plus new cache/value-model tests pass.
-- [ ] Generated files compile from a clean checkout.
-- [ ] No Flutter, Bloc or Riverpod dependency was added to core packages.
-- [ ] SQLite remains the only ORM/LINQ target in this release program.
-- [ ] Adapter candidates (Socket.IO, CRDT, native schedulers, UI conflict screens) are documented without becoming hidden core dependencies.
+- [x] `d_rocket` and `d_rocket_builder` analyze cleanly.
+- [x] All existing tests plus new cache/value-model tests pass.
+- [ ] Generated files compile from a clean published-package checkout; local
+  generated fixtures compile and are verified, but coordinated 2.6.0 packages
+  are not published yet.
+- [x] No Flutter, Bloc or Riverpod dependency was added to core packages.
+- [x] SQLite remains the only ORM/LINQ target in this release program.
+- [x] Adapter candidates (Socket.IO, CRDT, native schedulers, UI conflict screens) are documented without becoming hidden core dependencies.
 - [ ] No push or publication occurs until the 2.6.0 release decision is explicit.
