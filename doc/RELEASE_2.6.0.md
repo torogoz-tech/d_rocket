@@ -25,6 +25,8 @@ version is bumped or published.
 - `@JsonConverterBinding` can install class-level converters during generated
   serializer registration; global registration remains available through
   `Serializer.registerConverter<T>`.
+- Generated `@Part` parameters now produce multipart bytes and a matching
+  `Content-Type` boundary.
 
 ## Still required before release
 

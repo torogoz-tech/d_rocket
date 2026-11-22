@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@JsonKey(readValue: ...)` support.
 * Added `@JsonConverterBinding` for generated class-level converter
   registration, including scalar types such as `DateTime` and decimal values.
+* Added runtime multipart body/part encoding for generated `@Part` REST
+  parameters.
 * Added dynamic `FormGroup` and `FormArray` controls with nested validation,
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
