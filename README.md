@@ -87,6 +87,28 @@ validation responses can be mapped directly with `form.applyRestError(error)`.
 Generated serializer conversions report the model field and expected type via
 `SerializationException`.
 
+For network-first clients, REST queries can opt into a reactive in-memory
+cache without coupling the data layer to Flutter state management:
+
+```dart
+@RestClient(baseUrl: 'https://api.example.com')
+abstract class AccountsClient {
+  @QueryCache(tags: <String>['account:{id}'])
+  @HttpGet('/accounts/{id}')
+  Stream<Account> watchAccount(@Path('id') String id);
+
+  @Invalidates(<String>['account:{request.sourceId}'])
+  @HttpPost('/transfers')
+  Future<TransferReceipt> transfer(@Body() TransferRequest request);
+}
+```
+
+`dRest.clearQueryCache()` clears values and prevents late responses from
+repopulating the cache after logout. `@Serializable(copyWith: true,
+equality: true)` additionally generates value helpers and a JSON Schema
+function. Dynamic nested forms are available through `FormGroup` and
+`FormArray`, while field-level sync deltas are available through `DeltaSync`.
+
 For Flutter applications, the optional [`d_rocket_flutter`](https://pub.dev/packages/d_rocket_flutter)
 package provides `DrocketFormBuilder` and generic field bindings. It does not
 replace `TextField`, `DropdownButton` or any other control: the application

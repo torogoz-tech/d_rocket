@@ -5,6 +5,36 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2.6.0 program
+
+### Added
+
+* Added an instance-scoped reactive REST query cache with concurrent request
+  deduplication, tag invalidation, stale/cache lifetimes and generation-safe
+  clearing through `dRest.queryCache` and `dRest.clearQueryCache()`.
+* Added `@QueryCache` and `@Invalidates` contracts for generated REST clients.
+* Added opt-in generated `copyWith`, deep value equality and JSON Schema
+  metadata through `@Serializable(copyWith: true, equality: true)`.
+* Added `ValueEquality`, explicit `JsonConverter` registration and
+  `@JsonKey(readValue: ...)` support.
+* Added dynamic `FormGroup` and `FormArray` controls with nested validation,
+  dirty/pristine state and runtime registration.
+* Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
+  contracts.
+
+### SQLite scope
+
+* Added validated parameterized `SqliteQuery.select` and
+  `SqliteQuery.execute` contracts. LINQ/ORM work remains SQLite-focused for
+  this program.
+
+### Pending work
+
+* OpenAPI import/export, generated pagination metadata, full converter/schema
+  configuration, companion ORM APIs, realtime delivery acknowledgements,
+  resumable attachment sync and the complete compatibility matrix remain in
+  the tracked 2.6.0 plan.
+
 ## [2.5.0] — 2026-11-21
 
 ### Added
