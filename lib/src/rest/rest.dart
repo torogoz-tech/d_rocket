@@ -23,6 +23,8 @@ export 'rest_response.dart';
 export 'rest_problem_details.dart';
 export 'rest_query_cache.dart';
 export 'rest_query_cache_options.dart';
+export 'rest_page.dart';
+export 'rest_transfer_progress.dart';
 export 'retry_request_context.dart';
 export 'clients/gzip_codec_io.dart'
     if (dart.library.html) 'clients/gzip_codec_stub.dart'
