@@ -28,4 +28,15 @@ void main() {
     expect(first, second);
     expect(first.hashCode, second.hashCode);
   });
+
+  test('generated schema describes fields and required values', () {
+    final Map<String, Object?> schema = ValueModelJsonSchema();
+    expect(schema['type'], 'object');
+    expect(
+      (schema['properties']! as Map<String, Object?>).keys,
+      containsAll(<String>['id', 'description', 'labels']),
+    );
+    expect(schema['required'], contains('id'));
+    expect(schema['required'], isNot(contains('description')));
+  });
 }
