@@ -27,6 +27,7 @@ export 'rest_page.dart';
 export 'rest_transfer_progress.dart';
 export 'rest_multipart_body.dart';
 export 'rest_multipart_part.dart';
+export 'rest_streaming_body.dart';
 export 'retry_request_context.dart';
 export 'clients/gzip_codec_io.dart'
     if (dart.library.html) 'clients/gzip_codec_stub.dart'

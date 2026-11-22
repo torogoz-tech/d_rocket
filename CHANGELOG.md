@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameters.
 * Added a reproducible benchmark command for reactive cache and JSON
   serialization paths.
+* Added `RestStreamingBody` with chunked uploads, optional content length and
+  upload progress callbacks.
 * Added dynamic `FormGroup` and `FormArray` controls with nested validation,
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`

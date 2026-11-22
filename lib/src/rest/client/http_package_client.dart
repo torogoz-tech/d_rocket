@@ -23,15 +23,32 @@ class HttpPackageClient implements HttpClient {
     final RestRequest req = await chain.onRequest(request);
 
     final Uri uri = Uri.parse(req.fullUrl);
-    final http.Request httpReq = http.Request(req.method, uri);
+    final http.BaseRequest httpReq;
+    final RestStreamingBody? streamingBody =
+        req.body is RestStreamingBody ? req.body! as RestStreamingBody : null;
+    if (streamingBody != null) {
+      final http.StreamedRequest streamedRequest =
+          http.StreamedRequest(req.method, uri);
+      if (streamingBody.totalBytes != null) {
+        streamedRequest.contentLength = streamingBody.totalBytes!;
+      }
+      httpReq = streamedRequest;
+      if (streamingBody.contentType != null) {
+        streamedRequest.headers['Content-Type'] = streamingBody.contentType!;
+      }
+      unawaited(_writeStreamingBody(streamingBody, streamedRequest));
+    } else {
+      httpReq = http.Request(req.method, uri);
+    }
     httpReq.headers.addAll(req.headers);
 
-    if (req.body != null) {
+    if (req.body != null && streamingBody == null) {
       final Object body = req.body!;
+      final http.Request regularRequest = httpReq as http.Request;
       if (body is String) {
-        httpReq.body = body;
+        regularRequest.body = body;
       } else if (body is List<int>) {
-        httpReq.bodyBytes = body;
+        regularRequest.bodyBytes = body;
       } else {
         // Refuse to silently fall back to `body.toString`: the
         // caller almost certainly meant a `String` or `List<int>` body
@@ -138,6 +155,19 @@ class HttpPackageClient implements HttpClient {
         throw RequestCancelledException(token?.reason ?? 'cancelled');
       }
       throw NetworkException('Unexpected error: $e', cause: e);
+    }
+  }
+
+  Future<void> _writeStreamingBody(
+    RestStreamingBody body,
+    http.StreamedRequest request,
+  ) async {
+    try {
+      await body.chunks.listen(request.sink.add).asFuture<void>();
+      await request.sink.close();
+    } on Object catch (error, stackTrace) {
+      request.sink.addError(error, stackTrace);
+      await request.sink.close();
     }
   }
 
