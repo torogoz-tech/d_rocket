@@ -285,6 +285,10 @@ outside the pure-Dart package by design.
   metrics are present and covered by sync tests.
 - [x] Core and builder analyze cleanly; the SQLite engine analyzes without
   errors and retains ten pre-existing informational notices.
+- [x] The CI analyzer gate reports those notices without treating them as
+  failures, while still failing on warnings and errors.
+- [x] The core package dry-run publishes with zero warnings after removing the
+  duplicated DevTools build from its archive.
 - [ ] Published-package compatibility resolution remains the release gate;
   it requires the coordinated 2.6.0 packages to exist on pub.dev and is not
   performed during local implementation.
