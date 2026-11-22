@@ -17,7 +17,7 @@ DrocketDevToolsBridge.register(includeSensitiveData: true);
 Use payload capture only with non-sensitive development data.
 
 This enables the bounded in-memory event buffer and registers the VM Service
-endpoints consumed by the bundled `d_rocket` DevTools extension. The extension
+endpoints consumed by the separate `d_rocket_devtools_extension` package. The extension
 is available when DevTools is connected to an application that depends on
 `d_rocket`.
 
