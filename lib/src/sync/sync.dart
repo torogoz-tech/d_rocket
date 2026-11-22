@@ -61,3 +61,5 @@ export 'retry_policies_extended.dart';
 export 'vector_clock.dart';
 export 'websocket_sync_provider.dart';
 export 'multi_transport_sync_provider.dart';
+export 'resumable_attachment_chunk.dart';
+export 'resumable_attachment_state.dart';
