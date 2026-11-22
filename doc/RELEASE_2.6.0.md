@@ -29,12 +29,14 @@ version is bumped or published.
   `Content-Type` boundary.
 - Added a reproducible local benchmark for cache and JSON serialization paths.
 - Added `RestStreamingBody` for chunked uploads with progress reporting.
+- OpenAPI export can now preserve complete schemas supplied by serializer
+  metadata.
 
 ## Still required before release
 
 Global converter configuration for applications with multiple independently
-generated models, richer OpenAPI schema generation and the published-package
-compatibility matrix remain pending. The realtime and
+generated models and the published-package compatibility matrix remain
+pending. The realtime and
 attachment work currently provides pure-Dart contracts; transport/storage
 adapters still need to be implemented. The authoritative task list is the
 [2.6.0 implementation plan](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).
