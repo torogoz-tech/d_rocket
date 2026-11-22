@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
   contracts.
+* Added generated REST cache and `JsonKey.readValue` integration fixtures.
+* Added bounded realtime delivery acknowledgements and resumable attachment
+  checkpoints for data-layer adapters.
 
 ### SQLite scope
 
@@ -31,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Pending work
 
 * OpenAPI import/export, generated pagination metadata, full converter/schema
-  configuration, companion ORM APIs, realtime delivery acknowledgements,
-  resumable attachment sync and the complete compatibility matrix remain in
+  configuration, companion ORM APIs, transport/storage adapters for realtime
+  delivery and attachments, and the complete compatibility matrix remain in
   the tracked 2.6.0 plan.
 
 ## [2.5.0] — 2026-11-21
