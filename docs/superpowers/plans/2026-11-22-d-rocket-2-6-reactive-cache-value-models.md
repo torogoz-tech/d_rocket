@@ -266,6 +266,29 @@ outside the pure-Dart package by design.
 
 ## Final Verification
 
+### Current audit (2026-11-22)
+
+- [x] REST cache, generated annotations, invalidation and logout generation
+  safety are implemented and covered by runtime/codegen fixtures.
+- [x] Value equality, nullable-safe `copyWith`, converter/read hooks,
+  unknown-key policies and generated schemas are implemented and covered.
+- [x] Forms cover nested groups/arrays, async validation, dirty/pristine,
+  enabled/disabled state, composite callbacks and RFC 7807 field paths.
+- [x] SQLite custom SQL, companions, value converters, serialized reads and
+  destructive migration review are implemented and tested.
+- [x] REST pagination, transfers, multipart, streaming bodies, progress and
+  OpenAPI endpoint metadata are implemented and tested.
+- [x] Realtime SSE/WebSocket lifecycle contracts, bounded inbound/outbound
+  delivery, acknowledgements and named multiplexed channels are implemented
+  and tested.
+- [x] Delta sync, durable queue support, resumable attachment state and sync
+  metrics are present and covered by sync tests.
+- [x] Core and builder analyze cleanly; the SQLite engine analyzes without
+  errors and retains ten pre-existing informational notices.
+- [ ] Published-package compatibility resolution remains the release gate;
+  it requires the coordinated 2.6.0 packages to exist on pub.dev and is not
+  performed during local implementation.
+
 - [ ] `d_rocket` and `d_rocket_builder` analyze cleanly.
 - [ ] All existing tests plus new cache/value-model tests pass.
 - [ ] Generated files compile from a clean checkout.
