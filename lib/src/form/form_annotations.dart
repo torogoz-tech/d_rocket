@@ -10,6 +10,8 @@ export 'annotations/uuid_version.dart';
 export 'form_error.dart';
 export 'form_field_definition.dart';
 export 'form_field_state.dart';
+export 'form_group.dart';
+export 'form_array.dart';
 export 'form_input.dart';
 export 'form_state.dart';
 export 'form_validator.dart';

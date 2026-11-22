@@ -82,6 +82,9 @@ class FormFieldState<T> {
   /// Whether a user or control has interacted with this field.
   bool get isTouched => _isTouched;
 
+  /// Whether the current value differs from the initial value.
+  bool get isDirty => _value != _initialValue;
+
   /// Emits after a control changes this field.
   Stream<FormFieldChange<T>> get changes => _changeController.stream;
 
