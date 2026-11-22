@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registration, including scalar types such as `DateTime` and decimal values.
 * Added runtime multipart body/part encoding for generated `@Part` REST
   parameters.
+* Added a reproducible benchmark command for reactive cache and JSON
+  serialization paths.
 * Added dynamic `FormGroup` and `FormArray` controls with nested validation,
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
