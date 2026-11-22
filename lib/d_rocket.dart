@@ -65,6 +65,7 @@ export 'src/serializer/serializable.dart';
 export 'src/serializer/serializable_union.dart';
 export 'src/serializer/serializer.dart';
 export 'src/serializer/unknown_key_policy.dart';
+export 'src/serializer/value_equality.dart';
 
 // ─── Layer 2: REST with steroids (absorbed from d_rest 0.1.0) ──────
 //

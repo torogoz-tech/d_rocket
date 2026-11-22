@@ -23,12 +23,20 @@ class Serializable {
   /// Global naming strategy for fields in this class.
   final JsonNaming naming;
 
+  /// Generates an opt-in typed `copyWith` extension.
+  final bool copyWith;
+
+  /// Generates an opt-in equality mixin using [ValueEquality].
+  final bool equality;
+
   const Serializable({
     this.rename,
     this.discriminator,
     this.typeField,
     this.unknownKeyPolicy = UnknownKeyPolicy.ignore,
     this.naming = JsonNaming.none,
+    this.copyWith = false,
+    this.equality = false,
   });
 }
 
