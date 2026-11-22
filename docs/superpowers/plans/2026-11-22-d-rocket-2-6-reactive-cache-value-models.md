@@ -290,6 +290,8 @@ outside the pure-Dart package by design.
   failures, while still failing on warnings and errors.
 - [x] The core package dry-run publishes with zero warnings after removing the
   duplicated DevTools build from its archive.
+- [x] A clean external consumer fixture resolves the local 2.6.0 packages,
+  runs build_runner and compiles generated serializer/form code successfully.
 - [ ] Published-package compatibility resolution remains the release gate;
   it requires the coordinated 2.6.0 packages to exist on pub.dev and is not
   performed during local implementation.
