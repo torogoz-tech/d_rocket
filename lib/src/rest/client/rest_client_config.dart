@@ -3,6 +3,7 @@ import 'diagnostic_http_client.dart';
 import '../../diagnostics/drocket_diagnostics.dart';
 import '../../transport/transport_policy.dart';
 import '../../transport/transport_policy_http_client.dart';
+import '../rest_query_cache.dart';
 
 /// Builds the HTTP client used by one generated REST client.
 typedef HttpClientWrapper = HttpClient Function(HttpClient inner);
@@ -18,6 +19,7 @@ class RestClientConfig {
     this.client,
     this.wrappers = const <HttpClientWrapper>[],
     this.baseUrl,
+    this.queryCache,
     this.transportPolicy,
     this.transportMaxAttempts = 1,
   });
@@ -32,6 +34,12 @@ class RestClientConfig {
   ///
   /// When omitted, the URL declared by `@RestClient` is used.
   final String? baseUrl;
+
+  /// Optional cache owned by this generated client instance.
+  ///
+  /// When omitted, the generated client falls back to [dRest.queryCache] so
+  /// existing applications keep their current behavior.
+  final RestQueryCache? queryCache;
 
   /// Optional policy shared with SSE and streaming transports.
   final TransportPolicy? transportPolicy;

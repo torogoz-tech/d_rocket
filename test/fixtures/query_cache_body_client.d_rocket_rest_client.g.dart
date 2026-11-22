@@ -16,7 +16,9 @@ part of 'query_cache_body_client.dart';
 class _$QueryCacheBodyClientFixture implements QueryCacheBodyClientFixture {
   _$QueryCacheBodyClientFixture({RestClientConfig? config})
       : _client = config?.build(dRest.client),
-        _baseUrl = config?.baseUrl ?? 'https://cache.example';
+        _baseUrl = config?.baseUrl ?? 'https://cache.example',
+        _queryCache = config?.queryCache ?? dRest.queryCache;
+  final RestQueryCache _queryCache;
   final HttpClient? _client;
   final String _baseUrl;
 
@@ -39,7 +41,7 @@ class _$QueryCacheBodyClientFixture implements QueryCacheBodyClientFixture {
       (dynamic data) => data,
       client: _client,
     );
-    await dRest.queryCache.invalidate(<String>[
+    await _queryCache.invalidate(<String>[
       resolveRestQueryTemplate(
         'account:{request.sourceAccountId}',
         <String, Object?>{

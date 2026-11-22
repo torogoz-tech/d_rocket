@@ -96,4 +96,22 @@ void main() {
     await subscription.cancel();
     await dRest.clearQueryCache();
   });
+
+  test('generated clients can use an instance-scoped query cache', () async {
+    final _CacheHttpClient transport = _CacheHttpClient();
+    final RestQueryCache customCache = RestQueryCache();
+    final QueryCacheClientFixture client = createQueryCacheClientFixture(
+      config: RestClientConfig(client: transport, queryCache: customCache),
+    );
+    final StreamSubscription<Object?> subscription =
+        client.watchAccount('42').listen((Object? _) {});
+
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(customCache.entryCount, 1);
+    expect(dRest.queryCache.entryCount, 0);
+    await subscription.cancel();
+    await customCache.clear();
+  });
 }
