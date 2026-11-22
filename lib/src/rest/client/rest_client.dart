@@ -25,6 +25,11 @@ class DRest {
   RestConfig _config = RestConfig();
   RestConfig get config => _config;
 
+  RestQueryCache _queryCache = RestQueryCache();
+
+  /// Instance-scoped reactive REST query cache.
+  RestQueryCache get queryCache => _queryCache;
+
   HttpClient get client => _config.httpClient;
 
   /// Inicializa el runtime con un cliente HTTP y los interceptors
@@ -39,6 +44,7 @@ class DRest {
     Duration defaultTimeout = const Duration(seconds: 30),
     Map<String, String> defaultHeaders = const <String, String>{},
   }) {
+    _queryCache = RestQueryCache();
     final HttpClient client = httpClient ??
         HttpPackageClient(
           client: null,
@@ -51,6 +57,9 @@ class DRest {
       defaultHeaders: defaultHeaders,
     );
   }
+
+  /// Clears cached query values and invalidates late in-flight responses.
+  Future<void> clearQueryCache() => _queryCache.clear();
 
   /// Reemplaza el [HttpClient] en tiempo de ejecución (útil para
   /// tests o para usar una implementación basada en `dio`).
