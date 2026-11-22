@@ -1,7 +1,7 @@
 # d_rocket 2.6.0 — implementation status
 
-This document tracks the 2.6.0 functional-parity program before the package
-version is bumped or published.
+This document tracks the 2.6.0 functional-parity program after the local
+version bump and before publication.
 
 ## Implemented in the current worktree
 
