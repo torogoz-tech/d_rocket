@@ -73,13 +73,27 @@ void main() {
       () async {
     final _CacheHttpClient transport = _CacheHttpClient();
     registerTransferRequestSerializer();
+    final QueryCacheClientFixture queryClient = createQueryCacheClientFixture(
+      config: RestClientConfig(client: transport),
+    );
     final QueryCacheBodyClientFixture client =
         createQueryCacheBodyClientFixture(
       config: RestClientConfig(client: transport),
     );
 
-    await client.execute(const TransferRequest(sourceAccountId: '42'));
+    final List<Object?> values = <Object?>[];
+    final StreamSubscription<Object?> subscription =
+        queryClient.watchAccount('42').listen(values.add);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
 
-    expect(transport.calls, 1);
+    await client.execute(const TransferRequest(sourceAccountId: '42'));
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(transport.calls, 3);
+    expect(values.last, <String, Object?>{'id': '42', 'balance': 125});
+    await subscription.cancel();
+    await dRest.clearQueryCache();
   });
 }
