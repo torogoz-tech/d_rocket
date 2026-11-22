@@ -10,6 +10,20 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-22-d-rocket-2-6-reactive-cache-value-models-design.md`
 
+## Current implementation status
+
+The local 2.6.0 candidate implements the runtime and generated contracts for
+REST query caching, value helpers, forms, serialization/converters, SQLite
+companions and migration review, typed REST transfers/OpenAPI metadata,
+realtime delivery/multiplexing and offline sync checkpoints. The checkboxes
+below describe the implementation history; they are not a release claim by
+themselves.
+
+The only verification that cannot be completed before publication is resolving
+the coordinated versions from pub.dev in a clean external consumer. Native
+background scheduling, UI state-management adapters, Socket.IO and CRDTs stay
+outside the pure-Dart package by design.
+
 ## Global Constraints
 
 - Keep the feature in the Dart/data layer; do not add Flutter, Bloc or Riverpod dependencies.
