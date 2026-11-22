@@ -23,6 +23,7 @@
 // 4. Update the local watermark.
 
 export 'conflict_resolver.dart';
+export 'delta_sync.dart';
 export 'custom_conflict_resolver.dart';
 export 'exponential_backoff_retry_policy.dart';
 export 'io_file_sync_state_store.dart'
