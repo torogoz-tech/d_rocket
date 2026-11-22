@@ -137,6 +137,9 @@ class Serializer {
 
   /// Deserializes a decoded JSON value into type [T].
   static T fromDynamic<T>(dynamic decoded) {
+    final JsonConverter<dynamic, Object?>? converter = _converters[T];
+    if (converter != null) return converter.decode(decoded) as T;
+
     if (decoded is Map<String, dynamic>) {
       return _decodeMap<T>(decoded);
     }

@@ -22,11 +22,15 @@ version is bumped or published.
 - SQLite companion statements and deterministic read ordering are implemented
   in `d_rocket_engine_sqlite`.
 - `RestPage<T>` now has typed JSON conversion for cursor metadata and items.
+- `@JsonConverterBinding` can install class-level converters during generated
+  serializer registration; global registration remains available through
+  `Serializer.registerConverter<T>`.
 
 ## Still required before release
 
-Complete pagination codegen, global/class converter metadata and the
-published-package compatibility matrix remain pending. The realtime and
+Global converter configuration for applications with multiple independently
+generated models and the published-package compatibility matrix remain
+pending. The realtime and
 attachment work currently provides pure-Dart contracts; transport/storage
 adapters still need to be implemented. The authoritative task list is the
 [2.6.0 implementation plan](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).

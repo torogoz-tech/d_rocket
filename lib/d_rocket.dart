@@ -61,6 +61,7 @@ export 'src/linq/record.dart';
 export 'src/serializer/format.dart';
 export 'src/serializer/json_key.dart';
 export 'src/serializer/json_converter.dart';
+export 'src/serializer/json_converter_binding.dart';
 export 'src/serializer/json_naming.dart';
 export 'src/serializer/serializable.dart';
 export 'src/serializer/serializable_union.dart';

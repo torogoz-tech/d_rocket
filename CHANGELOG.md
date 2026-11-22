@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata through `@Serializable(copyWith: true, equality: true)`.
 * Added `ValueEquality`, explicit `JsonConverter` registration and
   `@JsonKey(readValue: ...)` support.
+* Added `@JsonConverterBinding` for generated class-level converter
+  registration, including scalar types such as `DateTime` and decimal values.
 * Added dynamic `FormGroup` and `FormArray` controls with nested validation,
   dirty/pristine state and runtime registration.
 * Added typed `RestPage`, `RestTransferProgress` and field-level `DeltaSync`
