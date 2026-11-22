@@ -1,2 +1,4 @@
 docs/
 pubspec_overrides.yaml
+commit_msg_rename.txt
+rename_rocket.py
