@@ -135,3 +135,35 @@ class RestQueryCache {
     });
   }
 }
+
+/// Resolves the restricted `{name}` / `{object.property}` syntax emitted by
+/// the REST builder for cache tags.
+String resolveRestQueryTemplate(
+  String template,
+  Map<String, Object?> values,
+) {
+  return template.replaceAllMapped(
+    RegExp(r'\{([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)?)\}'),
+    (Match match) {
+      final String path = match.group(1)!;
+      Object? value = values[path];
+      if (value == null && path.contains('.')) {
+        final List<String> parts = path.split('.');
+        value = values[parts.first];
+        for (final String property in parts.skip(1)) {
+          if (value is Map<String, Object?>) {
+            value = value[property];
+          } else {
+            throw ArgumentError(
+              'Tag placeholder "$path" requires a map value at "${parts.first}".',
+            );
+          }
+        }
+      }
+      if (value == null) {
+        throw ArgumentError('Missing query tag value for "$path".');
+      }
+      return value.toString();
+    },
+  );
+}

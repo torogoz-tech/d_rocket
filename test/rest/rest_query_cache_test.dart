@@ -5,6 +5,19 @@ import 'package:test/test.dart';
 
 void main() {
   group('RestQueryCache', () {
+    test('resolves supported tag placeholders without evaluating code', () {
+      expect(
+        resolveRestQueryTemplate(
+          'account:{id}:{request.sourceId}',
+          <String, Object?>{
+            'id': '123',
+            'request.sourceId': '456',
+          },
+        ),
+        'account:123:456',
+      );
+    });
+
     test('deduplicates concurrent loads and shares the result', () async {
       final RestQueryCache cache = RestQueryCache();
       final Completer<void> gate = Completer<void>();

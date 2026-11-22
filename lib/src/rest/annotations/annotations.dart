@@ -3,3 +3,5 @@
 export 'http_method.dart';
 export 'parameter.dart';
 export 'route.dart';
+export 'invalidates.dart';
+export 'query_cache.dart';
