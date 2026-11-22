@@ -105,7 +105,9 @@ abstract class AccountsClient {
 
 `dRest.clearQueryCache()` clears values and prevents late responses from
 repopulating the cache after logout. `@Serializable(copyWith: true,
-equality: true)` additionally generates value helpers and a JSON Schema
+equality: true)` additionally generates value helpers and a JSON Schema.
+When equality is enabled, add the generated mixin to the model:
+`class Account with _$AccountEquality { ... }`.
 function. Dynamic nested forms are available through `FormGroup` and
 `FormArray`; fields can be enabled or disabled without losing their value, and
 `FormValidators` provides reusable cross-field rules. REST validation errors
