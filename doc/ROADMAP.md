@@ -138,6 +138,18 @@ priority order; the maintainer picks a subset for each
 monthly release. Anything not picked in a given month rolls
 to the next monthly release.
 
+### 2.6.0 proposal — network-first reactivity and value models
+
+- **Reactive REST query cache.** Add pure-Dart `@QueryCache` and
+  `@Invalidates` contracts with in-flight request deduplication, tag-based
+  invalidation, active stream refetching and deterministic logout clearing.
+- **Opt-in value-model helpers.** Add generated `copyWith` and equality
+  support to `@Serializable`, using an explicit generated mixin for equality
+  because Dart parts cannot reopen a class to add operators.
+
+The implementation plan is tracked in
+[`docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md`](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).
+
 ### Tier 1 — engine parity (next 1-2 monthly releases)
 
 - **Parity tests for Postgres + Web parity with the SQLite
