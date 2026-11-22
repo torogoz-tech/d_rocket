@@ -17,7 +17,9 @@ class FormFieldState<T> {
     List<AsyncFormValidator<T>>? asyncValidators,
     this.asyncValidationDebounce,
     this.validationMode = FormValidationMode.manual,
+    bool enabled = true,
   })  : _initialValue = initialValue,
+        _isEnabled = enabled,
         _value = initialValue,
         _rawValue = initialValue,
         _validators = List<FormValidator<T>>.unmodifiable(
@@ -39,6 +41,7 @@ class FormFieldState<T> {
   T? _value;
   Object? _rawValue;
   bool _isTouched = false;
+  bool _isEnabled;
   bool _isDisposed = false;
   int _validationGeneration = 0;
   FormValidationState _validationState = FormValidationState.idle;
@@ -82,6 +85,28 @@ class FormFieldState<T> {
   /// Whether a user or control has interacted with this field.
   bool get isTouched => _isTouched;
 
+  /// Whether this field participates in value changes and validation.
+  bool get isEnabled => _isEnabled;
+
+  /// Disables the field and cancels any pending asynchronous validation.
+  void disable() => setEnabled(false);
+
+  /// Enables the field for subsequent changes and validation.
+  void enable() => setEnabled(true);
+
+  /// Changes whether this field participates in validation.
+  void setEnabled(bool enabled) {
+    if (_isEnabled == enabled) return;
+    _isEnabled = enabled;
+    ++_validationGeneration;
+    if (!enabled) {
+      _errors.clear();
+      _externalErrors.clear();
+      _setValidationState(FormValidationState.idle);
+    }
+    _emitChange();
+  }
+
   /// Whether the current value differs from the initial value.
   bool get isDirty => _value != _initialValue;
 
@@ -111,6 +136,7 @@ class FormFieldState<T> {
 
   /// Sets a typed value and clears errors caused by the previous value.
   void setValue(T? nextValue) {
+    if (!_isEnabled) return;
     _value = nextValue;
     _rawValue = nextValue;
     _isTouched = true;
@@ -133,6 +159,7 @@ class FormFieldState<T> {
 
   /// Sets a raw control value and converts it when a parser is available.
   void setRawValue(Object? nextRawValue) {
+    if (!_isEnabled) return;
     _rawValue = nextRawValue;
     _isTouched = true;
     _errors.clear();
@@ -170,6 +197,7 @@ class FormFieldState<T> {
 
   /// Marks the field as interacted with and validates in blur mode.
   void touch() {
+    if (!_isEnabled) return;
     _isTouched = true;
 
     if (validationMode == FormValidationMode.onBlur) {
@@ -183,6 +211,10 @@ class FormFieldState<T> {
 
   /// Runs all validators and returns whether the field is valid.
   bool validate() {
+    if (!_isEnabled) {
+      _setValidationState(FormValidationState.idle);
+      return true;
+    }
     final FormError? conversionError = _errors
         .where((FormError item) => item.code == 'conversion.invalid')
         .cast<FormError?>()
@@ -219,6 +251,10 @@ class FormFieldState<T> {
 
   /// Runs synchronous and asynchronous validators with optional debounce.
   Future<bool> validateAsync() async {
+    if (!_isEnabled) {
+      _setValidationState(FormValidationState.idle);
+      return true;
+    }
     final int generation = ++_validationGeneration;
     _setValidationState(FormValidationState.validating);
     final Duration? debounce = asyncValidationDebounce;

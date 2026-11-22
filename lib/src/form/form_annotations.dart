@@ -15,6 +15,7 @@ export 'form_array.dart';
 export 'form_input.dart';
 export 'form_state.dart';
 export 'form_validator.dart';
+export 'form_validators.dart';
 export 'form_validation_mode.dart';
 export 'form_validation_state.dart';
 export 'form_value_parser.dart';

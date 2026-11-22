@@ -31,14 +31,18 @@ version is bumped or published.
 - Added `RestStreamingBody` for chunked uploads with progress reporting.
 - OpenAPI export can now preserve complete schemas supplied by serializer
   metadata.
+- Form controls now expose enabled/disabled state, nested propagation and
+  reusable cross-field validators, while REST validation errors resolve dotted
+  and bracketed field paths.
+- `SqliteMigrationReview` summarizes safe and unsafe schema changes so the CLI
+  can identify when a manual `ALTER TABLE` migration needs review.
 
 ## Still required before release
 
-Global converter configuration for applications with multiple independently
-generated models and the published-package compatibility matrix remain
-pending. The realtime and
-attachment work currently provides pure-Dart contracts; transport/storage
-adapters still need to be implemented. The authoritative task list is the
+The published-package compatibility matrix remains pending until the release
+artifacts exist on pub.dev. The realtime and attachment work currently
+provides pure-Dart contracts; transport/storage adapters remain deliberately
+outside the core package. The authoritative task list is the
 [2.6.0 implementation plan](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).
 
 No generated file is edited manually. Generated fixtures are recreated with

@@ -10,7 +10,7 @@
 
 | | |
 |---|---|
-| Current line | **2.5.0** (local release candidate; not pushed) |
+| Current line | **2.6.0** (local release candidate; not pushed) |
 | Previous release | 2.4.2 |
 | Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
@@ -138,7 +138,7 @@ priority order; the maintainer picks a subset for each
 monthly release. Anything not picked in a given month rolls
 to the next monthly release.
 
-### 2.6.0 proposal — full data-layer functional parity
+### 2.6.0 local release candidate — full data-layer functional parity
 
 - **Reactive REST query cache.** Add pure-Dart `@QueryCache` and
   `@Invalidates` contracts with in-flight request deduplication, tag-based
@@ -165,6 +165,13 @@ to the next monthly release.
 - **Contracts and verification.** Add mocks, fake servers, schema/OpenAPI
   goldens, migration fixtures, benchmarks and published-package compatibility
   checks across supported Dart, Flutter and platform targets.
+
+The local candidate now contains the runtime and codegen contracts above,
+including generated multipart/streaming REST bodies, OpenAPI endpoint metadata,
+form state/error binding, SQLite companion/review tooling, realtime delivery
+acknowledgements and resumable sync checkpoints. The remaining release gate is
+verification against the packages after they are published; no publish is
+performed as part of local implementation.
 
 The core package remains pure Dart. Flutter widgets, Bloc/Riverpod adapters,
 native background scheduling, conflict-resolution screens, Socket.IO, CRDTs

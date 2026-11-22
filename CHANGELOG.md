@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added generated REST cache and `JsonKey.readValue` integration fixtures.
 * Added bounded realtime delivery acknowledgements and resumable attachment
   checkpoints for data-layer adapters.
+* Form fields now support explicit enabled/disabled state, nested propagation,
+  reusable cross-field validators and robust dotted/bracket REST error paths.
+* Added a SQLite migration-review summary that highlights destructive changes
+  before a manual `ALTER TABLE` migration is applied.
 
 ### SQLite scope
 
@@ -43,10 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Pending work
 
-* OpenAPI import/export, generated pagination metadata, full converter/schema
-  configuration, companion ORM APIs, transport/storage adapters for realtime
-  delivery and attachments, and the complete compatibility matrix remain in
-  the tracked 2.6.0 plan.
+* Published-package compatibility verification remains the final release gate;
+  platform adapters stay outside the pure-Dart core by design.
 
 ## [2.5.0] — 2026-11-21
 

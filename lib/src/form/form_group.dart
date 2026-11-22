@@ -21,6 +21,18 @@ class FormGroup {
   bool get isDirty => _controls.values.any(_controlIsDirty);
   bool get isPristine => !isDirty;
 
+  /// Whether every child control is enabled.
+  bool get isEnabled => _controls.values.every(_controlIsEnabled);
+
+  /// Enables or disables all nested controls.
+  void setEnabled(bool enabled) {
+    for (final Object control in _controls.values) {
+      if (control is FormFieldState<Object?>) control.setEnabled(enabled);
+      if (control is FormGroup) control.setEnabled(enabled);
+      if (control is FormArray) control.setEnabled(enabled);
+    }
+  }
+
   FormValidationState get validationState {
     if (_controls.values.any(_controlIsValidating)) {
       return FormValidationState.validating;
@@ -101,6 +113,13 @@ class FormGroup {
     if (control is FormFieldState<Object?>) return control.isDirty;
     if (control is FormGroup) return control.isDirty;
     if (control is FormArray) return control.isDirty;
+    return false;
+  }
+
+  static bool _controlIsEnabled(Object control) {
+    if (control is FormFieldState<Object?>) return control.isEnabled;
+    if (control is FormGroup) return control.isEnabled;
+    if (control is FormArray) return control.isEnabled;
     return false;
   }
 

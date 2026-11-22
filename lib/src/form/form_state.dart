@@ -177,6 +177,11 @@ class FormState<T> {
   /// Applies field errors returned by a REST endpoint.
   void applyRestError(RestHttpException error) {
     final RestProblemDetails problem = error.problem;
+    applyProblemDetails(problem);
+  }
+
+  /// Applies an already decoded RFC 7807 payload to this form.
+  void applyProblemDetails(RestProblemDetails problem) {
     final String prefix =
         problem.code == null ? 'server' : 'server.${problem.code}';
     applyFieldErrors(problem.validationErrors, codePrefix: prefix);
@@ -188,8 +193,9 @@ class FormState<T> {
     String codePrefix = 'server.validation',
   }) {
     _validationGeneration++;
+    _formErrors.clear();
     for (final MapEntry<String, List<String>> entry in fieldErrors.entries) {
-      final FormFieldState<Object?>? field = _fields[entry.key];
+      final FormFieldState<Object?>? field = _findField(entry.key);
       final List<FormError> errors = <FormError>[
         for (final String message in entry.value)
           FormError(code: codePrefix, message: message),
@@ -201,6 +207,29 @@ class FormState<T> {
       }
     }
     _setValidationState(FormValidationState.invalid);
+  }
+
+  FormFieldState<Object?>? _findField(String path) {
+    final FormFieldState<Object?>? direct = _fields[path];
+    if (direct != null) return direct;
+    final List<String> parts = path
+        .split(RegExp(r'[^A-Za-z0-9_]+'))
+        .where((String part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return null;
+    final String leaf = parts.last;
+    final String normalized = parts.join('.');
+    final FormFieldState<Object?>? exact = _fields[normalized];
+    if (exact != null) return exact;
+    for (final MapEntry<String, FormFieldState<Object?>> item
+        in _fields.entries) {
+      if (normalized.endsWith('.${item.key}') ||
+          leaf == item.key ||
+          path.contains(item.key)) {
+        return item.value;
+      }
+    }
+    return null;
   }
 
   /// Marks every registered field as touched.
