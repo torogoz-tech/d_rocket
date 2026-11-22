@@ -14,6 +14,7 @@
 import 'dart:convert';
 
 import 'codec_encoder.dart';
+import 'json_converter.dart';
 import 'json_encoder.dart';
 import 'json_factory.dart';
 import 'serialization_exception.dart';
@@ -45,6 +46,8 @@ class Serializer {
       <Type, JsonFactory<dynamic>>{};
   static final Map<Type, JsonEncoder<dynamic>> _encoders =
       <Type, JsonEncoder<dynamic>>{};
+  static final Map<Type, JsonConverter<dynamic, Object?>> _converters =
+      <Type, JsonConverter<dynamic, Object?>>{};
   static final Map<Type, String> _unionTypeFields = <Type, String>{};
   static final Map<Type, Map<String, JsonFactory<dynamic>>> _unionFactories =
       <Type, Map<String, JsonFactory<dynamic>>>{};
@@ -70,6 +73,33 @@ class Serializer {
   }) {
     _factories[T] = (Map<String, dynamic> json) => fromJson(json);
     _encoders[T] = (dynamic value) => toJson(value as T);
+  }
+
+  /// Registers an explicit converter with precedence over built-in codecs.
+  static void registerConverter<T>(JsonConverter<T, Object?> converter) {
+    _converters[T] = converter as JsonConverter<dynamic, Object?>;
+  }
+
+  /// Decodes a value using a registered or explicitly supplied converter.
+  static T decodeWithConverter<T>(
+    Object? value, {
+    JsonConverter<T, Object?>? converter,
+  }) {
+    final JsonConverter<T, Object?>? selected =
+        converter ?? _converters[T] as JsonConverter<T, Object?>?;
+    if (selected == null) return fromDynamic<T>(value);
+    return selected.decode(value);
+  }
+
+  /// Encodes a value using a registered or explicitly supplied converter.
+  static Object? encodeWithConverter<T>(
+    T value, {
+    JsonConverter<T, Object?>? converter,
+  }) {
+    final JsonConverter<T, Object?>? selected =
+        converter ?? _converters[T] as JsonConverter<T, Object?>?;
+    if (selected == null) return _encodeValue(value);
+    return selected.encode(value);
   }
 
   /// Registers a union subtype factory under a
@@ -193,6 +223,7 @@ class Serializer {
     _encoders.clear();
     _unionTypeFields.clear();
     _unionFactories.clear();
+    _converters.clear();
   }
 
   /// Returns an immutable snapshot of the current
@@ -248,6 +279,11 @@ class Serializer {
   }
 
   static Object? _encodeValue(Object? value) {
+    if (value != null) {
+      final JsonConverter<dynamic, Object?>? converter =
+          _converters[value.runtimeType];
+      if (converter != null) return converter.encode(value);
+    }
     for (final _ValueCodec codec in _valueCodecs) {
       if (codec.matches(value)) {
         return codec.encode(value, _encodeValue);

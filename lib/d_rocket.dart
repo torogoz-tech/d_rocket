@@ -60,6 +60,7 @@ export 'src/linq/record.dart';
 // class — the user only has to call `initializeD` once.
 export 'src/serializer/format.dart';
 export 'src/serializer/json_key.dart';
+export 'src/serializer/json_converter.dart';
 export 'src/serializer/json_naming.dart';
 export 'src/serializer/serializable.dart';
 export 'src/serializer/serializable_union.dart';

@@ -15,6 +15,9 @@ class JsonKey {
   /// `XToJson` / `XFromJson`.
   final String? converter;
 
+  /// Name of a top-level reader receiving the complete JSON map.
+  final String? readValue;
+
   /// Encodes enums by index instead of enum name.
   final bool useEnumIndex;
 
@@ -31,6 +34,7 @@ class JsonKey {
     this.ignore = false,
     this.defaultValue,
     this.converter,
+    this.readValue,
     this.useEnumIndex = false,
     this.requiredKey = false,
     this.unknownEnumValue,
