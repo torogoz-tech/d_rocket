@@ -138,7 +138,7 @@ priority order; the maintainer picks a subset for each
 monthly release. Anything not picked in a given month rolls
 to the next monthly release.
 
-### 2.6.0 proposal — network-first reactivity and value models
+### 2.6.0 proposal — full data-layer functional parity
 
 - **Reactive REST query cache.** Add pure-Dart `@QueryCache` and
   `@Invalidates` contracts with in-flight request deduplication, tag-based
@@ -146,6 +146,30 @@ to the next monthly release.
 - **Opt-in value-model helpers.** Add generated `copyWith` and equality
   support to `@Serializable`, using an explicit generated mixin for equality
   because Dart parts cannot reopen a class to add operators.
+- **Advanced forms.** Add nested groups, dynamic arrays, dirty/pristine and
+  enabled/disabled state, async/debounced validators, cross-field rules,
+  composite bindings and typed REST field-error mapping.
+- **Serialization contracts.** Add converters, `readValue`, explicit unknown
+  field policies, schema export, and complete diagnostics for dates, decimals,
+  enums, UUIDs, nullable nested models, generic envelopes and opaque JSON.
+- **SQLite ORM depth.** Add manager/companion APIs, extensible SQLite type
+  converters, validated custom SQL/functions, query granularity and migration
+  review tooling. LINQ remains SQLite-only in this program.
+- **REST contracts.** Add OpenAPI 3.1 import/export, typed pagination,
+  endpoint serializers, multipart transfer progress, large-body streaming,
+  auth refresh and richer retry/error policies.
+- **Realtime delivery.** Strengthen SSE/WebSocket lifecycle, heartbeat,
+  jitter, multiplexing, backpressure, queued messages and acknowledgements.
+- **Offline-first sync.** Add delta and partial-field sync, durable queues,
+  resumable attachments, conflict-specific retry and persistent metrics.
+- **Contracts and verification.** Add mocks, fake servers, schema/OpenAPI
+  goldens, migration fixtures, benchmarks and published-package compatibility
+  checks across supported Dart, Flutter and platform targets.
+
+The core package remains pure Dart. Flutter widgets, Bloc/Riverpod adapters,
+native background scheduling, conflict-resolution screens, Socket.IO, CRDTs
+and testcontainers remain explicit adapter/extension candidates rather than
+implicit core dependencies.
 
 The implementation plan is tracked in
 [`docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md`](../docs/superpowers/plans/2026-11-22-d-rocket-2-6-reactive-cache-value-models.md).
@@ -214,8 +238,8 @@ The implementation plan is tracked in
 
 ## Release cadence
 
-`d_rocket 2.5.0` is prepared locally and has not been pushed or published.
-Bug fixes can ship at any time as patch releases. See
+`d_rocket 2.5.0` is the current published baseline. Bug fixes can ship at any
+time as patch releases. See
 [`RELEASE_CADENCE.md`](RELEASE_CADENCE.md) for the full
 policy, the calendar of upcoming releases, and the criteria
 for out-of-band patch releases.

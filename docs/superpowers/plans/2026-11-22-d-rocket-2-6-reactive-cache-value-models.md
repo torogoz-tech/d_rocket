@@ -1,10 +1,10 @@
-# d_rocket 2.6.0 Reactive Cache and Value Models Implementation Plan
+# d_rocket 2.6.0 Functional Parity Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a framework-independent reactive REST query cache with tag invalidation and opt-in generated `copyWith`/value equality helpers for 2.6.0.
+**Goal:** Deliver the complete 2.6.0 data-layer program: reactive REST queries, value models, advanced forms, serialization/schema contracts, SQLite-focused ORM depth, REST/realtime/sync capabilities, and a published-package compatibility matrix.
 
-**Architecture:** Keep query caching in the d_rocket REST runtime as an instance-scoped `RestQueryCache`, then let the REST builder translate annotations into cache and invalidation calls. Keep value helpers in serializer codegen: generate a sentinel-based extension for `copyWith` and an explicit generated equality mixin because a Dart part cannot reopen a class to add operators.
+**Architecture:** Keep each capability in its owning layer. REST caching and transport contracts stay in the pure Dart runtime; annotations and generated code stay in their builders; forms, serializers and SQLite use independent files and tests; mobile/background/UI integrations remain adapters. Generate value helpers with a sentinel-based `copyWith` extension and an explicit equality mixin because a Dart part cannot reopen a class to add operators.
 
 **Tech Stack:** Dart 3.11.5–3.13, Flutter-compatible pure Dart runtime, `build_runner`, `source_gen`, existing `HttpClient`, `RestClient` and `@Serializable` pipelines, `package:test`.
 
@@ -19,6 +19,9 @@
 - Do not evaluate arbitrary tag expressions; support only validated parameter/body-property placeholders.
 - Do not inject `operator ==` into a class automatically; require the generated equality mixin when equality is enabled.
 - Do not edit generated files manually; regenerate them with build_runner.
+- Keep LINQ and ORM scope restricted to SQLite for this program.
+- Treat Flutter widgets, Bloc/Riverpod, native schedulers, Socket.IO, CRDTs and
+  testcontainers as adapter/extension work, not hidden core dependencies.
 
 ## Review Focus
 
@@ -139,10 +142,120 @@
 - [ ] **Step 5: Review generated diffs and package dry-runs.**
 - [ ] **Step 6: Commit documentation and integration tests** with `docs: prepare d_rocket 2.6.0 plan and contracts`.
 
+### Task 6: Advanced forms and error binding
+
+**Files:**
+- Create: `packages/d_rocket/lib/src/forms/form_group.dart`
+- Create: `packages/d_rocket/lib/src/forms/form_array.dart`
+- Create: `packages/d_rocket/lib/src/forms/form_validation_state.dart`
+- Modify: `packages/d_rocket/lib/src/forms/validators.dart`
+- Modify: `packages/d_rocket_builder/lib/src/forms/*`
+- Test: `packages/d_rocket/test/forms/advanced_form_state_test.dart`
+- Test: `packages/d_rocket_builder/test/forms/advanced_form_codegen_test.dart`
+
+- [ ] **Step 1: Add failing tests** for nested groups, dynamic arrays, reset/default values, dirty/pristine, enabled/disabled, pending and composite bindings.
+- [ ] **Step 2: Add composable async validators** with debounce, cancellation and `validating`/`valid`/`invalid` state transitions.
+- [ ] **Step 3: Add cross-field built-ins** such as comparison, matching, membership, containment, `requiredTrue` and credit-card validation without UI widgets.
+- [ ] **Step 4: Map typed REST/RFC 7807 field errors** to form and field state, preserving server field paths.
+- [ ] **Step 5: Add builder metadata and generated binding descriptors** for compound fields; reject ambiguous mappings with diagnostics.
+- [ ] **Step 6: Run focused form tests and commit** with `feat: expand data-layer forms`.
+
+### Task 7: Serialization converters, unknown fields and schemas
+
+**Files:**
+- Create: `packages/d_rocket/lib/src/serializer/json_converter.dart`
+- Create: `packages/d_rocket/lib/src/serializer/unknown_field_policy.dart`
+- Create: `packages/d_rocket/lib/src/serializer/json_schema.dart`
+- Modify: `packages/d_rocket/lib/src/serializer/serializable.dart`
+- Modify: `packages/d_rocket_builder/lib/src/serializer/*`
+- Test: `packages/d_rocket/test/serializer/converter_policy_test.dart`
+- Test: `packages/d_rocket_builder/test/serializer/json_schema_codegen_test.dart`
+
+- [ ] **Step 1: Add failing tests** for converter precedence, `readValue`, unknown-field policies, field naming, null inclusion and explicit nested conversion.
+- [ ] **Step 2: Cover dates, decimals, enums, UUIDs, nullable nested models, generic envelopes and opaque JSON values** with field-path diagnostics.
+- [ ] **Step 3: Implement `JsonConverter<T, Object?>` registration** at global, class and field scope without changing default behavior.
+- [ ] **Step 4: Generate JSON Schema and golden fixtures** from the same metadata used by serialization.
+- [ ] **Step 5: Run generated-code compilation tests and commit** with `feat: extend serialization contracts`.
+
+### Task 8: SQLite ORM and query tooling
+
+**Files:**
+- Create/modify: `packages/d_rocket_engine_sqlite/lib/src/query/*`
+- Create/modify: `packages/d_rocket_engine_sqlite/lib/src/sql/*`
+- Create/modify: `packages/d_rocket_engine_sqlite/lib/src/migrations/*`
+- Test: `packages/d_rocket_engine_sqlite/test/query/*`
+- Test: `packages/d_rocket_engine_sqlite/test/migrations/*`
+
+- [ ] **Step 1: Add failing SQLite tests** for manager APIs, incremental predicates, ordering, paging, reactive query granularity and companion-style partial writes.
+- [ ] **Step 2: Add extensible SQLite type converters** and validate custom SQL parameters, functions and aggregates.
+- [ ] **Step 3: Add SQL/schema inspection and generated migration tests**, explicitly flagging destructive `ALTER TABLE`, drops and type changes for review.
+- [ ] **Step 4: Add optional read-isolate/read-pool execution policies** without changing the SQLite public contract.
+- [ ] **Step 5: Run the complete SQLite suite and commit** with `feat: deepen sqlite query tooling`.
+
+### Task 9: REST contracts, pagination and transfers
+
+**Files:**
+- Create/modify: `packages/d_rocket/lib/src/rest/pagination/*`
+- Create/modify: `packages/d_rocket/lib/src/rest/transfer/*`
+- Create/modify: `packages/d_rocket/lib/src/rest/openapi/*`
+- Modify: `packages/d_rocket_builder/lib/src/rest/*`
+- Test: `packages/d_rocket/test/rest/pagination_transfer_test.dart`
+- Test: `packages/d_rocket_builder/test/rest/openapi_codegen_test.dart`
+
+- [ ] **Step 1: Add failing tests** for typed pagination, endpoint serializers, multipart upload/download progress and large-body streaming.
+- [ ] **Step 2: Add OpenAPI 3.1 export/import** for annotated clients, typed errors and pagination metadata.
+- [ ] **Step 3: Integrate auth refresh, retry policy and RFC 7807 mapping** with transport ownership and cancellation preserved.
+- [ ] **Step 4: Add contract fixtures and generated-client compilation tests.**
+- [ ] **Step 5: Run focused REST tests and commit** with `feat: expand rest contracts and transfers`.
+
+### Task 10: Realtime delivery contracts
+
+**Files:**
+- Create/modify: `packages/d_rocket/lib/src/realtime/*`
+- Test: `packages/d_rocket/test/realtime/realtime_delivery_test.dart`
+
+- [ ] **Step 1: Add failing tests** for reconnect jitter, heartbeat-aware idle detection, multiplexed channels, backpressure and delivery acknowledgement.
+- [ ] **Step 2: Unify observable lifecycle/auth status** for SSE and WebSocket clients, including safe restart and cancellation.
+- [ ] **Step 3: Add queued outbound-message policies** with explicit delivery guarantees and bounded memory.
+- [ ] **Step 4: Keep Socket.IO and platform negotiation in adapters**; add only extension contracts in core.
+- [ ] **Step 5: Run realtime tests and commit** with `feat: strengthen realtime delivery contracts`.
+
+### Task 11: Offline-first synchronization
+
+**Files:**
+- Create: `packages/d_rocket/lib/src/sync/delta_sync.dart`
+- Create: `packages/d_rocket/lib/src/sync/sync_queue.dart`
+- Create: `packages/d_rocket/lib/src/sync/sync_metrics.dart`
+- Create: `packages/d_rocket/lib/src/sync/attachment_transfer.dart`
+- Test: `packages/d_rocket/test/sync/sync_contract_test.dart`
+
+- [ ] **Step 1: Add failing tests** for delta/incremental sync, partial entity/field sync and conflict-specific retry.
+- [ ] **Step 2: Implement a durable queue contract** with resumable attachment transfers and persistent metrics.
+- [ ] **Step 3: Expose data-layer conflict inspection/resolution decisions** without adding a UI resolver.
+- [ ] **Step 4: Keep native background scheduling in mobile/Flutter adapters** and CRDT support as a separate extension point.
+- [ ] **Step 5: Run sync tests and commit** with `feat: add incremental sync contracts`.
+
+### Task 12: Contracts, fixtures and release verification
+
+**Files:**
+- Create/modify: `packages/d_rocket/tool/contract_fixtures/*`
+- Create/modify: `packages/d_rocket/tool/benchmarks/*`
+- Modify: `.github/workflows/compatibility.yml`
+- Modify: package READMEs, changelogs and release notes
+
+- [ ] **Step 1: Add REST mocks, fake HTTP servers, migration fixtures, schema/OpenAPI golden tests and generated form metadata fixtures.**
+- [ ] **Step 2: Add benchmarks** for REST cache hits/misses, serialization, SQLite CRUD/query chains, sync and realtime delivery.
+- [ ] **Step 3: Verify** Dart 3.11.5, 3.12 and 3.13, stable Flutter, and applicable Web/Android/iOS/macOS/Linux targets.
+- [ ] **Step 4: Resolve dependencies from published packages in a clean consumer fixture**, in addition to path-based workspace tests.
+- [ ] **Step 5: Run `dart analyze`, `dart test`, `dart run build_runner build --delete-conflicting-outputs` and package dry-runs for every affected repository.
+- [ ] **Step 6: Review generated diffs, docs and release promises; commit** with `test: verify d_rocket 2.6 compatibility matrix`.
+
 ## Final Verification
 
 - [ ] `d_rocket` and `d_rocket_builder` analyze cleanly.
 - [ ] All existing tests plus new cache/value-model tests pass.
 - [ ] Generated files compile from a clean checkout.
-- [ ] No Flutter, Bloc or Riverpod dependency was added.
+- [ ] No Flutter, Bloc or Riverpod dependency was added to core packages.
+- [ ] SQLite remains the only ORM/LINQ target in this release program.
+- [ ] Adapter candidates (Socket.IO, CRDT, native schedulers, UI conflict screens) are documented without becoming hidden core dependencies.
 - [ ] No push or publication occurs until the 2.6.0 release decision is explicit.
