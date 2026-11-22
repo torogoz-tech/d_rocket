@@ -4,6 +4,8 @@ import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
 
 import '../fixtures/query_cache_client.dart';
+import '../fixtures/query_cache_body_client.dart';
+import '../fixtures/transfer_request.dart';
 
 class _CacheHttpClient implements HttpClient {
   int calls = 0;
@@ -36,7 +38,8 @@ class _CacheHttpClient implements HttpClient {
 }
 
 void main() {
-  test('generated query cache deduplicates and invalidates active streams', () async {
+  test('generated query cache deduplicates and invalidates active streams',
+      () async {
     final _CacheHttpClient transport = _CacheHttpClient();
     final QueryCacheClientFixture client = createQueryCacheClientFixture(
       config: RestClientConfig(client: transport),
@@ -64,5 +67,19 @@ void main() {
     await firstSubscription.cancel();
     await secondSubscription.cancel();
     await dRest.clearQueryCache();
+  });
+
+  test('generated invalidation resolves properties from body parameters',
+      () async {
+    final _CacheHttpClient transport = _CacheHttpClient();
+    registerTransferRequestSerializer();
+    final QueryCacheBodyClientFixture client =
+        createQueryCacheBodyClientFixture(
+      config: RestClientConfig(client: transport),
+    );
+
+    await client.execute(const TransferRequest(sourceAccountId: '42'));
+
+    expect(transport.calls, 1);
   });
 }
