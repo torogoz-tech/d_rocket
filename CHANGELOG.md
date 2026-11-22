@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkpoints for data-layer adapters.
 * Form fields now support explicit enabled/disabled state, nested propagation,
   reusable cross-field validators and robust dotted/bracket REST error paths.
+  `FormBinding` metadata now describes composite controls and rejects
+  ambiguous mappings during generation.
 * Added a SQLite migration-review summary that highlights destructive changes
   before a manual `ALTER TABLE` migration is applied.
 * Added named realtime multiplexing and bounded outbound queues with explicit

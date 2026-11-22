@@ -1,6 +1,8 @@
 import 'package:d_rocket/d_rocket.dart';
 import 'package:test/test.dart';
 
+import '../fixtures/composite_form_request.dart';
+
 void main() {
   test('disabled fields do not change or participate in validation', () {
     final FormFieldState<String> field = FormFieldState<String>(
@@ -68,5 +70,20 @@ void main() {
     expect(FormValidators.oneOf<String>(<String>['a'])('b'), isNotNull);
     expect(FormValidators.range(min: 1, max: 3)(2), isNull);
     expect(FormValidators.range(min: 1, max: 3)(4), isNotNull);
+    expect(FormValidators.matches<String>((_) => 'same')('same'), isNull);
+    expect(FormValidators.matches<String>((_) => 'other')('same'), isNotNull);
+    expect(FormValidators.contains('card')('card-number'), isNull);
+    expect(FormValidators.contains('missing')('card-number'), isNotNull);
+    expect(FormValidators.creditCard()('4111 1111 1111 1111'), isNull);
+    expect(FormValidators.creditCard()('4111 1111 1111 1112'), isNotNull);
+  });
+
+  test('generated definitions describe composite field targets', () {
+    final FormFieldDefinition definition =
+        CompositeFormRequestForm.definitions.firstWhere(
+      (FormFieldDefinition item) => item.name == 'expiry',
+    );
+
+    expect(definition.binding, <String>['expiryMonth', 'expiryYear']);
   });
 }

@@ -36,13 +36,29 @@ class UuidRequestForm {
 
   static const List<FormFieldDefinition> definitions = <FormFieldDefinition>[
     FormFieldDefinition(
-        name: 'requestId', label: null, order: 0, input: FormInput.text),
+        name: 'requestId',
+        label: null,
+        order: 0,
+        input: FormInput.text,
+        binding: const <String>[]),
     FormFieldDefinition(
-        name: 'generalId', label: null, order: 0, input: FormInput.text),
+        name: 'generalId',
+        label: null,
+        order: 0,
+        input: FormInput.text,
+        binding: const <String>[]),
     FormFieldDefinition(
-        name: 'versionedId', label: null, order: 0, input: FormInput.text),
+        name: 'versionedId',
+        label: null,
+        order: 0,
+        input: FormInput.text,
+        binding: const <String>[]),
     FormFieldDefinition(
-        name: 'optionalId', label: null, order: 0, input: FormInput.text),
+        name: 'optionalId',
+        label: null,
+        order: 0,
+        input: FormInput.text,
+        binding: const <String>[]),
   ];
   FormFieldState<String> get requestId =>
       state.fields['requestId']! as FormFieldState<String>;

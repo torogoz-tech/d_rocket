@@ -1,5 +1,6 @@
 export 'annotations/email.dart';
 export 'annotations/form.dart';
+export 'annotations/form_binding.dart';
 export 'annotations/form_field.dart';
 export 'annotations/length.dart';
 export 'annotations/pattern.dart';

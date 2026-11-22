@@ -26,6 +26,59 @@ class FormValidators {
         : FormError(code: code, message: message);
   }
 
+  /// Compares the current value with another value using [comparison].
+  static FormValidator<T> compare<T>(
+    T? Function(T? value) other,
+    int Function(T? left, T? right) comparison, {
+    String code = 'comparison.invalid',
+    String message = 'La comparación no es válida',
+  }) {
+    return (T? value) => comparison(value, other(value)) == 0
+        ? null
+        : FormError(code: code, message: message);
+  }
+
+  /// Requires a string or iterable value to contain [expected].
+  static FormValidator<Object?> contains(
+    Object? expected, {
+    String code = 'contains.invalid',
+    String message = 'El valor no contiene el elemento requerido',
+  }) {
+    return (Object? value) {
+      final bool found = value is String
+          ? value.contains('$expected')
+          : value is Iterable<Object?> && value.contains(expected);
+      return found ? null : FormError(code: code, message: message);
+    };
+  }
+
+  /// Validates a card number with the Luhn checksum.
+  static FormValidator<String> creditCard({
+    String code = 'credit_card.invalid',
+    String message = 'El número de tarjeta no es válido',
+  }) {
+    return (String? value) {
+      final String digits = value?.replaceAll(RegExp(r'\s|-'), '') ?? '';
+      if (digits.length < 12 || !RegExp(r'^\d+$').hasMatch(digits)) {
+        return FormError(code: code, message: message);
+      }
+      int sum = 0;
+      bool doubleDigit = false;
+      for (int index = digits.length - 1; index >= 0; index--) {
+        int digit = int.parse(digits[index]);
+        if (doubleDigit) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        doubleDigit = !doubleDigit;
+      }
+      return sum % 10 == 0
+          ? null
+          : FormError(code: code, message: message);
+    };
+  }
+
   /// Requires a value to be contained in [allowed].
   static FormValidator<T> oneOf<T>(
     Iterable<T> allowed, {

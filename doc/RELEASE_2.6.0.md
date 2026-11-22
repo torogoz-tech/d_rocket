@@ -33,7 +33,8 @@ version bump and before publication.
   metadata.
 - Form controls now expose enabled/disabled state, nested propagation and
   reusable cross-field validators, while REST validation errors resolve dotted
-  and bracketed field paths.
+  and bracketed field paths. `FormBinding` metadata now describes composite
+  controls and the builder validates ambiguous mappings.
 - `SqliteMigrationReview` summarizes safe and unsafe schema changes so the CLI
   can identify when a manual `ALTER TABLE` migration needs review.
 - Realtime now includes named channel multiplexing and bounded outbound
