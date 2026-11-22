@@ -38,6 +38,8 @@ version is bumped or published.
   can identify when a manual `ALTER TABLE` migration needs review.
 - Realtime now includes named channel multiplexing and bounded outbound
   delivery queues with explicit acknowledgement and retry limits.
+- The core package no longer embeds the DevTools web build; the extension is
+  maintained and published independently.
 
 ## Still required before release
 

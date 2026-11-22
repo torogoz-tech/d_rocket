@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before a manual `ALTER TABLE` migration is applied.
 * Added named realtime multiplexing and bounded outbound queues with explicit
   acknowledgement and retry limits.
+* Removed the checked-in DevTools web build from the core package; DevTools is
+  distributed independently through `d_rocket_devtools_extension`.
 
 ### SQLite scope
 
