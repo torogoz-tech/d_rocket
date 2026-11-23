@@ -1,6 +1,6 @@
 # d_rocket — Roadmap
 
-> What shipped in 1.x through 2.6.0, and what remains on the
+> What shipped in 1.x through 2.6.1, and what remains on the
 > post-2.6.0 roadmap. The 2.x line is the current line; the
 > 1.x line is in maintenance mode.
 
@@ -10,11 +10,11 @@
 
 | | |
 |---|---|
-| Current line | **2.6.0** (local release candidate; not pushed) |
-| Previous release | 2.5.0 |
+| Current line | **2.6.1** (release candidate; not pushed) |
+| Previous release | 2.6.0 |
 | Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Package versions | core/builder/SQLite `2.6.0`; Flutter bindings and lints advance independently |
+| Package versions | core/builder/SQLite `2.6.1`; Flutter bindings and lints advance independently |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
 
@@ -29,6 +29,12 @@ independent version lines.
 
 ## Shipped versions
 
+### 2.6.1 — documentation and release metadata
+
+This patch release translates the public documentation to English, corrects
+internal documentation links and aligns package metadata after the 2.6.0
+publication. No runtime or code-generation behavior changes.
+
 ### 2.6.0 — reactive REST data and generated value models
 
 Reactive REST queries, tag invalidation, generated value helpers, nested form
@@ -37,11 +43,11 @@ checkpoints and SQLite companion/read-ordering contracts.
 
 ### 2.5.0 — forms, serialization and realtime hardening
 
-The current release candidate adds async form validation with debounce and
+The 2.5.0 release added async form validation with debounce and
 REST error mapping, detailed serializer diagnostics, UUID validation and
 robust WebSocket lifecycle/authentication handling. Dart 3.11.5, 3.12.0 and
 3.13.0 are covered by CI; Web, Android, iOS, macOS and Linux were validated
-manually. No push or publication has been performed.
+manually. The release is published and remains the compatibility baseline.
 
 ### 2.4.0–2.4.2 — transport and generic codegen hardening
 
@@ -143,41 +149,6 @@ Items that have been discussed for the 2.x line after 2.6.0. Listed in
 priority order; the maintainer picks a subset for each
 monthly release. Anything not picked in a given month rolls
 to the next monthly release.
-
-### 2.6.0 local release candidate — full data-layer functional parity
-
-- **Reactive REST query cache.** Add pure-Dart `@QueryCache` and
-  `@Invalidates` contracts with in-flight request deduplication, tag-based
-  invalidation, active stream refetching and deterministic logout clearing.
-- **Opt-in value-model helpers.** Add generated `copyWith` and equality
-  support to `@Serializable`, using an explicit generated mixin for equality
-  because Dart parts cannot reopen a class to add operators.
-- **Advanced forms.** Add nested groups, dynamic arrays, dirty/pristine and
-  enabled/disabled state, async/debounced validators, cross-field rules,
-  composite bindings and typed REST field-error mapping.
-- **Serialization contracts.** Add converters, `readValue`, explicit unknown
-  field policies, schema export, and complete diagnostics for dates, decimals,
-  enums, UUIDs, nullable nested models, generic envelopes and opaque JSON.
-- **SQLite ORM depth.** Add manager/companion APIs, extensible SQLite type
-  converters, validated custom SQL/functions, query granularity and migration
-  review tooling. LINQ remains SQLite-only in this program.
-- **REST contracts.** Add OpenAPI 3.1 import/export, typed pagination,
-  endpoint serializers, multipart transfer progress, large-body streaming,
-  auth refresh and richer retry/error policies.
-- **Realtime delivery.** Strengthen SSE/WebSocket lifecycle, heartbeat,
-  jitter, multiplexing, backpressure, queued messages and acknowledgements.
-- **Offline-first sync.** Add delta and partial-field sync, durable queues,
-  resumable attachments, conflict-specific retry and persistent metrics.
-- **Contracts and verification.** Add mocks, fake servers, schema/OpenAPI
-  goldens, migration fixtures, benchmarks and published-package compatibility
-  checks across supported Dart, Flutter and platform targets.
-
-The local candidate now contains the runtime and codegen contracts above,
-including generated multipart/streaming REST bodies, OpenAPI endpoint metadata,
-form state/error binding, SQLite companion/review tooling, realtime delivery
-acknowledgements and resumable sync checkpoints. The remaining release gate is
-verification against the packages after they are published; no publish is
-performed as part of local implementation.
 
 The core package remains pure Dart. Flutter widgets, Bloc/Riverpod adapters,
 native background scheduling, conflict-resolution screens, Socket.IO, CRDTs

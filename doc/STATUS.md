@@ -7,11 +7,11 @@
 
 | Metric | Value |
 |---|---|
-| Current line | **2.6.0** (local release candidate; not pushed) |
-| Previous release | 2.5.0 |
+| Current line | **2.6.1** (release candidate; not pushed) |
+| Previous release | 2.6.0 |
 | Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Package versions | core/builder/SQLite `2.6.0`; Flutter bindings and lints advance independently |
+| Package versions | core/builder/SQLite `2.6.1`; Flutter bindings and lints advance independently |
 | Release policy | core and builder are coordinated; bindings, lints and engines advance independently when their APIs require it |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
@@ -39,8 +39,7 @@
 - Realtime delivery queues, channel multiplexing, attachment checkpoints,
   pagination, multipart and OpenAPI metadata improvements.
 
-This version is prepared in local commits only; no push or publication has
-been performed.
+This version is published and available from pub.dev.
 
 ### 2.5.0 — forms, serialization and realtime hardening
 

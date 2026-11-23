@@ -119,12 +119,12 @@ annotation has no `sendEventNames` (the client
 cannot send events over SSE — it would use a
 `@WebSocketClient` for that).
 
-## `SseReconnector` robusto
+## Robust `SseReconnector`
 
-Desde 2.2.2, el runtime también expone `SseReconnector` para consumidores que
-necesitan controlar directamente la conexión SSE. `headersProvider` se ejecuta
-antes de cada intento y `onUnauthorized` puede renovar la sesión cuando el
-servidor responde `401`:
+Since 2.2.2, the runtime also exposes `SseReconnector` for consumers that need
+direct control over an SSE connection. `headersProvider` runs before every
+attempt and `onUnauthorized` can refresh the session when the server returns
+`401`:
 
 ```dart
 final SseReconnector stream = SseReconnector(
@@ -139,11 +139,11 @@ final SseReconnector stream = SseReconnector(
 );
 ```
 
-El estado se observa mediante `states` (`connecting`, `connected`, `retrying`,
-`stopped` y `failed`). Los errores HTTP se exponen como `SseHttpException` con
-su `statusCode`; un `403` es terminal y no crea reintentos infinitos.
+Observe lifecycle through `states` (`connecting`, `connected`, `retrying`,
+`stopped` and `failed`). HTTP errors are exposed as `SseHttpException` with
+their `statusCode`; `403` is terminal and does not create infinite retries.
 
-El cursor se puede confirmar después de persistir el evento:
+The cursor can be acknowledged after persisting the event:
 
 ```dart
 stream.events.listen((event) async {
@@ -152,11 +152,11 @@ stream.events.listen((event) async {
 });
 ```
 
-`clearLastEventId()` elimina el cursor. `stop()` cancela reintentos,
-suscripciones y transporte, y un `start()` posterior crea una nueva generación
-que ignora eventos tardíos de la conexión anterior. `dispose()` cierra también
-los streams públicos. El temporizador de `inactivityTimeout` considera tanto
-eventos como comentarios SSE usados como heartbeats.
+`clearLastEventId()` clears the cursor. `stop()` cancels retries, subscriptions
+and transport, while a later `start()` creates a new generation that ignores
+late events from the previous connection. `dispose()` also closes public
+streams. The `inactivityTimeout` timer considers both events and SSE comments
+used as heartbeats.
 
 ## Generated event API
 

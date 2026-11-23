@@ -23,8 +23,8 @@ day-to-day.
   five minutes.
 - **[03 — Installation](03-installation.md)** — pubspec config,
   `build_runner` setup, dependency choices, and troubleshooting.
-- **[15 — Para qué usar d_rocket](15-para-que-usar.md)** — decisión de
-  adopción, casos de uso completos y límites del framework.
+- **[15 — Why use d_rocket?](15-use-cases.md)** — adoption guidance,
+  complete use cases and framework boundaries.
 
 ### The seven layers
 
@@ -91,7 +91,7 @@ rest.
 order 1 → 6 as you need them.
 
 **If you are evaluating the framework:** read
-[15 — Para qué usar d_rocket](15-para-que-usar.md) first. It explains which
+[15 — Why use d_rocket?](15-use-cases.md) first. It explains which
 layers to adopt for REST-only, SQLite/offline-first, forms and realtime apps.
 
 **If you're migrating from another framework (Entity Framework

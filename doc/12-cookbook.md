@@ -3,9 +3,9 @@
 Real-world recipes. Each recipe is a self-contained
 example you can drop into a project.
 
-> Para decidir qué capas necesita tu aplicación, consulta
-> [Para qué usar d_rocket](15-para-que-usar.md). Este cookbook se concentra
-> en recetas puntuales y no reemplaza la guía de arquitectura.
+> To decide which layers your application needs, see
+> [Why use d_rocket?](15-use-cases.md). This cookbook focuses on focused
+> recipes and does not replace the architecture guide.
 
 ---
 

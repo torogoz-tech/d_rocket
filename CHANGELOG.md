@@ -5,7 +5,22 @@ All notable changes to `d_rocket` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2.6.0 program
+## [Unreleased]
+
+Future changes will be listed here.
+
+## [2.6.1] — 2026-11-22
+
+### Documentation
+
+* Translated the public README and extended documentation to English.
+* Added the English use-case guide with REST cache, SQLite, forms, realtime
+  and synchronization examples.
+* Renamed the model-driven forms and use-case documentation to English
+  filenames and updated all internal links.
+* Corrected release-status and changelog metadata after the 2.6.0 publication.
+
+## [2.6.0] — 2026-11-22
 
 ### Added
 
@@ -52,11 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added validated parameterized `SqliteQuery.select` and
   `SqliteQuery.execute` contracts. LINQ/ORM work remains SQLite-focused for
   this program.
-
-### Pending work
-
-* Published-package compatibility verification remains the final release gate;
-  platform adapters stay outside the pure-Dart core by design.
 
 ## [2.5.0] — 2026-11-21
 
@@ -229,7 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   integration with the existing serializer and REST annotations. Numeric,
   boolean, date and enum inputs support raw-value parsing through `bindRaw()`;
   existing string/date formatters are applied during capture. See
-  `doc/2.2-formularios-modelo.md`.
+  `doc/2.2-model-driven-forms.md`.
 
 ## [2.1.0] — Unreleased
 

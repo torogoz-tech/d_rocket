@@ -1,9 +1,9 @@
 # d_rocket 2.5.0
 
-## Validación de UUID
+## UUID validation
 
-Los modelos de formularios pueden reemplazar expresiones regulares repetidas
-por una anotación explícita:
+Form models can replace repeated regular expressions with an explicit
+annotation:
 
 ```dart
 @Required()
@@ -11,56 +11,54 @@ por una anotación explícita:
 final String requestId;
 ```
 
-`@Uuid()` acepta UUID canónicos con versiones 1 a 8. El parámetro opcional
-`version` restringe el nibble de versión a `UuidVersion.v1` hasta
-`UuidVersion.v8`. La validación acepta mayúsculas y minúsculas, exige guiones,
-comprueba la variante RFC compatible y conserva `message` y `code` para
-localización y telemetría.
+`@Uuid()` accepts canonical UUIDs from versions 1 through 8. The optional
+`version` argument restricts the version nibble to a specific
+`UuidVersion.v1` through `UuidVersion.v8`. Validation accepts upper- and
+lower-case values, requires hyphens, checks the compatible RFC variant and
+preserves `message` and `code` for localization and telemetry.
 
-La anotación valida valores existentes; no genera UUIDs. Para generar un UUID
-v4 se mantiene disponible `generateUuidV4()`.
+The annotation validates existing values; it does not generate UUIDs. Use
+`generateUuidV4()` when a v4 UUID must be created.
 
-## WebSocket robusto
+## Robust WebSocket reconnecting
 
-`WebSocketReconnector` puede resolver headers asíncronos antes de cada
-conexión, publicar sus estados (`connecting`, `connected`, `retrying`,
-`stopped` y `failed`) y recuperar un `401` mediante `onUnauthorized`. Los
-`403` son terminales, el contador se reinicia solo después de conectar con
-éxito y `inactivityTimeout` considera el tráfico de heartbeat. `stop()`
-cancela timers, suscripciones y conexiones pendientes; `start()` puede
-utilizarse nuevamente y `dispose()` cierra también los streams públicos.
+`WebSocketReconnector` resolves asynchronous headers before every connection,
+publishes `connecting`, `connected`, `retrying`, `stopped` and `failed`, and
+can recover a `401` through `onUnauthorized`. A `403` is terminal, the retry
+counter resets only after a successful connection, and `inactivityTimeout`
+includes heartbeat traffic. `stop()` can be followed by `start()`, while
+`dispose()` closes the public streams as well.
 
-## Errores REST tipados
+## Typed REST errors
 
-`RestHttpException.problem` ofrece una vista `RestProblemDetails` de payloads
-RFC 7807, con `validationErrors`, código de negocio y metadatos de correlación.
-Los headers de respuesta `traceId` y `requestId` también quedan disponibles.
-El acceso original `problemDetails` continúa disponible para extensiones
-específicas del backend.
+`RestHttpException.problem` provides a `RestProblemDetails` view of RFC 7807
+payloads, including `validationErrors`, business codes and correlation
+metadata. Response `traceId` and `requestId` headers are also available. The
+original `problemDetails` access remains available for backend-specific
+extensions.
 
-## Diagnostics y codegen
+## Diagnostics and code generation
 
-Los reconnectores publican eventos `websocket.state` correlacionados con el
-estado, intento, status HTTP y contexto de cierre. Los bodies y errores de
-validación permanecen ocultos salvo que se habilite explícitamente la captura
-de datos sensibles. El pipeline regenera los `.g.dart` y ejecuta
-`dart run tool/verify_generated.dart` antes del análisis para detectar tokens
-sin expandir, doble nulabilidad, casts nulos de `DateTime` y listas default
-con `<dynamic>`.
+Reconnectors publish correlated `websocket.state` events with state, attempt,
+HTTP status and close context. Bodies and validation errors remain hidden
+unless sensitive-data capture is explicitly enabled. CI regenerates `.g.dart`
+files and runs `dart run tool/verify_generated.dart` before analysis to detect
+unexpanded tokens, double nullability, invalid nullable `DateTime` casts and
+default lists emitted as `<dynamic>`.
 
-## Validación entre campos
+## Cross-field validation
 
-Los validadores de nivel de modelo de `FormState<T>` se ejecutan después de
-las validaciones de campo y permiten reglas como confirmar contraseñas o
-calcular la longitud del CVV según la marca. `bindComposite()` mantiene el
-binding de controles que alimentan más de una propiedad.
+Model-level validators on `FormState<T>` run after field validation and enable
+rules such as password confirmation or CVV length based on the detected card
+brand. `bindComposite()` keeps controls that feed multiple properties
+declarative.
 
-## Validación asíncrona
+## Asynchronous validation
 
-Los adaptadores generados aceptan `AsyncFormValidator<T>` y exponen
-`validateAsync()` y `buildAsync()`. `FormFieldState` y `FormState` publican
-`FormValidationState.validating`, `valid` e `invalid`; el debounce evita
-solicitudes remotas por cada pulsación.
+Generated adapters accept `AsyncFormValidator<T>` and expose
+`validateAsync()` and `buildAsync()`. `FormFieldState` and `FormState` publish
+`FormValidationState.validating`, `valid` and `invalid`; debounce prevents a
+remote request on every keystroke.
 
 ```dart
 final form = LoginRequestForm(
@@ -71,20 +69,21 @@ final form = LoginRequestForm(
 );
 ```
 
-Un `RestHttpException` puede aplicarse directamente al formulario mediante
-`form.applyRestError(error)`, mapeando `problem.validationErrors` a los campos
-generados.
+A `RestHttpException` can be applied directly with
+`form.applyRestError(error)`, mapping `problem.validationErrors` to generated
+fields.
 
-## Diagnóstico de serialización
+## Serialization diagnostics
 
-Las conversiones generadas ahora lanzan `SerializationException` con el campo,
-tipo esperado, valor recibido y causa original. Se mantienen las políticas
-explícitas `UnknownKeyPolicy.strict`, `ignore` y `capture`; las fechas,
-decimales equivalentes (`double`/`num`), enums y UUID continúan usando sus
-contratos declarativos existentes.
+Generated conversions now throw `SerializationException` with the model field,
+expected type, received value and original cause. The explicit
+`UnknownKeyPolicy.strict`, `ignore` and `capture` policies remain available;
+dates, decimal equivalents (`double`/`num`), enums and UUIDs continue to use
+their existing declarative contracts.
 
-## Compatibilidad
+## Compatibility
 
-El workflow `Compatibility` regenera y prueba el paquete con Dart 3.11.5,
-3.12.0 y 3.13.0 junto con Flutter estable. Su ejecución manual puede activar
-la comprobación de resolución exclusiva desde pub.dev para los paquetes 2.5.0.
+The compatibility workflow regenerates and tests the package with Dart 3.11.5,
+3.12.0 and 3.13.0 together with stable Flutter. The optional verification
+mode resolves dependencies exclusively from pub.dev for the published package
+line.

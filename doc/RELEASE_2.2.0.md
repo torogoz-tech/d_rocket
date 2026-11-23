@@ -74,17 +74,17 @@ part 'login_request.d_rocket_serializer.g.dart';
 class LoginRequest {
   LoginRequest({required this.email, required this.password});
 
-  @FormField(label: 'Correo electrónico', order: 1)
+  @FormField(label: 'Email', order: 1)
   @Required(message: 'El correo es obligatorio')
-  @Email(message: 'Escribe un correo válido')
+  @Email(message: 'Enter a valid email')
   final String email;
 
   @FormField(
-    label: 'Contraseña',
+    label: 'Password',
     order: 2,
     input: FormInput.password,
   )
-  @Required(message: 'La contraseña es obligatoria')
+  @Required(message: 'Password is required')
   @Length(min: 8, message: 'Debe tener al menos 8 caracteres')
   final String password;
 }
@@ -108,7 +108,7 @@ final form = LoginRequestForm(
 TextFormField(
   onChanged: form.email.bind(),
   decoration: InputDecoration(
-    labelText: 'Correo electrónico',
+    labelText: 'Email',
     errorText: form.email.error,
   ),
 )

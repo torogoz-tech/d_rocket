@@ -17,17 +17,16 @@ a dozen different libraries: **JSON serialization**, **typed HTTP
 clients**, **LINQ-style queries**, **an ORM**, **offline-first sync**,
 and **WebSocket / SSE realtime**, plus model-driven forms.
 
-## ¿Para qué usar d_rocket?
+## Why use d_rocket?
 
-Usa d_rocket cuando quieres que el mismo contrato de dominio sirva para
-JSON, REST, formularios, SQLite, sincronización y realtime sin duplicar DTOs,
-serializadores ni lógica de errores. Las capas son opcionales: REST-only,
-SQLite offline-first, formularios con controles Flutter existentes y SSE o
-WebSocket son combinaciones válidas.
+Use d_rocket when you want one domain contract to serve JSON, REST, forms,
+SQLite, synchronization and realtime without duplicating DTOs, serializers or
+error-handling logic. Layers are optional: REST-only, SQLite offline-first,
+forms with existing Flutter controls, and SSE or WebSocket are all valid
+combinations.
 
-La guía [Para qué usar d_rocket](doc/15-para-que-usar.md) incluye ejemplos
-completos, una matriz de decisión y también los escenarios donde conviene
-usar una herramienta especializada.
+The [Why use d_rocket?](doc/15-use-cases.md) guide includes complete examples,
+a decision matrix and the scenarios where a specialized tool is a better fit.
 
 ## Modular by design
 
@@ -73,7 +72,7 @@ Forms are the seventh framework layer, available since 2.2.0. They bind
 existing Flutter or Dart controls to an annotated model without introducing
 framework widgets or a parallel form model. See
 [`RELEASE_2.2.0.md`](doc/RELEASE_2.2.0.md) and
-[`2.2-formularios-modelo.md`](doc/2.2-formularios-modelo.md).
+[`2.2-model-driven-forms.md`](doc/2.2-model-driven-forms.md).
 
 UUID fields can use the dedicated validator instead of repeating a regular
 expression:
@@ -169,21 +168,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.6.0
+  d_rocket: ^2.6.1
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.6.0
+  d_rocket: ^2.6.1
 dev_dependencies:
-  d_rocket_builder: ^2.6.0
+  d_rocket_builder: ^2.6.1
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.6.0
-  d_rocket_engine_sqlite: ^2.6.0
+  d_rocket: ^2.6.1
+  d_rocket_engine_sqlite: ^2.6.1
 dev_dependencies:
-  d_rocket_builder: ^2.6.0
+  d_rocket_builder: ^2.6.1
   d_rocket_lints: ^2.3.0            # N+1 + closure-linq + enum guidance
   build_runner: ^2.4.13
 ```
@@ -273,7 +272,7 @@ For Flutter applications, install the optional adapter alongside the core:
 
 ```yaml
 dependencies:
-  d_rocket: ^2.6.0
+  d_rocket: ^2.6.1
   d_rocket_flutter: ^2.4.0
 ```
 

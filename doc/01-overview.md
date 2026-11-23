@@ -29,7 +29,7 @@ project. There is no per-file `registerAll()`, no abstract
 
 For an adoption-oriented guide with complete REST/cache, SQLite, forms,
 realtime and synchronization examples, see
-[Para qué usar d_rocket](15-para-que-usar.md).
+[Why use d_rocket?](15-use-cases.md).
 
 ## The seven layers, in detail
 
