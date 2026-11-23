@@ -269,9 +269,11 @@ outside the pure-Dart package by design.
 ### Current audit (2026-11-22)
 
 - [x] REST cache, generated annotations, invalidation and logout generation
-  safety are implemented and covered by runtime/codegen fixtures.
+  safety are implemented and covered by runtime/codegen fixtures, including
+  body-property tags and per-client cache isolation.
 - [x] Value equality, nullable-safe `copyWith`, converter/read hooks,
-  unknown-key policies and generated schemas are implemented and covered.
+  unknown-key policies and generated schemas are implemented and covered,
+  including generic value helpers.
 - [x] Forms cover nested groups/arrays, async validation, dirty/pristine,
   enabled/disabled state, composite callbacks, generated composite metadata,
   reusable validators and RFC 7807 field paths.
