@@ -292,6 +292,8 @@ outside the pure-Dart package by design.
   failures, while still failing on warnings and errors.
 - [x] The core package dry-run publishes with zero warnings after removing the
   duplicated DevTools build from its archive.
+- [x] The SQLite package dry-run publishes with zero warnings; the builder's
+  remaining dry-run warning is the intentional exact `analyzer: 13.0.0` pin.
 - [x] A clean external consumer fixture resolves the local 2.6.0 packages,
   runs build_runner and compiles generated serializer/form code successfully.
 - [ ] Published-package compatibility resolution remains the release gate;
