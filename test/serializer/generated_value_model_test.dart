@@ -1,4 +1,5 @@
 import '../fixtures/value_model.dart';
+import '../fixtures/generic_value_model.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -38,5 +39,16 @@ void main() {
     );
     expect(schema['required'], contains('id'));
     expect(schema['required'], isNot(contains('description')));
+  });
+
+  test('generic value helpers preserve type parameters and equality', () {
+    const GenericValue<String> value =
+        GenericValue<String>(data: 'one', message: 'ok');
+
+    expect(value.copyWith(data: 'two').data, 'two');
+    expect(
+      value,
+      const GenericValue<String>(data: 'one', message: 'ok'),
+    );
   });
 }
