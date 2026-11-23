@@ -6,6 +6,9 @@
 !lib/example/end_to_end/entities.g.dart
 !test/fixtures/uuid_request.d_rocket_form.g.dart
 !test/fixtures/composite_form_request.d_rocket_form.g.dart
+!test/fixtures/generic_value_model.d_rocket_serializer.g.dart
+!test/fixtures/query_cache_body_client.d_rocket_rest_client.g.dart
+!test/fixtures/transfer_request.d_rocket_serializer.g.dart
 
 # Dart / Pub
 .dart_tool/
