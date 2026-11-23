@@ -1,7 +1,7 @@
 # d_rocket — Roadmap
 
-> What shipped in 1.x through 2.5.0, and what remains on the
-> post-2.5.0 roadmap. The 2.x line is the current line; the
+> What shipped in 1.x through 2.6.0, and what remains on the
+> post-2.6.0 roadmap. The 2.x line is the current line; the
 > 1.x line is in maintenance mode.
 
 ---
@@ -11,10 +11,10 @@
 | | |
 |---|---|
 | Current line | **2.6.0** (local release candidate; not pushed) |
-| Previous release | 2.4.2 |
+| Previous release | 2.5.0 |
 | Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Package versions | core/builder `2.5.0`; Flutter bindings `2.4.0`; lints `2.3.0`; engines `2.1.0` |
+| Package versions | core/builder/SQLite `2.6.0`; Flutter bindings and lints advance independently |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
 
@@ -28,6 +28,12 @@ independent version lines.
 ---
 
 ## Shipped versions
+
+### 2.6.0 — reactive REST data and generated value models
+
+Reactive REST queries, tag invalidation, generated value helpers, nested form
+composition, OpenAPI metadata, realtime delivery queues, attachment
+checkpoints and SQLite companion/read-ordering contracts.
 
 ### 2.5.0 — forms, serialization and realtime hardening
 
@@ -131,9 +137,9 @@ release notes and the breaking-change list.
 
 ---
 
-## Post-2.5.0 candidates
+## Post-2.6.0 candidates
 
-Items that have been discussed for the 2.x line. Listed in
+Items that have been discussed for the 2.x line after 2.6.0. Listed in
 priority order; the maintainer picks a subset for each
 monthly release. Anything not picked in a given month rolls
 to the next monthly release.

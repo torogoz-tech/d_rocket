@@ -3,6 +3,10 @@
 Real-world recipes. Each recipe is a self-contained
 example you can drop into a project.
 
+> Para decidir qué capas necesita tu aplicación, consulta
+> [Para qué usar d_rocket](15-para-que-usar.md). Este cookbook se concentra
+> en recetas puntuales y no reemplaza la guía de arquitectura.
+
 ---
 
 ## Table of contents
@@ -27,8 +31,43 @@ example you can drop into a project.
 - [Working with images and BLOBs](#images-blobs)
 - [Computed fields in queries](#computed-fields)
 - [Database migrations during a long-running transaction](#long-transactions)
+- [Reactive REST cache](#reactive-rest-cache)
 
 ---
+
+## Reactive REST cache
+
+Use `RestQueryCache` when reads are network-first but several consumers need
+the same value. The generated annotations declare the cache key's tags and
+the mutation's invalidation contract:
+
+```dart
+@RestClient(baseUrl: 'https://api.example.com')
+abstract class ProductClient {
+  @QueryCache(
+    tags: <String>['product:{id}'],
+    staleTime: Duration(seconds: 30),
+  )
+  @HttpGet('/products/{id}')
+  Stream<Product> watch(@Path('id') String id);
+
+  @Invalidates(<String>['product:{request.productId}'])
+  @HttpPatch('/products/{request.productId}')
+  Future<Product> update(@Body() UpdateProductRequest request);
+}
+```
+
+Use an instance-scoped cache for separate sessions:
+
+```dart
+final client = ProductClientImpl(
+  config: RestClientConfig(queryCache: RestQueryCache()),
+);
+```
+
+On logout, clear the cache before releasing the authenticated client. The
+generation guard prevents a late in-flight response from repopulating data
+from the previous session.
 
 ## Authentication
 

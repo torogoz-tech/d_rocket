@@ -17,6 +17,18 @@ a dozen different libraries: **JSON serialization**, **typed HTTP
 clients**, **LINQ-style queries**, **an ORM**, **offline-first sync**,
 and **WebSocket / SSE realtime**, plus model-driven forms.
 
+## ¿Para qué usar d_rocket?
+
+Usa d_rocket cuando quieres que el mismo contrato de dominio sirva para
+JSON, REST, formularios, SQLite, sincronización y realtime sin duplicar DTOs,
+serializadores ni lógica de errores. Las capas son opcionales: REST-only,
+SQLite offline-first, formularios con controles Flutter existentes y SSE o
+WebSocket son combinaciones válidas.
+
+La guía [Para qué usar d_rocket](doc/15-para-que-usar.md) incluye ejemplos
+completos, una matriz de decisión y también los escenarios donde conviene
+usar una herramienta especializada.
+
 ## Modular by design
 
 The framework is built as **seven independent layers**. A single
@@ -110,7 +122,7 @@ with `RestClientConfig(queryCache: RestQueryCache())`; when omitted it uses
 equality: true)` additionally generates value helpers and a JSON Schema.
 When equality is enabled, add the generated mixin to the model:
 `class Account with _$AccountEquality { ... }`.
-function. Dynamic nested forms are available through `FormGroup` and
+Dynamic nested forms are available through `FormGroup` and
 `FormArray`; fields can be enabled or disabled without losing their value, and
 `FormValidators` provides reusable cross-field rules. REST validation errors
 can be applied from RFC 7807 payloads even when the server uses dotted or
@@ -157,21 +169,21 @@ Pick the layers you need. There is no single "all-in" config.
 ```yaml
 # Layer 1 only (JSON ↔ Dart):
 dependencies:
-  d_rocket: ^2.5.0
+  d_rocket: ^2.6.0
 
 # Layer 1 + 2 (typed HTTP client):
 dependencies:
-  d_rocket: ^2.5.0
+  d_rocket: ^2.6.0
 dev_dependencies:
-  d_rocket_builder: ^2.5.0
+  d_rocket_builder: ^2.6.0
   build_runner: ^2.4.13
 
 # Layers 1, 2, 4, 6 (HTTP + ORM + realtime):
 dependencies:
-  d_rocket: ^2.5.0
-  d_rocket_engine_sqlite: ^2.1.0   # Compatible engine line for core 2.5.0
+  d_rocket: ^2.6.0
+  d_rocket_engine_sqlite: ^2.6.0
 dev_dependencies:
-  d_rocket_builder: ^2.5.0
+  d_rocket_builder: ^2.6.0
   d_rocket_lints: ^2.3.0            # N+1 + closure-linq + enum guidance
   build_runner: ^2.4.13
 ```
@@ -251,11 +263,17 @@ IDs from `RestHttpException.problem` without losing the original JSON body.
 CI regenerates and validates `.g.dart` output before analysis with
 `dart run tool/verify_generated.dart`.
 
+The 2.6.0 data-layer additions are described in
+[`doc/RELEASE_2.6.0.md`](doc/RELEASE_2.6.0.md): reactive REST query caching
+and tag invalidation, instance-scoped cache ownership, generated value-model
+helpers, nested form composition, realtime delivery queues, attachment
+checkpoints, OpenAPI metadata and SQLite companion contracts.
+
 For Flutter applications, install the optional adapter alongside the core:
 
 ```yaml
 dependencies:
-  d_rocket: ^2.5.0
+  d_rocket: ^2.6.0
   d_rocket_flutter: ^2.4.0
 ```
 

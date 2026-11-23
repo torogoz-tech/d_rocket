@@ -7,11 +7,11 @@
 
 | Metric | Value |
 |---|---|
-| Current line | **2.5.0** (local release candidate; not pushed) |
-| Previous release | 2.4.2 |
+| Current line | **2.6.0** (local release candidate; not pushed) |
+| Previous release | 2.5.0 |
 | Test suite | 900 `d_rocket` tests and 74 `d_rocket_builder` tests pass locally; platform validation was also performed manually |
 | Analyzer warnings | 0 |
-| Package versions | core/builder `2.5.0`; Flutter bindings `2.4.0`; lints `2.3.0`; engines `2.1.0` |
+| Package versions | core/builder/SQLite `2.6.0`; Flutter bindings and lints advance independently |
 | Release policy | core and builder are coordinated; bindings, lints and engines advance independently when their APIs require it |
 | Source | `github.com/torogoz-tech/d_rocket` |
 | pub.dev | `pub.dev/packages/d_rocket` and compatible package families |
@@ -27,6 +27,20 @@
 7. **Forms** — `@Form` model adapters with typed bindings, synchronous/asynchronous validation, debounce, composite values and REST field errors.
 
 ## Releases at a glance
+
+### 2.6.0 — reactive REST data and generated value models
+
+- Reactive in-memory REST queries with in-flight deduplication, tag
+  invalidation and instance-scoped cache ownership.
+- Opt-in generated `copyWith`, equality and JSON Schema metadata.
+- Explicit serializer converters and `@JsonKey(readValue: ...)` support.
+- Nested form groups, field arrays, composite bindings and REST validation
+  diagnostics.
+- Realtime delivery queues, channel multiplexing, attachment checkpoints,
+  pagination, multipart and OpenAPI metadata improvements.
+
+This version is prepared in local commits only; no push or publication has
+been performed.
 
 ### 2.5.0 — forms, serialization and realtime hardening
 
@@ -107,7 +121,7 @@ been performed.
   `d_serializer_builder`, `d_rest_build`) marked deprecated and
   the migration path documented.
 
-## Roadmap (post-2.5.0 candidates)
+## Roadmap (post-2.6.0 candidates)
 
 | Feature | Status | Notes |
 |---|---|---|

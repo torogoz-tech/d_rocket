@@ -23,6 +23,8 @@ day-to-day.
   five minutes.
 - **[03 — Installation](03-installation.md)** — pubspec config,
   `build_runner` setup, dependency choices, and troubleshooting.
+- **[15 — Para qué usar d_rocket](15-para-que-usar.md)** — decisión de
+  adopción, casos de uso completos y límites del framework.
 
 ### The seven layers
 
@@ -88,6 +90,10 @@ rest.
 [03 — Installation](03-installation.md), then the layer docs in
 order 1 → 6 as you need them.
 
+**If you are evaluating the framework:** read
+[15 — Para qué usar d_rocket](15-para-que-usar.md) first. It explains which
+layers to adopt for REST-only, SQLite/offline-first, forms and realtime apps.
+
 **If you're migrating from another framework (Entity Framework
 Core, .NET LINQ, Retrofit, sqflite, etc.):** jump straight to the
 layer that maps to your background:
@@ -125,13 +131,13 @@ Code samples in this documentation follow a few conventions:
 
 ## Versioning and stability
 
-This documentation is for `d_rocket` 1.0.0 and later. Within the
-`1.x` series:
+This documentation targets the current `d_rocket` 2.6.0 line. Within the
+`2.x` series:
 
-- **Patch versions** (1.0.x) — bug fixes only. Source-compatible.
-- **Minor versions** (1.x) — additive features, new annotations,
+- **Patch versions** (2.x.y) — bug fixes only. Source-compatible.
+- **Minor versions** (2.x.0) — additive features, new annotations,
   new operators. Source-compatible.
-- **Major versions** (2.x) — breaking changes. The migration
+- **Major versions** (x.0.0) — breaking changes. The migration
   guide will be in [13 — FAQ](13-faq.md#how-do-i-migrate-between-major-versions).
 
 See [CHANGELOG.md](../CHANGELOG.md) for the per-release detail.

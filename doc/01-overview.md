@@ -27,6 +27,10 @@ A single `initializeD()` call wires every annotated class in your
 project. There is no per-file `registerAll()`, no abstract
 `AsyncQueryProvider` to wire up by hand, no `as` aliases.
 
+For an adoption-oriented guide with complete REST/cache, SQLite, forms,
+realtime and synchronization examples, see
+[Para qué usar d_rocket](15-para-que-usar.md).
+
 ## The seven layers, in detail
 
 ### Layer 1 — Serialization
@@ -168,6 +172,21 @@ Layer 1 is reused for inbound and outbound payloads.
    never block on the network. If the network is up and
    you want realtime updates, attach a `WebSocketClient`
    and inject the events into a `DbSet<T>.watch()`.
+
+## Choosing the minimum surface
+
+The framework is intentionally composable:
+
+| Starting point | Add when needed | Result |
+|---|---|---|
+| `@Serializable` | `@RestClient` | Typed API contracts without an ORM |
+| `@Serializable` + `@Form` | `d_rocket_flutter` | Model validation with existing Flutter controls |
+| `@Serializable` + `@Table` | SQLite engine + sync | Offline-first local source of truth |
+| `@RestClient` | `@QueryCache` / `@Invalidates` | Reactive network-first reads |
+| `@SseClient` / `@WebSocketClient` | reconnectors and diagnostics | Resilient realtime delivery |
+
+The central registry is generated only for annotations found in the project;
+there is no requirement to enable every layer.
 
 ## What d_rocket is **not**
 
